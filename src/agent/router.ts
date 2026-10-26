@@ -5,6 +5,7 @@ import { bestFact } from "./grounding";
 import { fitLine, fitRows, roughRequirements } from "./fit";
 import { EVENT_LINES } from "./tools";
 import { eventsIn, profileFocus, projectFilter, REASONING, topicsIn } from "./intent";
+import { BEHAVIOR, ruleKind } from "./behavior";
 // runTool is imported lazily to keep router <-> tools free of a load-order cycle
 import * as tools from "./tools";
 
@@ -87,21 +88,6 @@ export function router(lastUser: string, emit: Emit): void {
   }
   // the questions recruiters actually ask get real answers even with every model down
   if (factAnswer(lastUser, emit, true)) return;
-  if (re(/\bwhy (should|would|do|to) (i|we|you|anyone) (hire|pick|choose)|\bwhy (hire )?him\b|what makes him|stand(s)? out|over other (freshers|candidates|engineers)/)) {
-    say(WHY_HIM); call("show_profile"); call("suggest", { options: ["Internals of PACK", "Get resume", "Contact Rizwan"] }); return;
-  }
-  if (re(/\bweak(est|ness(es)?)?\b|\bgaps?\b|\black(s|ing)?\b|improve on|not good at|red flags?/)) {
-    say(GAPS); call("suggest", { options: ["Everything he’s built", "How does this site work?", "Get resume"] }); return;
-  }
-  // his jobs: where he works, what he does there, his internships
-  if (!clear && re(/\bnovulis\b|\bsupraja\b|where (does|did) he work|\b(his|current) (job|role|employer|company)\b|\bintern(ship)?s?\b|what does he do\b/)) {
-    // only the roles asked about: Novulis, Supraja, or the internships; everything for "where does he work"
-    // "what does he do with azure": only the roles that mention it
-    const tool = TOOLKIT.flatMap(([, l]) => l).find((t) => mentionsTool(lastUser, t) && !/^(REST APIs|Render)$/.test(t));
-    const withTool = tool ? EXPERIENCE.filter((x) => mentionsTool(x.body, tool)) : [];
-    const pick = withTool.length ? withTool : EXPERIENCE.filter((x) => (re(/\bnovulis\b/) ? x.title.startsWith("Novulis") && (!re(/what does he do|currently|right now|\bnow\b/) || !!x.now) : re(/\bsupraja\b/) ? x.title.startsWith("Supraja") : re(/\bintern/) ? !!x.minor : re(/where does he work|\b(current|job|employer|company)\b/) ? !!x.now : true));
-    say(pick.map((x) => `${x.role} at ${x.title}, ${x.when}: ${roleDetail(x).replace(/\.$/, "")}.`).join(" ")); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return;
-  }
   if (re(/\b(resume|cv)\b/)) { say("Here’s his resume, once you approve."); call("offer_resume"); call("suggest", { options: ["Everything he’s built", "Contact Rizwan"] }); return; }
   if (re(/\b(contact|email|hire|reach)\b/)) { say("Every way to reach him, once you approve."); call("offer_contact"); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return; }
   if (re(/\b(classic|normal (site|page|portfolio)|scroll(ing)? (site|page)|regular (site|page))\b/)) { say("Switching you to the classic site."); call("switch_mode", { mode: "classic" }); return; }
@@ -129,28 +115,32 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   const last = lastUser.toLowerCase(), re = (r: RegExp) => r.test(last), say = (text: string) => emit({ type: "text", text });
   const call = (name: tools.ToolName, args: Record<string, unknown> = {}) => { emit({ type: "tool", name, args }); tools.runTool(name, args, emit); };
   const ranked = scoreProjects(last), best = ranked[0], clear = best.s >= 4 || (best.s >= 2 && ranked[1].s < best.s);
-  // "hello", "thanks", "ok": a greeting gets a greeting and a few ways in, never a panel or a model call
-  if (SMALL_TALK.test(lastUser.trim())) {
-    say(smallTalkReply(lastUser));
-    call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
-  }
-  // "who am I?", "do you know me?": the agent knows nothing about visitors and says so, then offers his work
-  if (re(/^\s*(who am i|who i am|do you know (me|who i am)|what(’|')?s my name|what is my name|guess who (i am|this is)|remember me)\b/)) {
-    say("I don’t know who you are, and I don’t keep track of visitors. I can show you what Rizwan has built.");
-    call("suggest", { options: ["Everything he’s built", "Why should we hire him?", "Get resume"] }); return true;
-  }
-  // "I'm his friend", "I'm a recruiter at X": a visitor introducing themselves gets a welcome and a way in, not "outside my lane"
-  const who = lastUser.match(/^\s*(?:hi[,!.\s]*|hey[,!.\s]*|hello[,!.\s]*)?(?:i\s*(?:’|')?\s*a?m|i am|this is)\s+(?:his\s+|a\s+|an\s+|the\s+)?(friend|best friend|classmate|batchmate|college ?mate|roommate|colleague|co-?worker|teammate|manager|mentor|teacher|professor|senior|junior|brother|sister|cousin|relative|recruiter|hiring manager|hr|talent \w+|founder|engineer|developer|student)\b/i);
-  if (who && lastUser.trim().split(/\s+/).length <= 14) {
-    const role = who[1].toLowerCase(), hiring = /recruiter|hiring|hr|talent|founder|manager/.test(role) && !/^his\b/i.test(lastUser.replace(/^.*?(?:am|this is)\s+/i, ""));
-    say(hiring ? "Welcome. Paste the role’s requirements and I’ll map them to his work, or start with his strongest projects." : `Nice to meet you. I can show you what he’s been building, or you can reach him directly.`);
-    call("suggest", { options: hiring ? ["Why should we hire him?", "Everything he’s built", "Get resume"] : ["Everything he’s built", "Has he won anything?", "Contact Rizwan"] }); return true;
+  // greetings, "who am I?", "I'm his friend": the kinds that never need his facts, answered from the one policy table
+  const kind = ruleKind(lastUser);
+  if (kind === "small_talk" || kind === "about_visitor" || kind === "visitor_intro") {
+    say(BEHAVIOR[kind].reply!(lastUser)); call("suggest", { options: BEHAVIOR[kind].chips }); return true;
   }
   // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
   if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && !topicsIn(lastUser).length && !profileFocus(lastUser)
     && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything)\b/)) {
-    say(`Not sure what you mean by “${lastUser.trim().slice(0, 40)}”. Ask about a project, his experience, or paste a job description.`);
+    say(BEHAVIOR.unclear.reply!(lastUser)); // never repeats the word back
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
+  }
+  // "why should we hire him?" has one written answer: his strongest evidence, said the same way every time
+  if (re(/\bwhy (should|would|do|to) (i|we|you|anyone) (hire|pick|choose)|\bwhy (hire )?him\b|what makes him|stand(s)? out|over other (freshers|candidates|engineers)/)) {
+    say(WHY_HIM); call("show_profile"); call("suggest", { options: ["Internals of PACK", "Get resume", "Contact Rizwan"] }); return true;
+  }
+  if (re(/\bweak(est|ness(es)?)?\b|\bgaps?\b|\black(s|ing)?\b|improve on|not good at|red flags?/)) {
+    say(GAPS); call("suggest", { options: ["Everything he’s built", "How does this site work?", "Get resume"] }); return true;
+  }
+  // his jobs: where he works, what he does there, his internships
+  if (!clear && re(/\bnovulis\b|\bsupraja\b|where (does|did) he work|\b(his|current) (job|role|employer|company)\b|\bintern(ship)?s?\b|what does he do\b/)) {
+    // only the roles asked about: Novulis, Supraja, or the internships; everything for "where does he work"
+    // "what does he do with azure": only the roles that mention it
+    const tool = TOOLKIT.flatMap(([, l]) => l).find((t) => mentionsTool(lastUser, t) && !/^(REST APIs|Render)$/.test(t));
+    const withTool = tool ? EXPERIENCE.filter((x) => mentionsTool(x.body, tool)) : [];
+    const pick = withTool.length ? withTool : EXPERIENCE.filter((x) => (re(/\bnovulis\b/) ? x.title.startsWith("Novulis") && (!re(/what does he do|currently|right now|\bnow\b/) || !!x.now) : re(/\bsupraja\b/) ? x.title.startsWith("Supraja") : re(/\bintern/) ? !!x.minor : re(/where does he work|\b(current|job|employer|company)\b/) ? !!x.now : true));
+    say(pick.map((x) => `${x.role} at ${x.title}, ${x.when}: ${roleDetail(x).replace(/\.$/, "")}.`).join(" ")); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }
   if (re(/\bopen to (work|roles?|opportunit\w*|new)|\bavailab(le|ility)\b|looking for (a )?(job|role|work|opportunit)|notice period|join(ing)? date|can he join|\b(salary|ctc|compensation|expected pay|pay expectations?|salary package)\b/)) {
     say("This site doesn’t say; ask him directly. His email, phone and LinkedIn are on his profile."); call("offer_contact"); call("suggest", { options: ["Get resume", "Everything he’s built"] }); return true;
@@ -215,17 +205,6 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
     say(`Live deployments: ${live.join(", ")}. None of the write-ups give user or traffic numbers.`); call("list_projects"); call("suggest", { options: ["Open CCR Compliance Advisor", "Get resume"] }); return true;
   }
   return false;
-}
-
-// one or more small-talk words and nothing else: "hello", "okay got it", "ok thanks", "cool, bye"
-const ST_WORDS = "hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (?:morning|afternoon|evening|night)|gm|thanks|thank you|thank u|thx|ty|cheers|ok(?:ay)?|k|cool|nice|great|awesome|perfect|sure|alright|fine|understood|noted|got it|makes sense|bye|goodbye|see you|see ya|a lot|so much";
-export const SMALL_TALK = new RegExp(`^\\s*(?:${ST_WORDS})(?:[\\s,!.?:)]+(?:${ST_WORDS}))*(?:\\s+(?:there|rizwan|agent|again|man|bro|buddy))?[\\s!.?,:)]*$`, "i");
-/** What a small-talk message gets back: a greeting, a thank-you, a goodbye, or an acknowledgement. */
-export function smallTalkReply(t: string): string {
-  if (/\b(bye|goodbye|see (you|ya))\b/i.test(t)) return "Thanks for stopping by. His resume and contact details are a click away if you need them.";
-  if (/\b(thanks|thank|thx|ty|cheers)\b/i.test(t)) return "Anytime. Ask about another project, or grab his resume.";
-  if (/^\s*(hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (morning|afternoon|evening|night)|gm)\b/i.test(t)) return "Hi! I’m Rizwan’s agent. Ask about his projects or experience, or paste a job description to see how he fits.";
-  return "Sure. Anything else you’d like to see?";
 }
 
 export const isJobDescription = (t: string) => t.length > 140 || /\b(job description|jd|requirements?|we need|we're looking for|we are looking for|must have|nice to have|is he a fit|good fit)\b/i.test(t);
