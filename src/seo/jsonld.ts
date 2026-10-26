@@ -1,5 +1,5 @@
-import type { BreadcrumbList, Person, ProfilePage, WebSite, CreativeWork, WithContext } from "schema-dts";
-import { EXPERIENCE, PROFILE } from "@/content/data";
+import type { BreadcrumbList, Person, ProfilePage, SoftwareSourceCode, WebSite, WithContext } from "schema-dts";
+import { EDUCATION, EVENTS, EXPERIENCE, PROFILE } from "@/content/data";
 import type { Project } from "@/content/types";
 import { SITE } from "@/content/site";
 
@@ -10,8 +10,10 @@ export const person: Person = {
   "@type": "Person",
   "@id": PERSON_ID,
   name: PROFILE.name,
-  // people search for him as "Mohammad Rizwan" as often as by his full name
-  alternateName: ["Mohammad Rizwan", "Rizwan"],
+  // every way people spell or shorten his name, so a search for any of them can resolve to this one person
+  alternateName: ["Mohammad Rizwan", "Mohammed Rizwan", "Muhammad Rizwan", "Syed Rizwan", "Rizwan Syed", "Rizwan"],
+  // what tells him apart from everyone else with the name
+  disambiguatingDescription: "AI engineer and software developer in Bengaluru, India; Associate Software Engineer (R&D) at Novulis Consulting.",
   givenName: "Mohammad Rizwan",
   familyName: "Syed",
   jobTitle: "AI Engineer",
@@ -21,10 +23,14 @@ export const person: Person = {
   url: SITE.url,
   image: `${SITE.url}/img/portrait.jpg`,
   email: `mailto:${PROFILE.links.email}`,
-  address: { "@type": "PostalAddress", addressLocality: "Bangalore", addressRegion: "Karnataka", addressCountry: "IN" },
-  alumniOf: { "@type": "CollegeOrUniversity", name: "NBKR Institute of Science and Technology" },
+  address: { "@type": "PostalAddress", addressLocality: "Bengaluru", addressRegion: "Karnataka", addressCountry: "IN" },
+  alumniOf: { "@type": "CollegeOrUniversity", name: EDUCATION.school, alternateName: "NBKRIST" },
+  award: EVENTS.filter((e) => e.kind === "won").map((e) => `${e.result.replace(/^won /, "")} prize, ${e.title} (${e.where}, ${e.when})`),
+  homeLocation: { "@type": "City", name: "Bengaluru", alternateName: "Bangalore" },
   knowsAbout: ["AI agents", "Multi-agent systems", "LangGraph", "Retrieval-augmented generation", "Voice agents", "Python", "FastAPI", "TypeScript", "Next.js", "Azure"],
+  // every profile that is him: the links search engines use to join them into one person
   sameAs: [PROFILE.links.github, PROFILE.links.linkedin],
+  mainEntityOfPage: SITE.url,
 };
 
 export const siteGraph: WithContext<WebSite> = {
@@ -33,6 +39,7 @@ export const siteGraph: WithContext<WebSite> = {
   "@id": `${SITE.url}/#website`,
   url: SITE.url,
   name: SITE.name,
+  alternateName: ["Mohammad Rizwan", "mohammad-rizwan.tech"],
   description: SITE.description,
   inLanguage: "en",
   publisher: { "@id": PERSON_ID },
@@ -43,17 +50,25 @@ export const profilePage = (path: string): WithContext<ProfilePage> => ({
   "@type": "ProfilePage",
   url: SITE.url + path,
   name: SITE.title,
+  dateModified: SITE.updated,
+  inLanguage: "en",
+  isPartOf: { "@id": `${SITE.url}/#website` },
   mainEntity: person,
 });
 
-export const projectWork = (p: Project): WithContext<CreativeWork> => ({
+/** A project as what it is, code with an author: the repository, languages and topics, credited to him. */
+export const projectWork = (p: Project): WithContext<SoftwareSourceCode> => ({
   "@context": "https://schema.org",
-  "@type": "CreativeWork",
+  "@type": "SoftwareSourceCode",
   name: p.title,
   description: p.oneLiner,
   url: `${SITE.url}/work/${p.id}`,
   dateCreated: String(p.year),
-  keywords: p.stack.join(", "),
+  keywords: [...(p.keywords ?? []), ...p.stack].join(", "),
+  programmingLanguage: p.stack.filter((x) => /^(Python|TypeScript|JavaScript|Java\b|Kotlin|SQL)/.test(x)),
+  ...(p.links.source ? { codeRepository: p.links.source } : {}),
+  ...(p.links.live ? { targetProduct: { "@type": "SoftwareApplication", name: p.title, url: p.links.live, applicationCategory: "WebApplication", operatingSystem: "Web" } } : {}),
+  author: { "@type": "Person", "@id": PERSON_ID, name: PROFILE.name, url: SITE.url },
   creator: { "@id": PERSON_ID },
   ...(p.image ? { image: `${SITE.url}/img/${p.image}` } : {}),
 });

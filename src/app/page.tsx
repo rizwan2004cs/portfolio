@@ -9,8 +9,8 @@ import { classicRows, esc, STAR, contactForm } from "@/render/html";
 import { ldJson, profilePage } from "@/seo/jsonld";
 
 export const metadata: Metadata = {
-  title: { absolute: `${SITE.name} — AI Engineer in Bangalore · Work, experience, toolkit` },
-  description: `${PROFILE.summary} ${PROJECTS.length} projects: multi-agent LangGraph, cited RAG, voice agents and full-stack products.`,
+  title: { absolute: "Syed Mohammad Rizwan — AI Engineer in Bengaluru · Portfolio" },
+  description: SITE.description,
   alternates: { canonical: "/" },
 };
 
@@ -44,7 +44,7 @@ export default function ClassicPage() {
           <section className="chero">
             <div className="hstat"><span className="dotlive" />{PROFILE.location}<span className="sepd" /><span data-clock="short">IST</span></div>
             <h1><span className="ln"><span>Syed Mohammad</span></span>{" "}<span className="ln"><span>Rizwan</span></span></h1>
-            <p className="sub">AI engineer in Bangalore. I build reliable AI agents.</p>
+            <p className="sub">AI engineer in Bengaluru. I build reliable AI agents.</p>
             <div className="loopline" id="loop" aria-hidden="true">
               {LOOP.map((s, i) => <Fragment key={s}>{i > 0 && <span>→</span>}<span data-i={i}>{s}</span></Fragment>)}
             </div>
@@ -60,9 +60,11 @@ export default function ClassicPage() {
           <section className="csec" id="about" aria-labelledby="h-about">
             <div className="csh"><h2 id="h-about"><span className="no">01</span>About</h2><span>Bangalore · B.Tech CSE ’26</span></div>
             <div className="about">
-              <img src="/img/portrait-320.jpg" alt={PROFILE.name} width={200} height={200} className="ld" />
+              <img src="/img/portrait-320.jpg" alt={`${PROFILE.name}, AI engineer in Bengaluru`} width={200} height={200} className="ld" />
               <div>
-                <p className="lead">{PROFILE.summary.replace(/^Builds/, "I build")}</p>
+                {/* the one sentence that says who this is, in the words people search: his full name, the short form, the city both ways */}
+                <p className="lead">I’m Syed Mohammad Rizwan (Mohammad Rizwan, or just Rizwan), an AI engineer in Bengaluru (Bangalore) and {EXPERIENCE[0].role} at {EXPERIENCE[0].title}.</p>
+                <p className="lead2">{PROFILE.summary.replace(/^Builds/, "I build")}</p>
                 <p className="lead2">Off the clock I write poetry and build tools for myself. When an open-source app I use is missing something, I fork it and add it, and send it upstream when others need it too.</p>
                 <dl className="kv">
                   {[["Based in", PROFILE.location], ["Focus", "Reliable AI agents"], ["Studied", "B.Tech CSE, NBKRIST"]].map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
@@ -173,7 +175,7 @@ export default function ClassicPage() {
             <div className="csh"><h2 id="h-contact"><span className="no">09</span>Contact</h2><span data-clock="label" /></div>
             {/* opens a Gmail compose (works without a mail app) and copies the address, saying so */}
             <p className="cbig"><a href={`https://mail.google.com/mail/?view=cm&to=${PROFILE.links.email}`} target="_blank" rel="noopener" data-copy={PROFILE.links.email}>{PROFILE.links.email.split("@")[0]}<wbr />@{PROFILE.links.email.split("@")[1]}</a><span className="copied" role="status" aria-live="polite" /></p>
-            <div className="cfwrap" dangerouslySetInnerHTML={{ __html: `<h4>Or leave a message</h4>${contactForm("classic")}` }} />
+            <div className="cfwrap" dangerouslySetInnerHTML={{ __html: `<h3>Or leave a message</h3>${contactForm("classic")}` }} />
             <div className="cta" style={{ marginTop: "var(--s6)" }}>
               <a className="btn dark" href="/agent?new">Or ask my agent <span className="arr">↗</span></a>
               {PROFILE.links.phone && <Ext href={`https://wa.me/${PROFILE.links.phone.replace(/\D/g, "")}`}>WhatsApp</Ext>}

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ClassicIsland } from "@/components/ClassicIsland";
 import { Header } from "@/components/Header";
 import { PROJECTS, projectById } from "@/content/data";
+import type { Project } from "@/content/types";
 import { SITE } from "@/content/site";
 import { archBlock, diagramSize, esc, factsHtml, img } from "@/render/html";
 import { ldJson, projectCrumbs, projectWork } from "@/seo/jsonld";
@@ -12,16 +13,35 @@ export const generateStaticParams = () => PROJECTS.map((p) => ({ slug: p.id }));
 
 type Params = { params: Promise<{ slug: string }> };
 
+/** What a search snippet shows: whole words, ≤ 155 characters. */
+const snippet = (t: string, max = 155) => (t.length <= max ? t : `${t.slice(0, t.lastIndexOf(" ", max - 1)).replace(/[,;:·—-]+$/, "")}…`);
+/** "PACK: AI agents playing a game", "CCR Compliance Advisor: RAG": the words someone would search for the project. */
+const seoTitle = (p: Project) => {
+  const [k1 = "", k2 = ""] = p.keywords ?? p.tags;
+  // "multi-agent" alone reads oddly; a named tool after it ("multi-agent LangGraph") says what it is
+  const kw = /^[A-Z]/.test(k2) && !/\s/.test(k1) && !/^[A-Z]/.test(k1) ? `${k1} ${k2}` : k1;
+  const lead = kw && !p.title.toLowerCase().includes(kw.toLowerCase()) ? `${p.title}: ${kw}` : p.title;
+  return `${lead} · Syed Mohammad Rizwan`.length <= 65 ? `${lead} · Syed Mohammad Rizwan` : `${p.title} · Syed Mohammad Rizwan`;
+};
+/** Other projects that share the most tags: links that tell Google how his work fits together. */
+const related = (p: Project) => PROJECTS.filter((x) => x.id !== p.id)
+  .map((x) => ({ x, n: x.tags.filter((t) => p.tags.includes(t)).length + x.stack.filter((t) => p.stack.includes(t)).length }))
+  .sort((a, b) => b.n - a.n).slice(0, 3).map(({ x }) => x);
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const p = projectById((await params).slug);
   if (!p) return {};
+  // his name early, so a cut snippet still says who built it
+  const title = seoTitle(p), description = snippet(`${p.oneLiner} By Syed Mohammad Rizwan, AI engineer in Bengaluru. Built with ${p.stack.slice(0, 3).join(", ")}.`);
   return {
-    title: p.title,
-    description: `${p.oneLiner} ${p.facts[0] ?? ""} Built by ${SITE.name}, AI engineer in Bengaluru.`.trim(),
+    title: { absolute: title },
+    description,
     alternates: { canonical: `/work/${p.id}` },
+    keywords: [p.title, ...(p.keywords ?? []).slice(0, 6), ...p.stack.slice(0, 4), "Syed Mohammad Rizwan", "Mohammad Rizwan"],
+    authors: [{ name: SITE.name, url: SITE.url }],
     // the card image is work/[slug]/opengraph-image.tsx: name, one-liner, stack and screenshot
-    openGraph: { type: "article", title: `${p.title} · ${SITE.name}`, description: p.oneLiner, url: `/work/${p.id}` },
-    twitter: { card: "summary_large_image", title: `${p.title} · ${SITE.name}`, description: p.oneLiner },
+    openGraph: { type: "article", title, description, url: `/work/${p.id}`, authors: [SITE.url] },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
@@ -58,6 +78,12 @@ export default async function WorkPage({ params }: Params) {
             {p.links.source && <a className="btn" href={p.links.source} target="_blank" rel="noopener">Source <span className="arr">↗</span></a>}
           </div>
           <div id="cwork" dangerouslySetInnerHTML={{ __html: body }} />
+          {/* who built it, in words: the page says his name, not just the title bar */}
+          <p className="byline">Built by <a href="/" rel="author">Syed Mohammad Rizwan</a>, AI engineer in Bengaluru, in {p.year}. {p.team}.</p>
+          <nav className="related" aria-label="Related projects">
+            <h2>Related projects</h2>
+            <ul>{related(p).map((x) => <li key={x.id}><a href={`/work/${x.id}`}><b>{x.title}</b></a> <span>{x.oneLiner}</span></li>)}</ul>
+          </nav>
           <nav className="nav2" aria-label="More work">
             {prev ? <a className="btn" href={`/work/${prev.id}`}>← {prev.title}</a> : <span />}
             {next ? <a className="btn" href={`/work/${next.id}`}>{next.title} →</a> : <a className="btn" href="/#projects">All projects</a>}

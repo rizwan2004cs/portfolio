@@ -11,7 +11,7 @@ export function GET() {
     "",
     `> ${SITE.description}`,
     "",
-    `${PROFILE.summary} Also known as Mohammad Rizwan. Based in Bengaluru, India.`,
+    `${PROFILE.summary} Also known as Mohammad Rizwan (also spelled Mohammed Rizwan or Muhammad Rizwan). An AI engineer based in Bengaluru (Bangalore), India; not to be confused with others who share the name.`,
     "",
     "## Pages",
     `- [Portfolio](${SITE.url}/): work, experience, toolkit, events and contact`,
