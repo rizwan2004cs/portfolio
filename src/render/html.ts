@@ -206,8 +206,18 @@ export function connectPanel(pr: Profile) {
       <li><span class="k">${ICON.linkedin}LinkedIn</span><a class="v" href="${esc(safeUrl(pr.links.linkedin))}" target="_blank" rel="noopener me">${esc(li)}</a><span class="cx"><a class="btn" href="${esc(safeUrl(pr.links.linkedin))}" target="_blank" rel="noopener me">Open <span class="arr">↗</span></a></span></li>
       <li><span class="k">${ICON.github}GitHub</span><a class="v" href="${esc(safeUrl(pr.links.github))}" target="_blank" rel="noopener me">${esc(gh)}</a><span class="cx"><a class="btn" href="${esc(safeUrl(pr.links.github))}" target="_blank" rel="noopener me">Open <span class="arr">↗</span></a></span></li>
       <li><span class="k">${ICON.doc}Resume</span><span class="v">1 page PDF</span><span class="cx"><button class="btn" data-viewresume>View here</button><a class="btn" href="/resume.pdf" download="Syed-Mohammad-Rizwan-Resume.pdf">Download</a></span></li>
-    </ul><p class="cnote" role="status" aria-live="polite"></p></article>`;
+    </ul><p class="cnote" role="status" aria-live="polite"></p>
+    <div class="cfwrap"><h4>Or leave a message</h4>${contactForm("agent")}</div></article>`;
 }
+
+/** A short message form that emails him (POST /api/contact). The "website" field is a spam trap people never see. */
+export const contactForm = (source: "classic" | "agent") => `<form class="cform" data-contact="${source}" novalidate>
+    <div class="cfrow"><label><span>Name</span><input name="name" autocomplete="name" required maxlength="120"></label>
+    <label><span>Email</span><input name="email" type="email" autocomplete="email" required maxlength="200"></label></div>
+    <label><span>Message</span><textarea name="message" rows="4" required minlength="5" maxlength="4000" placeholder="A role, a project, or just hello"></textarea></label>
+    <label class="cftrap" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+    <div class="cfacts"><button class="btn dark" type="submit">Send message</button><span class="cfnote" role="status" aria-live="polite"></span></div>
+  </form>`;
 
 /** Role fit report: each requirement with the project and fact that show it, or an honest gap. */
 export function fitPanel(rows: FitRow[]) {

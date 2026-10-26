@@ -1,6 +1,7 @@
 // Classic-mode behaviour on top of fully server-rendered content: one-open accordion, hover peek, hero loop line.
 import { projectById } from "@/content/data";
 import { esc, img } from "@/render/html";
+import { wireContactForms } from "./contact";
 import { startNudge } from "./nudge";
 import { fine, installImageHandling, readShortlist, reduce, runSim, startClock, wireArch, writeShortlist } from "./shared";
 
@@ -99,6 +100,7 @@ export function mountClassic(root: HTMLElement): () => void {
   }), { rootMargin: "-45% 0px -50% 0px" });
   links.forEach((a) => { const sec = document.getElementById(a.dataset.sec!); if (sec) spy.observe(sec); });
   // contact: copy the address on click (mailto alone silently does nothing without a mail app)
+  wireContactForms(root);
   root.querySelectorAll<HTMLElement>("[data-copy]").forEach((el) => el.addEventListener("click", () => {
     void navigator.clipboard?.writeText(el.dataset.copy!).then(() => {
       const note = root.querySelector<HTMLElement>(".copied");

@@ -843,3 +843,18 @@
 
 /* the logging notice under the agent's first input */
 .lognote { margin-top:var(--s2); font:400 12px/16px var(--f-mono); color:var(--muted); }
+
+/* contact form (Classic contact section and the agent's contact panel) */
+.cfwrap { margin-top:var(--s6); max-width:640px; }
+.connect .cfwrap { margin:0; padding:var(--s4); border-top:1px solid var(--line); max-width:none; }
+.cfwrap h4 { font:500 14px/20px var(--f-grotesk); margin-bottom:var(--s3); }
+.cform { display:grid; gap:var(--s3); }
+.cform .cfrow { display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); }
+.cform label { display:grid; gap:4px; font:400 12px/16px var(--f-mono); color:var(--muted); }
+.cform input, .cform textarea { font:400 15px/22px var(--f-sans); color:var(--ink); background:var(--bg); border:1px solid var(--line); padding:10px 12px; border-radius:0; width:100%; resize:vertical; }
+.cform input:focus-visible, .cform textarea:focus-visible { outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent); }
+.cform .cftrap { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+.cform .cfacts { display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; }
+.cform .cfnote { font:400 13px/18px var(--f-sans); color:var(--soft); }
+.cform.sent .cfnote { color:var(--ok); }
+@media (max-width:600px) { .cform .cfrow { grid-template-columns:1fr; } .cform input, .cform textarea { font-size:16px; } }
