@@ -19,6 +19,12 @@ export const BAD_OUTPUT =
 export const CODEY = /```|\bdef |\bfunction\s*\(|=>\s*{|\bimport\s+\w+\s+from/;
 export const stripCode = (t: string) => t.replace(/```[\s\S]*?(```|$)/g, " ").split("\n").filter((l) => !CODEY.test(l)).join("\n");
 
+// His private life is not on this site: partner, family, religion, age, home address. Answered with one fixed
+// line and no panel, never by a model (which could guess) and never with his profile card under it.
+const PERSONAL = /\b(girl ?friends?|boy ?friends?|gf|wife|husband|fianc[eé]e?|married|marriage|dating|crush|love life|relationship status|is he single|religion|religious|caste|politic(s|al)|how old is (he|rizwan)|his (age|address|family|parents|father|mother|dad|mom|siblings?|brother|sister))\b/i;
+export const personal = (text: string) => PERSONAL.test(text);
+export const PERSONAL_REPLY = "That’s personal, so I’ll leave it to him. I cover his work: projects, experience and how he builds.";
+
 export const REFUSAL = "Outside my lane. I only show Rizwan’s work.";
 export const GUARD_REFUSAL = "That reads like an attempt to rewrite my instructions, so I’ll skip it.";
 export const isRefusal = (s: string) => /\b(outside my lane|not something i can help|i only show rizwan|skip it)\b/i.test(s);
