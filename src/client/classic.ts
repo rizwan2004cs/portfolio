@@ -11,11 +11,12 @@ export function mountClassic(root: HTMLElement): () => void {
   installImageHandling();
   const stopClock = startClock();
   const ac = new AbortController(), sig = { signal: ac.signal }, timers: number[] = [];
-  const work = root.querySelector<HTMLElement>("#cwork")!;
+  // pages without the project list (/films) still get the clock, nav and copy buttons
+  const work = root.querySelector<HTMLElement>("#cwork") ?? root;
   const rows = [...work.querySelectorAll<HTMLButtonElement>(".prow")];
 
   /* hover preview (Akshay-style): an image card trails the cursor over the work list */
-  const peek = document.getElementById("peek")!, peekCard = document.getElementById("peekCard")!;
+  const peek = document.getElementById("peek") ?? document.createElement("div"), peekCard = document.getElementById("peekCard") ?? document.createElement("div");
   let mx = 0, my = 0, px = 0, py = 0, raf = 0;
   const loopPeek = () => {
     px += (mx - px) * 0.18; py += (my - py) * 0.18;

@@ -9,6 +9,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: SITE.url, lastModified: updated, changeFrequency: "monthly", priority: 1, images: [`${SITE.url}/img/portrait.jpg`] },
     { url: `${SITE.url}/agent`, lastModified: updated, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE.url}/films`, lastModified: updated, changeFrequency: "yearly", priority: 0.5 },
     ...PROJECTS.map((p) => ({
       url: `${SITE.url}/work/${p.id}`, lastModified: updated, changeFrequency: "yearly" as const, priority: 0.7,
       ...(p.image ? { images: [`${SITE.url}/img/${p.image}`] } : {}),

@@ -17,6 +17,7 @@ export function GET() {
     `- [Portfolio](${SITE.url}/): work, experience, toolkit, events and contact`,
     `- [AI agent](${SITE.url}/agent): ask about his projects, experience or fit for a role; shows its trace`,
     `- [Resume (PDF)](${SITE.url}/resume.pdf)`,
+    `- [Films that shaped how he works](${SITE.url}/films): his picks, in his own words`,
     "",
     "## Experience",
     ...EXPERIENCE.map((x) => `- ${x.role}, ${x.title} (${x.when}): ${roleDetail(x)}`),

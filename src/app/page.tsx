@@ -65,7 +65,7 @@ export default function ClassicPage() {
                 {/* the one sentence that says who this is, in the words people search: his full name, the short form, the city both ways */}
                 <p className="lead">I’m Syed Mohammad Rizwan (Mohammad Rizwan, or just Rizwan), an AI engineer in Bengaluru (Bangalore) and {EXPERIENCE[0].role} at {EXPERIENCE[0].title}.</p>
                 <p className="lead2">{PROFILE.summary.replace(/^Builds/, "I build")}</p>
-                <p className="lead2">Off the clock I write poetry and build tools for myself. When an open-source app I use is missing something, I fork it and add it, and send it upstream when others need it too.</p>
+                <p className="lead2">Off the clock I write poetry, watch <a href="/films">films that shape how I work</a>, and build tools for myself. When an open-source app I use is missing something, I fork it and add it, and send it upstream when others need it too.</p>
                 <dl className="kv">
                   {[["Based in", PROFILE.location], ["Focus", "Reliable AI agents"], ["Studied", "B.Tech CSE, NBKRIST"]].map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
                 </dl>

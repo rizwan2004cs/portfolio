@@ -903,3 +903,26 @@ details.cite > .panel { border:0; margin:0; }
 .wk .related li a { color:var(--ink); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px; }
 .wk .related li span { color:var(--muted); }
 @media (hover:hover) and (pointer:fine) { .wk .byline a:hover, .wk .related li a:hover { color:var(--accent); text-decoration-color:currentColor; } }
+
+/* /films: his picks, each with a small typographic tile instead of a poster */
+.films .fgroup { margin-top:var(--s10); }
+.films .fgroup h2 { font:500 22px/30px var(--f-grotesk); letter-spacing:-.01em; padding-bottom:var(--s3); border-bottom:1px solid var(--line); }
+.films .fgroup ul { list-style:none; }
+.films .film { display:grid; grid-template-columns:72px 1fr; gap:var(--s5); padding:var(--s5) 0; border-bottom:1px solid var(--line); scroll-margin-top:var(--s10); }
+.films .film h3 { font:500 18px/26px var(--f-grotesk); }
+.films .film h3 small { font:400 12px/16px var(--f-mono); color:var(--muted); margin-left:var(--s2); }
+.films .film p { margin-top:var(--s1); font-size:15px; line-height:24px; color:var(--soft); }
+.films .film blockquote { margin-top:var(--s2); padding-left:var(--s3); border-left:2px solid var(--ink); font-size:15px; line-height:24px; font-style:italic; color:var(--ink); }
+.ftile { position:relative; overflow:hidden; width:72px; height:108px; display:flex; flex-direction:column; justify-content:space-between; padding:8px; color:#fff;
+  background:hsl(var(--fh) 45% 26%); background-image:radial-gradient(rgba(255,255,255,.14) 1px, transparent 1.2px); background-size:6px 6px; border:1px solid var(--ink); }
+.ftile .fi { font:700 22px/1 var(--f-dot); letter-spacing:.06em; }
+.ftile .fy { font:400 10px/12px var(--f-mono); opacity:.8; }
+.ftile img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.films .flinks { display:flex; gap:var(--s4); margin-top:var(--s2); font:400 12px/16px var(--f-mono); }
+.films .flinks a { color:var(--muted); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px; }
+.films .tmdb { margin-top:var(--s8); font:400 11px/16px var(--f-mono); color:var(--muted); }
+.films .tmdb a { color:inherit; }
+@media (hover:hover) and (pointer:fine) { .films .flinks a:hover, .films .tmdb a:hover { color:var(--accent); text-decoration-color:currentColor; } .ftile:hover img { opacity:.9; } }
+@media (max-width:600px) { .films .film { grid-template-columns:56px 1fr; gap:var(--s4); } .ftile { width:56px; height:84px; padding:6px; } .ftile .fi { font-size:17px; } }
+.about .lead2 a { color:var(--ink); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px; }
+@media (hover:hover) and (pointer:fine) { .about .lead2 a:hover { color:var(--accent); text-decoration-color:currentColor; } }
