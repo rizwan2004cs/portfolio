@@ -56,7 +56,7 @@ export default function FilmsPage() {
   let n = 0;
   return (
     <div className="classic-page">
-      <Header mode="work" current="films" />
+      <Header mode="work" current="outside" />
       <main className="classic grid-bg" id="classic">
         <article className="wk films wide">
           <nav className="crumbs" aria-label="Breadcrumb"><a href="/">Syed Mohammad Rizwan</a> / Films</nav>
