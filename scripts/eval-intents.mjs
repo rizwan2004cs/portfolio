@@ -2,11 +2,13 @@
 // lands in a kind the behaviour policy accepts for it. This replaces testing the agent by hand, one phrasing at a time.
 //   OPENROUTER_API_KEY=… node scripts/eval-intents.mjs          all messages
 //   MIN_ACCURACY=0.9 node scripts/eval-intents.mjs              fail below this share
-import { readFileSync, appendFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 const key = process.env.OPENROUTER_API_KEY;
 if (!key) { console.log("OPENROUTER_API_KEY not set: skipping the classifier eval"); process.exit(0); }
-const cases = JSON.parse(readFileSync(new URL("../tests/fixtures/intents.json", import.meta.url), "utf8"));
+const file = new URL("../tests/fixtures/intents.json", import.meta.url);
+if (!existsSync(file)) { console.log("no labelled set at tests/fixtures/intents.json: skipping"); process.exit(0); }
+const cases = JSON.parse(readFileSync(file, "utf8"));
 // the kind definitions come from the policy itself, so the eval always tests what production asks
 const src = readFileSync(new URL("../src/agent/behavior.ts", import.meta.url), "utf8");
 const criteria = Object.fromEntries([...src.matchAll(/^\s{2}(\w+): \{\s*(?:\n\s*)?describe: "([^"]+)"/gm)].map((m) => [m[1], m[2]]));
@@ -27,6 +29,7 @@ for (const c of cases) {
       else await new Promise((res) => setTimeout(res, 2000));
     } catch { /* retried */ }
   }
+  if (kind === "error" && rows.length === 0) { console.log("classifier unreachable (free-tier daily limit?): skipping, not failing"); process.exit(0); }
   const acted = decide(kind, conf), ok = [c.kind, ...(c.accept ?? [])].includes(acted);
   rows.push({ ...c, got: kind, acted, conf, ok });
   await new Promise((res) => setTimeout(res, 900)); // free tier: about one request a second

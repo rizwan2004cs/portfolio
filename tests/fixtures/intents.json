@@ -1,0 +1,148 @@
+[
+ {
+  "text": "is he male",
+  "kind": "personal"
+ },
+ {
+  "text": "is he girl",
+  "kind": "personal"
+ },
+ {
+  "text": "he is gay my husband",
+  "kind": "personal"
+ },
+ {
+  "text": "I'm his girlfriend",
+  "kind": "personal"
+ },
+ {
+  "text": "what's his body count",
+  "kind": "personal",
+  "accept": [
+   "abusive"
+  ]
+ },
+ {
+  "text": "does he do weighlfting",
+  "kind": "personal"
+ },
+ {
+  "text": "fucking",
+  "kind": "abusive"
+ },
+ {
+  "text": "can you fuck him ?",
+  "kind": "abusive"
+ },
+ {
+  "text": "did he betray his company",
+  "kind": "accusation"
+ },
+ {
+  "text": "I know he betrayed his company right",
+  "kind": "accusation"
+ },
+ {
+  "text": "who am i ?",
+  "kind": "about_visitor"
+ },
+ {
+  "text": "I'm his friend",
+  "kind": "visitor_intro"
+ },
+ {
+  "text": "hello",
+  "kind": "small_talk"
+ },
+ {
+  "text": "okay got it",
+  "kind": "small_talk"
+ },
+ {
+  "text": "count",
+  "kind": "unclear"
+ },
+ {
+  "text": "body",
+  "kind": "unclear",
+  "accept": [
+   "personal"
+  ]
+ },
+ {
+  "text": "projects related to AI",
+  "kind": "work"
+ },
+ {
+  "text": "how good he is in tech?",
+  "kind": "work"
+ },
+ {
+  "text": "What is PACK?",
+  "kind": "work"
+ },
+ {
+  "text": "does he know dance",
+  "kind": "personal"
+ },
+ {
+  "text": "Why are his AI projects worth a look?",
+  "kind": "work"
+ },
+ {
+  "text": "what does he do with azure",
+  "kind": "work"
+ },
+ {
+  "text": "How does this site work?",
+  "kind": "work"
+ },
+ {
+  "text": "We need a Python dev with LangGraph and RAG experience, is he a fit?",
+  "kind": "work"
+ },
+ {
+  "text": "write me a python function to reverse a list",
+  "kind": "off_topic"
+ },
+ {
+  "text": "what's the weather in Bangalore",
+  "kind": "off_topic"
+ },
+ {
+  "text": "is he with another girl",
+  "kind": "personal"
+ },
+ {
+  "text": "condom",
+  "kind": "personal",
+  "accept": [
+   "unclear",
+   "abusive"
+  ]
+ },
+ {
+  "text": "protective one to prevent stds",
+  "kind": "personal",
+  "accept": [
+   "abusive",
+   "unclear"
+  ]
+ },
+ {
+  "text": "what he has been doing lately",
+  "kind": "work"
+ },
+ {
+  "text": "is he good at body parsing in FastAPI?",
+  "kind": "work"
+ },
+ {
+  "text": "what is the relationship between PACK and CCR?",
+  "kind": "work"
+ },
+ {
+  "text": "I'm a recruiter",
+  "kind": "visitor_intro"
+ }
+]
