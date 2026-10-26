@@ -1,0 +1,814 @@
+{
+  "profile": {
+    "name": "Syed Mohammad Rizwan",
+    "role": "AI engineer",
+    "location": "Bangalore, Karnataka",
+    "summary": "Builds AI agents and the systems around them: state machines, model fallbacks, validation, human confirmation and grounded retrieval, shipped inside full-stack products.",
+    "education": "B.Tech Computer Science, NBKRIST, 2026 · CGPA 9.09, First Class with Distinction",
+    "links": {
+      "github": "https://github.com/rizwan2004cs",
+      "linkedin": "https://www.linkedin.com/in/rizwan2004cs/",
+      "email": "mohammad22cse@gmail.com",
+      "phone": "+91 91103 73624"
+    },
+    "also": [
+      "Mar 2026 – now · Novulis Consulting: Associate Software Engineer (R&D) since Jun 2026, after an R&D internship (Mar – May 2026)",
+      "2026 · Superteam CTF v2 (Solana security), Bengaluru: won $115",
+      "2026 · Impact Lab Bengaluru (Claude Community Events): built DUO, a rehab companion robot",
+      "2026 · Monad Blitz Bangalore V4 hackathon (built PACK, team of two)",
+      "2025 · Google DevFest, GDG Chennai",
+      "2025 · Terralogic Hackathon, Nellore: his first hackathon (built PULSEVO)",
+      "2025 · Murf AI 'Ten Days of Voice Agents' challenge",
+      "2025 · Google Cloud Arcade, 9 skill badges",
+      "Jun – Sep 2025 · Cyber security internship (web application VAPT), Supraja Technologies, Vijayawada"
+    ]
+  },
+  "projects": [
+    {
+      "id": "pack",
+      "title": "PACK",
+      "year": 2026,
+      "tags": [
+        "agents",
+        "multi-agent",
+        "langgraph",
+        "game",
+        "hackathon"
+      ],
+      "oneLiner": "Seven AI agents play Werewolf; people watch and bet, or take a seat.",
+      "team": "Team of two with Mahesh Babu Kona, built at Monad Blitz Bangalore V4: he built the agent game orchestration and dialogue and moved betting off-chain; Mahesh built the MetaMask betting and player mode",
+      "facts": [
+        "A LangGraph state machine runs setup → night → morning → discussion → voting, with a win check each round.",
+        "7 players per game (2 wolves, 1 seer, 4 villagers) drawn from 12 characters with personas.",
+        "Each agent keeps private reasoning separate from its public speech; the UI shows both side by side.",
+        "Model chain: Groq llama-3.3-70b → llama-3.1-8b → OpenAI gpt-4o-mini → deterministic mock, so a game never stalls.",
+        "The server filters hidden roles out of the bettor view.",
+        "At the hackathon bets settled on-chain on Monad; the current build uses play money."
+      ],
+      "stack": [
+        "Python",
+        "FastAPI",
+        "LangGraph",
+        "Groq",
+        "React",
+        "Vite"
+      ],
+      "pipeline": [
+        [
+          "agent turn",
+          ""
+        ],
+        [
+          "private notes",
+          ""
+        ],
+        [
+          "llama-3.3-70b",
+          "model"
+        ],
+        [
+          "speech + vote",
+          "end"
+        ]
+      ],
+      "fallbacks": [
+        "llama-3.1-8b",
+        "gpt-4o-mini",
+        "deterministic mock"
+      ],
+      "image": "pack.jpg",
+      "links": {
+        "source": "https://github.com/rizwan2004cs/Agent-Werewolf"
+      },
+      "source": "Agent-Werewolf: backend/game/graph.py, roster.py, config.py, server.py",
+      "sims": [
+        {
+          "label": "Groq rate-limit",
+          "fails": [
+            "llama-3.3-70b"
+          ],
+          "via": "llama-3.1-8b",
+          "reach": true
+        },
+        {
+          "label": "Groq down",
+          "fails": [
+            "llama-3.3-70b",
+            "llama-3.1-8b"
+          ],
+          "via": "gpt-4o-mini",
+          "reach": true
+        },
+        {
+          "label": "No internet",
+          "fails": [
+            "llama-3.3-70b",
+            "llama-3.1-8b",
+            "gpt-4o-mini"
+          ],
+          "via": "deterministic mock",
+          "reach": true
+        }
+      ],
+      "keywords": [
+        "multi-agent",
+        "LangGraph",
+        "Werewolf",
+        "game",
+        "AI agents playing a game",
+        "state machine",
+        "model fallback",
+        "betting",
+        "Monad",
+        "hackathon",
+        "web3",
+        "Monad Blitz"
+      ]
+    },
+    {
+      "id": "ccr",
+      "title": "CCR Compliance Advisor",
+      "year": 2026,
+      "tags": [
+        "rag",
+        "agents",
+        "crawler",
+        "python"
+      ],
+      "oneLiner": "Answers California regulation questions, citing a section for every claim.",
+      "team": "Solo",
+      "facts": [
+        "Async breadth-first crawl collected 74,975 of 74,997 discovered regulation sections (99.97%).",
+        "Extraction runs 20 at a time and checkpoints every 100 records, so a crash resumes instead of restarting.",
+        "Sections are embedded (all-MiniLM-L6-v2) into Pinecone; the agent retrieves the top 8.",
+        "The model answers only from retrieved sections, cites one per claim, and asks a follow-up when context is insufficient.",
+        "Configurable model with a fallback; visitors see a plain message on failure, never a stack trace."
+      ],
+      "stack": [
+        "Python",
+        "Crawl4AI",
+        "asyncio",
+        "Pinecone",
+        "Groq",
+        "Streamlit",
+        "Render"
+      ],
+      "pipeline": [
+        [
+          "crawl",
+          ""
+        ],
+        [
+          "embed",
+          ""
+        ],
+        [
+          "retrieve k=8",
+          ""
+        ],
+        [
+          "gpt-oss-120b",
+          "model"
+        ],
+        [
+          "answer + sources",
+          "end"
+        ]
+      ],
+      "fallbacks": [
+        "gpt-oss-20b",
+        "plain notice"
+      ],
+      "image": "ccr.jpg",
+      "focus": "50% 0%",
+      "links": {
+        "live": "https://ccr-compliance-agent.onrender.com/",
+        "source": "https://github.com/rizwan2004cs/ccr_web_crawler"
+      },
+      "source": "ccr_web_crawler: crawler/, indexer/ingest.py, agent/app.py",
+      "sims": [
+        {
+          "label": "Model retired",
+          "fails": [
+            "gpt-oss-120b"
+          ],
+          "via": "gpt-oss-20b",
+          "reach": true
+        },
+        {
+          "label": "Both models down",
+          "fails": [
+            "gpt-oss-120b",
+            "gpt-oss-20b"
+          ],
+          "via": "plain notice",
+          "reach": false
+        }
+      ],
+      "keywords": [
+        "RAG",
+        "retrieval",
+        "compliance",
+        "regulations",
+        "California",
+        "legal",
+        "citations",
+        "web crawler",
+        "scraping",
+        "Pinecone",
+        "embeddings",
+        "vector search"
+      ]
+    },
+    {
+      "id": "finboom",
+      "title": "FinBoom",
+      "year": 2026,
+      "tags": [
+        "full-stack",
+        "agents",
+        "voice",
+        "finance",
+        "tool-use"
+      ],
+      "oneLiner": "Offline-first net-worth tracker for India, with an assistant that asks before it acts.",
+      "team": "Solo, 129 commits",
+      "facts": [
+        "The assistant turns speech or text into one validated action; nothing is written until the user confirms.",
+        "The model has no database access.",
+        "Offline-first PWA with an IndexedDB mutation queue; Supabase with row-level security.",
+        "22 asset classes, 7 calculators, Excel/CSV import, PDF statements.",
+        "Blog pipeline falls back across Gemini, Groq and OpenAI.",
+        "A React Native (Expo) mobile app reuses the same Clerk and Supabase backend, with an on-device SQLite cache, a mutation queue and a sync engine."
+      ],
+      "stack": [
+        "Next.js 16",
+        "React 19",
+        "Supabase",
+        "Clerk",
+        "TypeScript",
+        "Vitest",
+        "Tailwind CSS",
+        "GitHub Actions"
+      ],
+      "pipeline": [
+        [
+          "voice / text",
+          ""
+        ],
+        [
+          "extract action",
+          "model"
+        ],
+        [
+          "validate",
+          ""
+        ],
+        [
+          "you confirm?",
+          ""
+        ],
+        [
+          "write",
+          "end"
+        ]
+      ],
+      "fallbacks": [
+        "nothing written"
+      ],
+      "image": "finboom.jpg",
+      "links": {
+        "live": "https://finboom-cyan.vercel.app",
+        "source": "https://github.com/rizwan2004cs/finboom"
+      },
+      "source": "finboom: src/app/api/assistant/route.ts, src/lib/offline/, src/lib/blog/ai-generation.ts",
+      "sims": [
+        {
+          "label": "Model returns junk",
+          "fails": [
+            "validate"
+          ],
+          "via": "nothing written",
+          "reach": false
+        },
+        {
+          "label": "User says no",
+          "fails": [
+            "you confirm?"
+          ],
+          "via": "nothing written",
+          "reach": false
+        }
+      ],
+      "diagrams": [
+        {
+          "title": "Mobile app: system architecture",
+          "src": "Finboom Mobile app/finboom-native/docs/architecture/01-system-architecture.md",
+          "mermaid": "flowchart TD\n  subgraph app [React Native App - Expo]\n    Screens[\"Screens (Expo Router + NativeWind)\"]\n    Hooks[\"Hooks (useProfile, useCurrency, useAuth)\"]\n    Query[\"TanStack Query\"]\n    DataLayer[\"Data layer (fetchTable / insertRow / updateRow / deleteRow)\"]\n    Sqlite[(\"expo-sqlite (cache + _queue + _meta)\")]\n    Sync[\"Sync engine (replay + delta pull)\"]\n    NetInfo[\"NetInfo + AppState\"]\n    Logic[\"Reused TS (finance, types)\"]\n  end\n  subgraph backend [Existing backend - unchanged]\n    Clerk[\"Clerk\"]\n    Supa[(\"Supabase Postgres + RLS\")]\n    Cron[\"Vercel cron + API routes\"]\n  end\n  Screens --> Hooks --> Query --> DataLayer\n  Screens --> Logic\n  DataLayer --> Sqlite\n  DataLayer --> Sync\n  Sync --> Sqlite\n  Sync <--> Supa\n  NetInfo --> Sync\n  Screens --> Clerk\n  Clerk -->|\"JWT sub claim\"| Supa\n  Cron -->|\"push\"| app"
+        }
+      ],
+      "keywords": [
+        "personal finance",
+        "net worth",
+        "money",
+        "investments",
+        "calculators",
+        "PWA",
+        "offline-first",
+        "voice assistant",
+        "human approval",
+        "Supabase"
+      ]
+    },
+    {
+      "id": "voice",
+      "title": "Ten Days of Voice Agents",
+      "year": 2025,
+      "tags": [
+        "voice",
+        "agents",
+        "livekit"
+      ],
+      "oneLiner": "Nine voice agents of his own in Murf AI's ten-day challenge, one a day after the starter.",
+      "team": "Solo, on Murf AI's challenge starter",
+      "facts": [
+        "Each agent runs on LiveKit Agents with Deepgram nova-3 speech-to-text, Gemini 2.5 Flash and Murf Falcon text-to-speech.",
+        "Day 1 brings up Murf's starter agent; days 2–10 are nine agents of his own: a coffee barista with a live order receipt, a wellness companion, an active-recall tutor, a Razorpay SDR, a fraud-alert desk with a strict security question, Instamart ordering, a D&D game master, an agentic-commerce shop and an improv game, one branch per day.",
+        "Each agent keeps its own structured state (order, lead, fraud case) that the UI renders live."
+      ],
+      "stack": [
+        "Python",
+        "LiveKit Agents",
+        "Deepgram",
+        "Gemini",
+        "Murf Falcon",
+        "Next.js"
+      ],
+      "pipeline": [
+        [
+          "speech",
+          ""
+        ],
+        [
+          "deepgram stt",
+          ""
+        ],
+        [
+          "gemini + tools",
+          "model"
+        ],
+        [
+          "state",
+          ""
+        ],
+        [
+          "murf tts",
+          "end"
+        ]
+      ],
+      "fallbacks": [],
+      "image": "zepto.jpg",
+      "links": {
+        "source": "https://github.com/rizwan2004cs/ten-days-of-voice-agents-2025"
+      },
+      "source": "ten-days-of-voice-agents-2025: branches Day-1 … day-10",
+      "keywords": [
+        "voice",
+        "speech",
+        "LiveKit",
+        "Deepgram",
+        "text-to-speech",
+        "speech-to-text",
+        "conversational AI",
+        "sales agent",
+        "tutor",
+        "barista",
+        "Murf",
+        "Ten Days of Voice Agents"
+      ]
+    },
+    {
+      "id": "cpl",
+      "title": "Campus Premier League",
+      "year": 2026,
+      "tags": [
+        "full-stack",
+        "realtime",
+        "ai"
+      ],
+      "oneLiner": "A live player auction for a college league, with AI commentary in Telugu.",
+      "team": "Solo, with minor help from a friend: a rebuild of an earlier prototype, scaffolded with Lovable",
+      "facts": [
+        "Bids and player releases run as locked Postgres functions, so purse, points and roster always move together.",
+        "Supabase Realtime pushes every bid to the projector and to phones.",
+        "Commentary picks a meme template locally, then Groq personalises it: qwen3.8-27b, then gpt-oss-120b, each with an 8s timeout; if both fail, the browser shows a local template line.",
+        "87 players, 7 franchises, 124 Telugu meme lines."
+      ],
+      "stack": [
+        "React",
+        "TypeScript",
+        "Supabase",
+        "Vercel Functions",
+        "Groq",
+        "Tailwind CSS",
+        "GitHub Actions"
+      ],
+      "pipeline": [
+        [
+          "bid",
+          ""
+        ],
+        [
+          "place_bid() lock",
+          ""
+        ],
+        [
+          "realtime",
+          ""
+        ],
+        [
+          "qwen3.8-27b",
+          "model"
+        ],
+        [
+          "screens",
+          "end"
+        ]
+      ],
+      "fallbacks": [
+        "gpt-oss-120b",
+        "browser template line"
+      ],
+      "image": "cpl.jpg",
+      "links": {
+        "live": "https://campus-league-auction-arena.vercel.app",
+        "source": "https://github.com/rizwan2004cs/campus-league-auction-arena"
+      },
+      "source": "campus-league-auction-arena: supabase/migrations/*atomic_bids*.sql, api/commentary.ts, src/services/commentaryPrompt.ts",
+      "sims": [
+        {
+          "label": "Model timeout",
+          "fails": [
+            "qwen3.8-27b"
+          ],
+          "via": "gpt-oss-120b",
+          "reach": true
+        },
+        {
+          "label": "Groq down",
+          "fails": [
+            "qwen3.8-27b",
+            "gpt-oss-120b"
+          ],
+          "via": "browser template line",
+          "reach": true
+        }
+      ],
+      "keywords": [
+        "auction",
+        "live bidding",
+        "realtime",
+        "sports",
+        "college league",
+        "Supabase Realtime",
+        "Postgres",
+        "memes"
+      ]
+    },
+    {
+      "id": "duo",
+      "title": "DUO",
+      "year": 2026,
+      "tags": [
+        "hardware",
+        "robotics",
+        "hackathon",
+        "health"
+      ],
+      "oneLiner": "A 4 ft hardware rehab companion robot that turns exercise into play for people with limited mobility.",
+      "team": "Team project, built at Impact Lab Bengaluru, a Claude Community Events hackathon",
+      "facts": [
+        "Built over two days at Impact Lab Bengaluru, a “hacking human ability” hackathon presented by Claude Community Events.",
+        "A phone is the face (expressive eyes, voice and games) on a PVC neck over a LEGO base; the demo base was remote-driven.",
+        "The design wires ultrasonic and motion sensors through an ESP32 to the base and head motors, with the phone linked over Wi-Fi or Bluetooth.",
+        "Rehab as play: follow-me walks, air piano, a boxing partner, and reaction and memory games."
+      ],
+      "stack": [
+        "ESP32",
+        "LEGO Inventor",
+        "Ultrasonic sensor",
+        "Servo motors",
+        "Phone as head"
+      ],
+      "pipeline": [
+        [
+          "sensors",
+          ""
+        ],
+        [
+          "ESP32",
+          ""
+        ],
+        [
+          "phone head",
+          "model"
+        ],
+        [
+          "motors",
+          "end"
+        ]
+      ],
+      "fallbacks": [],
+      "image": "duo.jpg",
+      "focus": "left",
+      "links": {},
+      "source": "Impact Lab demo: prototype photos and the design sheet",
+      "keywords": [
+        "hardware",
+        "robot",
+        "robotics",
+        "ESP32",
+        "IoT",
+        "sensors",
+        "rehab",
+        "rehabilitation",
+        "health",
+        "accessibility",
+        "embedded",
+        "Impact Lab",
+        "Superhuman Lab"
+      ]
+    },
+    {
+      "id": "kerala",
+      "title": "Kerala Immersion",
+      "year": 2026,
+      "tags": [
+        "mobile",
+        "voice",
+        "ai",
+        "education"
+      ],
+      "oneLiner": "Learn Malayalam and Kannada through Tamil, with pronunciation scored by voice.",
+      "team": "Solo",
+      "facts": [
+        "Whisper transcribes the learner; a normalised edit-distance score turns it into 0–100.",
+        "An AI tutor and quiz generation run on Groq Llama 3.3 70B.",
+        "8 modules and 140 vocabulary entries with native script, transliteration and the Tamil cognate."
+      ],
+      "stack": [
+        "Expo",
+        "React Native",
+        "Firebase",
+        "Groq",
+        "Whisper"
+      ],
+      "pipeline": [
+        [
+          "speak",
+          ""
+        ],
+        [
+          "whisper",
+          "model"
+        ],
+        [
+          "edit distance",
+          ""
+        ],
+        [
+          "score 0–100",
+          "end"
+        ]
+      ],
+      "fallbacks": [],
+      "image": null,
+      "links": {
+        "source": "https://github.com/rizwan2004cs/kerala-immersion"
+      },
+      "source": "kerala-immersion: src/services/pronunciation.ts, src/data/vocabData.ts",
+      "keywords": [
+        "language learning",
+        "Malayalam",
+        "Kannada",
+        "Tamil",
+        "pronunciation",
+        "speech scoring",
+        "Whisper",
+        "education",
+        "mobile app",
+        "Expo"
+      ]
+    },
+    {
+      "id": "verseyou",
+      "title": "VerseYou",
+      "year": 2025,
+      "tags": [
+        "agents",
+        "ai",
+        "poetry",
+        "classifier",
+        "personal"
+      ],
+      "oneLiner": "An emotional companion that answers in verse, the way he would, after chatbots never felt like company.",
+      "team": "Solo",
+      "facts": [
+        "Three model steps: classify the message into one of 13 emotional modes, write a verse with that mode's own prompt, then add an English translation.",
+        "An unclear or unknown mode falls back to Safeguard mode, and a flat “I’m fine” is read as hidden hurt, not as fine.",
+        "Nine South Asian languages and scripts (Hindi-Urdu by default, Tamil, Telugu, Bengali and more) with a tone picker; signed-in visitors keep a verse history.",
+        "He built it on Lovable, an AI app builder; it is live at your-souls-echo.lovable.app."
+      ],
+      "stack": [
+        "React",
+        "TypeScript",
+        "Supabase Edge Functions",
+        "Gemini 2.5 Flash",
+        "Lovable"
+      ],
+      "pipeline": [
+        [
+          "your words",
+          ""
+        ],
+        [
+          "mode classifier",
+          "model"
+        ],
+        [
+          "mode prompt",
+          ""
+        ],
+        [
+          "verse",
+          "model"
+        ],
+        [
+          "translation",
+          "end"
+        ]
+      ],
+      "fallbacks": [
+        "Safeguard mode"
+      ],
+      "sims": [
+        {
+          "label": "Classifier unsure",
+          "fails": [
+            "mode classifier"
+          ],
+          "via": "Safeguard mode",
+          "reach": true
+        }
+      ],
+      "image": "verseyou.jpg",
+      "focus": "top",
+      "links": {
+        "live": "https://your-souls-echo.lovable.app/",
+        "source": "https://github.com/rizwan2004cs/your-souls-echo"
+      },
+      "source": "your-souls-echo: supabase/functions/generate-verse/index.ts",
+      "keywords": [
+        "poetry",
+        "verse",
+        "emotions",
+        "emotional support",
+        "companion",
+        "loneliness",
+        "classifier",
+        "multilingual",
+        "Hindi",
+        "Urdu"
+      ]
+    },
+    {
+      "id": "pulsevo",
+      "title": "PULSEVO",
+      "year": 2025,
+      "tags": [
+        "hackathon",
+        "full-stack",
+        "ai",
+        "forecasting"
+      ],
+      "oneLiner": "Team productivity dashboard that forecasts task trends, built in 12 hours at his first hackathon.",
+      "team": "Team project at Terralogic's Hackathon 2025 in Nellore: he built the frontend and part of the backend",
+      "facts": [
+        "Built in 12 hours at Terralogic's Hackathon 2025 in Nellore, his first hackathon.",
+        "FastAPI backend on Neon Postgres; a cron job simulates an organisation at work, generating synthetic tasks and activity.",
+        "An in-house model forecasts daily task trends and predicts the probability a task closes within 24 hours.",
+        "Live KPIs, team performance and an AI summary, plus natural-language questions about the team's productivity."
+      ],
+      "stack": [
+        "Python",
+        "FastAPI",
+        "Neon Postgres",
+        "React",
+        "TypeScript",
+        "Vite"
+      ],
+      "pipeline": [
+        [
+          "cron · synthetic org",
+          ""
+        ],
+        [
+          "FastAPI",
+          ""
+        ],
+        [
+          "Neon Postgres",
+          ""
+        ],
+        [
+          "forecast model",
+          "model"
+        ],
+        [
+          "insights",
+          "end"
+        ]
+      ],
+      "fallbacks": [],
+      "image": "pulsevo.jpg",
+      "focus": "top",
+      "links": {
+        "live": "https://hackathon-frontend-zeta-nine.vercel.app/insights",
+        "source": "https://github.com/rizwan2004cs/hackathon-Frontend-"
+      },
+      "source": "hackathon-Frontend-: src/lib/api.ts, src/pages/InsightsNew.tsx, src/pages/QueryNew.tsx",
+      "keywords": [
+        "dashboard",
+        "productivity",
+        "analytics",
+        "forecasting",
+        "prediction",
+        "synthetic data",
+        "FastAPI",
+        "Neon",
+        "hackathon",
+        "Terralogic",
+        "first hackathon"
+      ]
+    },
+    {
+      "id": "ngo",
+      "title": "NGO Donor Matcher",
+      "year": 2026,
+      "tags": [
+        "full-stack",
+        "maps",
+        "team"
+      ],
+      "oneLiner": "Donors find verified NGOs nearby and pledge exactly what they need.",
+      "team": "Final-year team project with Dinesh, Gowtham and Sriram",
+      "facts": [
+        "Radius search uses a haversine query; pledges expire after 48 hours via scheduled jobs.",
+        "NGO trust score from 0 to 100; donor, NGO and admin roles verified with Firebase tokens.",
+        "71 Java source files and 15 test files on Spring Boot 3."
+      ],
+      "stack": [
+        "Spring Boot",
+        "Java 21",
+        "React",
+        "Leaflet",
+        "PostgreSQL",
+        "Tailwind CSS",
+        "Docker",
+        "Render"
+      ],
+      "pipeline": [],
+      "fallbacks": [],
+      "image": "ngo.jpg",
+      "links": {
+        "live": "https://ai-donor-matcher-frontend.vercel.app/",
+        "source": "https://github.com/rizwan2004cs/NGO-Donor-Matcher-Backend"
+      },
+      "source": "NGO-Donor-Matcher-Backend: TrustScoreService.java, ScheduledJobService.java",
+      "diagrams": [
+        {
+          "title": "System architecture",
+          "src": "NGO-Donor-Matcher-Backend/docs/AI_Donation_Matcher_FINAL_v4_.md",
+          "mermaid": "flowchart LR\n    donor[\"Donor Browser\"] --> frontend[\"Vercel Frontend (React/Vite)\"]\n    ngo[\"NGO Browser\"] --> frontend\n    admin[\"Admin Browser\"] --> frontend\n\n    frontend --> firebase[\"Firebase Auth\"]\n    frontend --> api[\"Render Backend (Spring Boot)\"]\n\n    api --> neon[\"Neon PostgreSQL\"]\n    api --> firebaseAdmin[\"Firebase Admin SDK\"]\n    api --> cloudinary[\"Cloudinary\"]\n    api --> geocoding[\"OpenStreetMap Nominatim\"]\n\n    frontend --> osrm[\"OSRM Routing Service\"]"
+        },
+        {
+          "title": "Data model",
+          "src": "NGO-Donor-Matcher-Backend/docs/AI_Donation_Matcher_FINAL_v4_.md",
+          "mermaid": "erDiagram\n    USER ||--o| NGO : owns_profile\n    USER ||--o{ PLEDGE : creates\n    USER ||--o{ REPORT : submits\n    NGO ||--o{ NEED : publishes\n    NGO ||--o{ REPORT : receives\n    NEED ||--o{ PLEDGE : has\n\n    USER {\n        bigint id PK\n        string full_name\n        string email UK\n        string firebase_uid UK\n        string password\n        string role\n        boolean email_verified\n        string email_verification_token\n        string email_verification_otp\n        datetime email_verification_otp_expires_at\n        int email_verification_otp_attempts\n        string location\n        datetime created_at\n    }\n\n    NGO {\n        bigint id PK\n        bigint user_id FK\n        string name\n        string address\n        string contact_email\n        string contact_phone\n        string description\n        string category_of_work\n        string photo_url\n        string document_url\n        string status\n        boolean profile_complete\n        double lat\n        double lng\n        int trust_score\n        string trust_tier\n        datetime verified_at\n        datetime last_activity_at\n        string rejection_reason\n        datetime created_at\n    }\n\n    NEED {\n        bigint id PK\n        bigint ngo_id FK\n        string category\n        string item_name\n        string description\n        int quantity_required\n        int quantity_pledged\n        int quantity_received\n        string urgency\n        date expiry_date\n        string status\n        datetime created_at\n        datetime fulfilled_at\n    }\n\n    PLEDGE {\n        bigint id PK\n        bigint donor_id FK\n        bigint need_id FK\n        int quantity\n        string status\n        datetime created_at\n        datetime expires_at\n    }\n\n    REPORT {\n        bigint id PK\n        bigint reporter_id FK\n        bigint ngo_id FK\n        string reason\n        datetime reported_at\n    }"
+        }
+      ],
+      "keywords": [
+        "donations",
+        "NGO",
+        "nonprofit",
+        "maps",
+        "geolocation",
+        "donors",
+        "Spring Boot",
+        "Java",
+        "Firebase",
+        "team project"
+      ]
+    }
+  ]
+}

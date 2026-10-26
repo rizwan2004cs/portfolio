@@ -1,0 +1,18 @@
+# Only what the site needs goes to Vercel: never secrets, local tooling, evals or scratch work.
+# Paths are anchored with a leading slash so public/resume/ (the viewer images) still ships.
+.env
+.env*
+/.scratch/
+/.superpowers/
+/evals/
+/spike/
+/resume/
+/assets-src/
+/docs/
+/tests/
+/test-results/
+/playwright-report/
+/coverage/
+/.next*/
+*.tsbuildinfo
+.DS_Store
