@@ -7,6 +7,7 @@ import { groqScreen, modelChain } from "./models";
 import { router } from "./router";
 import { waitUntil } from "@vercel/functions";
 import { neonTurnLog, type TurnLogger } from "@/server/log";
+import { opikClient, traceTurn, type TurnTrace } from "@/server/opik";
 import { runAgent, SYSTEM } from "./run";
 import { ALL_FACTS_SOURCE, TOOL_DEFS, toolContext } from "./tools";
 import type { AgentEvent, ModelClient, RunMeta, Screen } from "./types";
@@ -33,6 +34,8 @@ export interface HandlerDeps {
   now: () => number;
   /** stores each finished turn (Neon in production); absent locally and in tests */
   log?: TurnLogger;
+  /** opens an Opik trace for one turn (when OPIK_API_KEY is set) */
+  tracer?: (t: { question: string; turns: string[]; session?: string; killed: boolean; country?: string }) => TurnTrace | undefined;
 }
 
 export function defaultDeps(env = process.env): HandlerDeps {
@@ -43,6 +46,7 @@ export function defaultDeps(env = process.env): HandlerDeps {
     cache: makeCache(),
     now: () => Date.now(),
     log: neonTurnLog(env.DATABASE_URL),
+    tracer: (t) => { const c = opikClient(env); return c ? traceTurn(c, t) : undefined; },
   };
 }
 
@@ -88,8 +92,10 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
     async start(controller) {
       const te = new TextEncoder();
       const send = (e: Parameters<typeof encoder.encode>[0]) => { try { controller.enqueue(te.encode(encoder.encode(e))); } catch { /* client gone */ } };
+      const country = req.headers.get("x-vercel-ip-country") ?? undefined;
+      const tt = deps.tracer?.({ question: turns.at(-1)!, turns, session: parsed.threadId, killed: parsed.killModel, country });
       const seen: AgentEvent[] = [];
-      const emit = (ev: AgentEvent) => { seen.push(ev); toAgui(ev).forEach(send); };
+      const emit = (ev: AgentEvent) => { seen.push(ev); tt?.event(ev); toAgui(ev).forEach(send); };
       let meta: RunMeta | undefined, error: string | undefined;
       send(runStarted(threadId, runId));
       try {
@@ -104,7 +110,7 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           const record = (ev: AgentEvent) => { if (ev.type !== "trace") recorded.push(ev); emit(ev); };
           const budgetOut = overBudget(now);
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
-          meta = await runAgent({ turns, shown, killModel: parsed.killModel || budgetOut }, record, { models: deps.models(), screen: deps.screen, signal: ctl.signal });
+          meta = await runAgent({ turns, shown, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, signal: ctl.signal });
           if (meta.mode === "model" || meta.mode === "partial") budget.runs++;
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
         }
@@ -122,8 +128,9 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
       } finally {
         controller.close();
         // the visitor already has the answer; the log write runs after the response, and never fails the turn
-        const row = { session: parsed.threadId, turn: parsed.turns.length, question: turns.at(-1)!, events: seen, meta, ms: deps.now() - now, killed: parsed.killModel, country: req.headers.get("x-vercel-ip-country") ?? undefined, error };
+        const row = { session: parsed.threadId, turn: parsed.turns.length, question: turns.at(-1)!, events: seen, meta, ms: deps.now() - now, killed: parsed.killModel, country, error };
         if (deps.log) waitUntil(deps.log(row).catch((e) => console.error("turn log failed", e instanceof Error ? e.message : e)));
+        if (tt) waitUntil(tt.end({ meta, events: seen, error }).catch((e) => console.error("opik trace failed", e instanceof Error ? e.message : e)));
       }
     },
     cancel() { ctl.abort(); },
