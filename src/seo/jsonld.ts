@@ -1,22 +1,29 @@
 import type { Person, ProfilePage, WebSite, CreativeWork, WithContext } from "schema-dts";
-import { PROFILE } from "@/content/data";
+import { EXPERIENCE, PROFILE } from "@/content/data";
 import type { Project } from "@/content/types";
 import { SITE } from "@/content/site";
 
 const PERSON_ID = `${SITE.url}/#person`;
+const CURRENT = EXPERIENCE.find((x) => x.now) ?? EXPERIENCE[0];
 
 export const person: Person = {
   "@type": "Person",
   "@id": PERSON_ID,
   name: PROFILE.name,
+  // people search for him as "Mohammad Rizwan" as often as by his full name
+  alternateName: ["Mohammad Rizwan", "Rizwan"],
+  givenName: "Mohammad Rizwan",
+  familyName: "Syed",
   jobTitle: "AI Engineer",
+  worksFor: { "@type": "Organization", name: CURRENT.title },
+  hasOccupation: { "@type": "Occupation", name: CURRENT.role, occupationLocation: { "@type": "City", name: "Bengaluru" } },
   description: PROFILE.summary,
   url: SITE.url,
   image: `${SITE.url}/img/portrait.jpg`,
   email: `mailto:${PROFILE.links.email}`,
   address: { "@type": "PostalAddress", addressLocality: "Bangalore", addressRegion: "Karnataka", addressCountry: "IN" },
   alumniOf: { "@type": "CollegeOrUniversity", name: "NBKR Institute of Science and Technology" },
-  knowsAbout: ["AI agents", "LangGraph", "Retrieval-augmented generation", "Voice agents", "FastAPI", "Next.js", "Azure"],
+  knowsAbout: ["AI agents", "Multi-agent systems", "LangGraph", "Retrieval-augmented generation", "Voice agents", "Python", "FastAPI", "TypeScript", "Next.js", "Azure"],
   sameAs: [PROFILE.links.github, PROFILE.links.linkedin],
 };
 

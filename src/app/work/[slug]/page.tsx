@@ -19,7 +19,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     title: p.title,
     description: `${p.oneLiner} ${p.facts[0] ?? ""} Built by ${SITE.name}, AI engineer in Bangalore.`.trim(),
     alternates: { canonical: `/work/${p.id}` },
-    openGraph: { type: "article", title: p.title, description: p.oneLiner, url: `/work/${p.id}`, ...(p.image ? { images: [{ url: `/img/${p.image}`, alt: `${p.title} screenshot` }] } : {}) },
+    // the card image is work/[slug]/opengraph-image.tsx: name, one-liner, stack and screenshot
+    openGraph: { type: "article", title: `${p.title} · ${SITE.name}`, description: p.oneLiner, url: `/work/${p.id}` },
+    twitter: { card: "summary_large_image", title: `${p.title} · ${SITE.name}`, description: p.oneLiner },
   };
 }
 
