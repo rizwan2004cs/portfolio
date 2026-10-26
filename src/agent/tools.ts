@@ -27,7 +27,7 @@ export const isFocus = (f: unknown): f is ProfileFocus => f === "events" || f ==
 const HARNESS_FLOW = [
   "1. A prompt guard (llama-prompt-guard-2-86m) screens the visitor's message, then a scope filter refuses anything off-topic.",
   "2. Known paths (scripted tours, opening a project, resume, contact) are answered in the browser with no model call; repeated questions come from a response cache.",
-  "3. Everything else goes to a model chain: gpt-oss-120b, then gpt-oss-20b, on each Groq key, then Gemini 2.5 Flash. The model can only call closed-world tools that pick content by id.",
+  "3. Everything else goes to a model chain: gpt-oss-120b, then gpt-oss-20b, on each Groq key, then Gemini 2.5 Flash, then free models on OpenRouter. The model can only call closed-world tools that pick content by id.",
   "4. A grounding check verifies every sentence against the facts and drops what it can't support.",
   "5. If every model fails, or the visitor takes the model offline, a deterministic router answers with no AI at all.",
 ];
@@ -119,7 +119,7 @@ export function toolContext(name: ToolName): string {
   switch (name) {
     case "match_role": return "requirements requirement role fit report match matches evidence toolkit public projects";
     case "list_projects": return PROJECTS.map((p) => `${p.title} ${p.oneLiner} ${p.tags.join(" ")} ${p.stack.join(" ")}`).join(" ");
-    case "show_harness": return `model models request requests visitor answer prompt guard llama-prompt-guard scope filter response cache cached scripted tours gpt-oss-120b gpt-oss-20b gemini fallback deterministic router outage offline grounding tokens panels tools approval routed ${HARNESS_FLOW.join(" ")}`;
+    case "show_harness": return `model models request requests visitor answer prompt guard llama-prompt-guard scope filter response cache cached scripted tours gpt-oss-120b gpt-oss-20b gemini openrouter nemotron free models fallback deterministic router outage offline grounding tokens panels tools approval routed ${HARNESS_FLOW.join(" ")}`;
     case "offer_resume": return "resume pdf approval approve open tab new";
     case "offer_contact": return "email contact approval approve address mail";
     case "show_profile": return `${JSON.stringify(PROFILE)} ${EVENT_LINES.join(" ")}`;
