@@ -21,7 +21,7 @@ export const stripCode = (t: string) => t.replace(/```[\s\S]*?(```|$)/g, " ").sp
 
 // His private life is not on this site: partner, family, religion, age, home address. Answered with one fixed
 // line and no panel, never by a model (which could guess) and never with his profile card under it.
-const PERSONAL = /\b(girl ?friends?|boy ?friends?|gf|bf|bestie|girl ?bestie|bff|best friends?|wife|husband|partner|fianc[eé]e?|married|marriage|dating|dates?|crush|love life|in love|relationships?|is he single|religion|religious|caste|politic(s|al)|how old|his age|age of|his (address|family|parents|father|mother|dad|mom|siblings?|brother|sister)|gay|lesbian|bi ?sexual|straight|homo\w*|queer|trans\w*gender|sexuality|orientation|gender|male or female|boy or (a )?girl|man or (a )?woman|sex\w*|intercourse|virgin\w*|body ?count|porn\w*|nudes?|naked|horny|kiss\w*|hook ?ups?|one night)\b/i;
+const PERSONAL = /\b(girl ?friends?|boy ?friends?|gf|bf|bestie|girl ?bestie|bff|best friends?|wife|husband|partner|fianc[eé]e?|married|marriage|dating|dates?|crush|love life|in love|relationships?|is he single|religion|religious|caste|politic(s|al)|how old|his age|age of|his (address|family|parents|father|mother|dad|mom|siblings?|brother|sister)|(is|was) (he|rizwan) (a |an )?(male|female|man|woman|boy|girl|guy|lady)|his (sex|gender|pronouns)|male|female|gay|lesbian|bi ?sexual|straight|homo\w*|queer|trans\w*gender|sexuality|orientation|gender|male or female|boy or (a )?girl|man or (a )?woman|sex\w*|intercourse|virgin\w*|body ?count|porn\w*|nudes?|naked|horny|kiss\w*|hook ?ups?|one night)\b/i;
 // "the relationship between PACK and CCR" is about his work: a named project wins
 export const personal = (text: string) => PERSONAL.test(text) && scoreProjects(text)[0].s < 4;
 

@@ -466,3 +466,16 @@ describe("golden · abuse, private life, accusations and vague words", () => {
     expect(r.text.match(/doesn’t cover that/g)).toHaveLength(1);
   });
 });
+
+describe("golden · the answer never claims what isn't on screen", () => {
+  it("'is he male' is private; 'Here is his resume' and 'Opening X' are cut when nothing opened", async () => {
+    expect((await turn({ turns: ["is he male"] }, [never()])).text).toBe(PERSONAL_REPLY);
+    const m = scripted("a", [say("His write-up covers his work in depth. Here is his resume. Opening CCR Compliance Advisor architecture.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["what does his write-up cover?"] }, [m]);
+    expect(r.text).not.toMatch(/Here is his resume|Opening CCR/);
+    expect(r.of("trace").some((t) => /describing something that wasn’t shown/.test(t.detail))).toBe(true);
+    // when the project really opened, saying so stays
+    const ok = await turn({ turns: ["Show me how CCR is built"] }, [scripted("a", [say("Here’s CCR Compliance Advisor: a crawler feeding cited answers.", call("open_project", { id: "ccr", view: "architecture" }), call("suggest", { options: ["x"] }))])]);
+    expect(ok.text).toMatch(/^Here’s CCR Compliance Advisor/);
+  });
+});
