@@ -1,4 +1,4 @@
-import type { Person, ProfilePage, WebSite, CreativeWork, WithContext } from "schema-dts";
+import type { BreadcrumbList, Person, ProfilePage, WebSite, CreativeWork, WithContext } from "schema-dts";
 import { EXPERIENCE, PROFILE } from "@/content/data";
 import type { Project } from "@/content/types";
 import { SITE } from "@/content/site";
@@ -56,6 +56,17 @@ export const projectWork = (p: Project): WithContext<CreativeWork> => ({
   keywords: p.stack.join(", "),
   creator: { "@id": PERSON_ID },
   ...(p.image ? { image: `${SITE.url}/img/${p.image}` } : {}),
+});
+
+/** The trail a write-up sits on (the same one its page shows): Google can print it under the link in results. */
+export const projectCrumbs = (p: Project): WithContext<BreadcrumbList> => ({
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: SITE.name, item: SITE.url },
+    { "@type": "ListItem", position: 2, name: "Projects", item: `${SITE.url}/#projects` },
+    { "@type": "ListItem", position: 3, name: p.title, item: `${SITE.url}/work/${p.id}` },
+  ],
 });
 
 /** Serialise for a <script type="application/ld+json">; escapes "<" so content can't close the tag. */

@@ -1,0 +1,23 @@
+# After Vercel finishes a production deploy, the live site must answer on its public address:
+# the home page, the agent, the resume and a write-up. Needs no token: Vercel reports the deploy to GitHub.
+name: Smoke check
+
+on: deployment_status
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      URL: ${{ vars.SITE_URL || 'https://mohammad-rizwan.tech' }}
+    steps:
+      - name: Live pages answer 200
+        run: |
+          for path in / /agent /resume.pdf /work/pack /sitemap.xml; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --retry 3 --retry-delay 5 "$URL$path")
+            echo "$path → $code"; [ "$code" = 200 ] || exit 1
+          done
