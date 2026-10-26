@@ -865,3 +865,29 @@ form.cform:focus-within { border-color:transparent; }
 .cform .cfnote { font:400 13px/18px var(--f-sans); color:var(--soft); }
 .cform.sent .cfnote { color:var(--ok); }
 @media (max-width:600px) { .cform .cfrow { grid-template-columns:1fr; } .cform input, .cform textarea { font-size:16px; } }
+
+/* agent answers: short paragraphs, project names as quiet links, figures in bold */
+.msg .text .tv p + p { margin-top:10px; }
+.msg .text b { font-weight:600; font-variant-numeric:tabular-nums; }
+.msg .text .pj { all:unset; cursor:pointer; font-weight:600; text-decoration:underline; text-decoration-color:var(--line); text-decoration-thickness:1px; text-underline-offset:3px; transition:color var(--fast) var(--ease), text-decoration-color var(--fast) var(--ease); }
+@media (hover:hover) and (pointer:fine) { .msg .text .pj:hover { color:var(--accent); text-decoration-color:currentColor; } }
+.msg .text.big .tv p { margin:0; }
+
+/* a project shown as evidence for a general answer: one folded line that opens to the full panel */
+details.cite { border:1px solid var(--line); background:var(--bg); }
+details.cite > summary { list-style:none; display:grid; grid-template-columns:auto auto 1fr 16px; align-items:center; gap:var(--s3); padding:10px var(--s4); cursor:pointer; min-width:0; }
+details.cite > summary::-webkit-details-marker { display:none; }
+details.cite > summary .lbl { font:400 11px/16px var(--f-mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+details.cite > summary b { font-weight:600; white-space:nowrap; }
+details.cite > summary .co { color:var(--soft); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+details.cite > summary .chev { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.5; transition:transform var(--fast) var(--ease); }
+details.cite[open] > summary .chev { transform:rotate(180deg); }
+details.cite[open] > summary { border-bottom:1px solid var(--line); }
+details.cite > .panel { border:0; margin:0; }
+@media (hover:hover) and (pointer:fine) { details.cite > summary:hover b { color:var(--accent); } }
+@media (max-width:600px) { details.cite > summary { grid-template-columns:auto 1fr 16px; } details.cite > summary .co { display:none; } }
+@media (prefers-reduced-motion:reduce) { details.cite > summary .chev { transition:none; } }
+
+/* a long team line goes under the title, left-aligned, instead of a ragged right-aligned block */
+.ph.stack { display:block; }
+.ph.stack small { display:block; text-align:left; margin-top:var(--s1); }

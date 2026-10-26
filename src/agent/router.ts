@@ -4,7 +4,7 @@ import type { Emit } from "./types";
 import { bestFact } from "./grounding";
 import { fitLine, fitRows, roughRequirements } from "./fit";
 import { EVENT_LINES } from "./tools";
-import { eventsIn, profileFocus, projectFilter, REASONING } from "./intent";
+import { eventsIn, profileFocus, projectFilter, REASONING, topicsIn } from "./intent";
 // runTool is imported lazily to keep router <-> tools free of a load-order cycle
 import * as tools from "./tools";
 
@@ -128,7 +128,13 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   const ranked = scoreProjects(last), best = ranked[0], clear = best.s >= 4 || (best.s >= 2 && ranked[1].s < best.s);
   // "hello", "thanks", "ok": a greeting gets a greeting and a few ways in, never a panel or a model call
   if (SMALL_TALK.test(lastUser.trim())) {
-    say(/^(thanks|thank you|thx|ty|cheers)\b/i.test(lastUser.trim()) ? "Anytime. Ask about another project, or grab his resume." : "Hi! I’m Rizwan’s agent. Ask about his projects or experience, or paste a job description to see how he fits.");
+    say(smallTalkReply(lastUser));
+    call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
+  }
+  // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
+  if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && !topicsIn(lastUser).length && !profileFocus(lastUser)
+    && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything)\b/)) {
+    say(`Not sure what you mean by “${lastUser.trim().slice(0, 40)}”. Ask about a project, his experience, or paste a job description.`);
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
   }
   if (re(/\bopen to (work|roles?|opportunit\w*|new)|\bavailab(le|ility)\b|looking for (a )?(job|role|work|opportunit)|notice period|join(ing)? date|can he join|\b(salary|ctc|compensation|expected pay|pay expectations?|salary package)\b/)) {
@@ -196,6 +202,15 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   return false;
 }
 
-export const SMALL_TALK = /^(hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (morning|afternoon|evening|night)|gm|thanks|thank you|thx|ty|cheers|ok(ay)?|cool|nice|great|awesome|got it|bye|see you)( there| rizwan| agent| again)?[\s!.?,:)]*$/i;
+// one or more small-talk words and nothing else: "hello", "okay got it", "ok thanks", "cool, bye"
+const ST_WORDS = "hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (?:morning|afternoon|evening|night)|gm|thanks|thank you|thank u|thx|ty|cheers|ok(?:ay)?|k|cool|nice|great|awesome|perfect|sure|alright|fine|understood|noted|got it|makes sense|bye|goodbye|see you|see ya|a lot|so much";
+export const SMALL_TALK = new RegExp(`^\\s*(?:${ST_WORDS})(?:[\\s,!.?:)]+(?:${ST_WORDS}))*(?:\\s+(?:there|rizwan|agent|again|man|bro|buddy))?[\\s!.?,:)]*$`, "i");
+/** What a small-talk message gets back: a greeting, a thank-you, a goodbye, or an acknowledgement. */
+export function smallTalkReply(t: string): string {
+  if (/\b(bye|goodbye|see (you|ya))\b/i.test(t)) return "Thanks for stopping by. His resume and contact details are a click away if you need them.";
+  if (/\b(thanks|thank|thx|ty|cheers)\b/i.test(t)) return "Anytime. Ask about another project, or grab his resume.";
+  if (/^\s*(hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (morning|afternoon|evening|night)|gm)\b/i.test(t)) return "Hi! I’m Rizwan’s agent. Ask about his projects or experience, or paste a job description to see how he fits.";
+  return "Sure. Anything else you’d like to see?";
+}
 
 export const isJobDescription = (t: string) => t.length > 140 || /\b(job description|jd|requirements?|we need|we're looking for|we are looking for|must have|nice to have|is he a fit|good fit)\b/i.test(t);

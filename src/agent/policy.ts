@@ -15,6 +15,8 @@ const ASKS: Partial<Record<ToolName, [RegExp, string]>> = {
 const SITE_Q = /\b(this (site|agent|portfolio|chat)|the site|how (do|does) you work|your (model|harness|guard))\b/i;
 export const ABOUT_HIM = /\b(won|win|wins|prizes?|awards?|achiev\w*|hackathons?|events?|competitions?|contests?|educat\w*|stud(y|ied|ies)|college|university|degree|cgpa|gpa|grades?|based|located|location|who is (?:he|rizwan|syed)|background|intern\w*|job|employer|company|works? at|currently|where (?:does|did) he work|novulis|supraja|employ\w*)\b/i;
 
+const WORK_Q = /\b(built|build|made|projects?|work|portfolio|shipped|apps?|experience|skills?|stack|hire|role|job|tech\w*|engineer\w*|cod(e|ing)|develop\w*|program\w*|strong\w*|best|good at|ai|agents?|rag|llm\w*|backend|frontend|full.?stack|systems?|fail\w*|architecture|internals?|example|show)\b/i;
+
 /** Every model tool call passes through here before anything reaches the visitor. */
 export function checkToolCall(call: { name: string; args: Record<string, unknown> }, ctx: { last: string; subject?: string; shown: string[]; openedThisRun: Set<string> }): Decision {
   if (!isToolName(call.name)) return { action: "drop", detail: `blocked unknown tool ${call.name.slice(0, 40)}`, reason: "unknown tool" };
@@ -34,6 +36,8 @@ export function checkToolCall(call: { name: string; args: Record<string, unknown
     // "has he won anything?" is answered by his profile; a project nobody named is noise under it
     if (!mentioned && ABOUT_HIM.test(ctx.last) && !(ctx.subject && (scoreProjects(ctx.subject).find((x) => x.p.id === args.id)?.s ?? 0) > 0))
       return { action: "drop", detail: `blocked opening ${String(args.id)}: the question is about him, not a project`, reason: "the visitor asked about Rizwan himself; answer from show_profile and do not open a project they did not name" };
+    if (!mentioned && !(ctx.subject && (scoreProjects(ctx.subject).find((x) => x.p.id === args.id)?.s ?? 0) > 0) && !WORK_Q.test(ctx.last))
+      return { action: "drop", detail: `blocked opening ${String(args.id)}: the message isn’t about his work`, reason: "the visitor did not ask about his projects or skills; answer briefly and show nothing" };
     if (/\b(architecture|internals?|diagram|pipeline|under the hood)\b/i.test(ctx.last) && args.view !== "architecture") {
       args.view = "architecture";
       detail = "switched open_project to the architecture view: you asked how it works";
@@ -68,7 +72,7 @@ export function checkToolCall(call: { name: string; args: Record<string, unknown
   }
 
   // the list and his profile answer questions about his work and about him; under "hello" or "can you hear me" they are noise
-  const WORKY = /\b(built|build|made|projects?|work|portfolio|everything|shipped|apps?|experience|skills?|stack|hire|role|job|resume|cv)\b/i;
+  const WORKY = /\b(built|build|made|projects?|work|portfolio|everything|shipped|apps?|experience|skills?|stack|hire|role|job|resume|cv|tech\w*|engineer\w*|cod(e|ing)|develop\w*|program\w*|strong\w*|best|good at|ai|agents?|backend|frontend|full.?stack|systems?)\b/i;
   if (name === "list_projects" && !WORKY.test(ctx.last) && !projectFilter(ctx.last, undefined, true))
     return { action: "drop", detail: "blocked the project list: the message doesn’t ask about his work", reason: "the visitor did not ask about his projects; answer briefly and show nothing" };
   if (name === "show_profile" && !ABOUT_HIM.test(ctx.last) && !profileFocus(ctx.last) && !/\b(he|him|his|rizwan|syed|who)\b/i.test(ctx.last) && !WORKY.test(ctx.last))

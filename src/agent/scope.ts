@@ -21,8 +21,23 @@ export const stripCode = (t: string) => t.replace(/```[\s\S]*?(```|$)/g, " ").sp
 
 // His private life is not on this site: partner, family, religion, age, home address. Answered with one fixed
 // line and no panel, never by a model (which could guess) and never with his profile card under it.
-const PERSONAL = /\b(girl ?friends?|boy ?friends?|gf|wife|husband|fianc[eé]e?|married|marriage|dating|crush|love life|relationship status|is he single|religion|religious|caste|politic(s|al)|how old is (he|rizwan)|his (age|address|family|parents|father|mother|dad|mom|siblings?|brother|sister))\b/i;
-export const personal = (text: string) => PERSONAL.test(text);
+const PERSONAL = /\b(girl ?friends?|boy ?friends?|gf|bf|bestie|girl ?bestie|bff|best friends?|wife|husband|partner|fianc[eé]e?|married|marriage|dating|dates?|crush|love life|in love|relationships?|is he single|religion|religious|caste|politic(s|al)|how old|his age|age of|his (address|family|parents|father|mother|dad|mom|siblings?|brother|sister)|gay|lesbian|bi ?sexual|straight|homo\w*|queer|trans\w*gender|sexuality|orientation|gender|male or female|boy or (a )?girl|man or (a )?woman|sex\w*|intercourse|virgin\w*|body ?count|porn\w*|nudes?|naked|horny|kiss\w*|hook ?ups?|one night)\b/i;
+// "the relationship between PACK and CCR" is about his work: a named project wins
+export const personal = (text: string) => PERSONAL.test(text) && scoreProjects(text)[0].s < 4;
+
+// abuse and profanity: one calm line, never a model (a model either lectures or plays along)
+const ABUSE = /\b(f+u+c+k\w*|fck\w*|f\*+k|sh[i1]t\w*|bitch\w*|bastard\w*|asshole\w*|dick\w*|cock\w*|puss(y|ies)|slut\w*|whore\w*|cunt\w*|wank\w*|retard\w*|idiot\w*|stupid|dumb\w*|moron\w*|chutiya\w*|madarchod|behenchod|bhenchod|bc|mc|randi\w*|gandu|lavde|lodu)\b/i;
+export const abusive = (text: string) => ABUSE.test(text);
+export const ABUSE_REPLY = "Let’s keep it to his work. Ask about a project or his experience, or paste a job description.";
+
+// accusations about him: nothing on the site says so, and the agent never guesses about a person
+const ACCUSE = /\b(betray\w*|fired|sacked|terminated|laid off|scam\w*|fraud\w*|cheat(ed|er|s|ing)?|stole|steal\w*|lied|liar|lying|criminal|arrest\w*|jail\w*|prison|lawsuit|sued|scandal\w*|plagiar\w*|blacklist\w*|misconduct|harass\w*)\b/i;
+export const accusation = (text: string) => ACCUSE.test(text) && scoreProjects(text)[0].s < 4;
+export const ACCUSE_REPLY = "Nothing on this site says that, and I won’t guess about a person. His work history and projects are here if you want to check them.";
+// his life outside work (fitness, sports, hobbies, looks) is not on this site either, apart from the poetry he writes
+const LIFESTYLE = /\b(gym|work ?outs?|weigh\w*|lift(ing|s)?|body ?build\w*|bodybuilding|fitness|exercis\w*|sports?|cricket|football|soccer|basketball|badminton|running|marathon|yoga|swim\w*|hobb(y|ies)|movies?|films?|music|songs?|singer|dance|danc\w*|travel\w*|food|diet|vegetarian|height|how tall|his weight|how does he look|good.looking|handsome|physique|games he plays|play(s)? (games|any sport))\b/i;
+export const lifestyle = (text: string) => LIFESTYLE.test(text) && !/\b(app|project|built|build|agent|dashboard|platform)\b/i.test(text);
+export const LIFESTYLE_REPLY = "His write-up only covers his work. Outside it, the one thing it mentions is that he writes poetry, which became VerseYou.";
 export const PERSONAL_REPLY = "That’s personal, so I’ll leave it to him. I cover his work: projects, experience and how he builds.";
 
 export const REFUSAL = "Outside my lane. I only show Rizwan’s work.";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GUARD_REFUSAL, PERSONAL_REPLY, REFUSAL } from "@/agent/scope";
+import { ABUSE_REPLY, ACCUSE_REPLY, GUARD_REFUSAL, PERSONAL_REPLY, REFUSAL } from "@/agent/scope";
 import { ModelError } from "@/agent/types";
 import { assertHealthy, blockScreen, call, http, say, scripted, tools, turn } from "./helpers";
 
@@ -427,5 +427,42 @@ describe("golden · panels only for questions about him or his work", () => {
     const m = scripted("a", [say("He has built ten projects.", call("list_projects"), call("suggest", { options: ["x"] }))]);
     const r = await turn({ turns: ["Why is his work interesting?"] }, [m]);
     expect(r.of("panel").map((p) => p.panel.kind)).toEqual(["index"]);
+  });
+});
+
+describe("golden · life outside work, and projects nobody asked about", () => {
+  it("fitness, sports and hobbies get one honest line and no panel", async () => {
+    for (const q of ["does he do weighlfting", "does he do body weightlifting", "does he go to the gym?", "what are his hobbies?", "does he play cricket"]) {
+      const r = await turn({ turns: [q] }, [never()]);
+      expect(r.text).toMatch(/only covers his work/); expect(r.of("panel")).toHaveLength(0);
+    }
+    const app = await turn({ turns: ["did he build a fitness app?"] }, [scripted("a", [say("None of his projects is a fitness app.", call("suggest", { options: ["x"] }))])]);
+    expect(app.text).not.toMatch(/only covers his work/);
+  });
+  it("a project the model opens under a message about nothing in his work is blocked", async () => {
+    const m = scripted("a", [say("He keeps busy.", call("open_project", { id: "pack", view: "architecture" }), call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["is he a morning person?"] }, [m]);
+    expect(r.of("panel")).toHaveLength(0);
+    expect(r.of("trace").some((t) => /the message isn’t about his work/.test(t.detail))).toBe(true);
+    const tech = await turn({ turns: ["how good is he in tech?"] }, [scripted("a", [say("His strongest evidence is PACK.", call("open_project", { id: "pack" }), call("suggest", { options: ["x"] }))])]);
+    expect(tech.of("panel").map((p) => p.panel.id)).toEqual(["pack"]);
+  });
+});
+
+describe("golden · abuse, private life, accusations and vague words", () => {
+  const fixed = async (q: string) => turn({ turns: [q] }, [never()]);
+  it("abuse gets one calm line; sexuality, gender, age and body questions are private; accusations are not repeated", async () => {
+    for (const q of ["fucking", "did he fuck yesterday", "can you fuck him ?"]) { const r = await fixed(q); expect(r.text).toBe(ABUSE_REPLY); expect(r.of("panel")).toHaveLength(0); }
+    for (const q of ["what's his body count", "girlbestie", "is he a boy or girl", "how old he is", "any relationships", "does he do sexual intercourse", "his boyfriend", "is he gay or male", "is he bisexual"]) {
+      const r = await fixed(q); expect(r.text).toBe(PERSONAL_REPLY); expect(r.of("panel")).toHaveLength(0);
+    }
+    for (const q of ["did he betray his company", "I know he betrayed his company right", "was he fired?"]) { const r = await fixed(q); expect(r.text).toBe(ACCUSE_REPLY); expect(r.of("panel")).toHaveLength(0); }
+  });
+  it("one or two words that name nothing get a question back, not a guess", async () => {
+    for (const q of ["count", "body"]) { const r = await fixed(q); expect(r.text).toMatch(/^Not sure what you mean/); expect(r.of("panel")).toHaveLength(0); }
+  });
+  it("a sentence the model repeats is said once", async () => {
+    const r = await turn({ turns: ["what does he think about tabs vs spaces?"] }, [scripted("a", [say("His write-up doesn’t cover that. His write-up doesn’t cover that. His write-up doesn’t cover that.", call("suggest", { options: ["x"] }))])]);
+    expect(r.text.match(/doesn’t cover that/g)).toHaveLength(1);
   });
 });

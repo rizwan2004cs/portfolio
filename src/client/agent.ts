@@ -4,7 +4,7 @@ import { EXPERIENCE, PROFILE, PROJECTS } from "@/content/data";
 import type { Project } from "@/content/types";
 import { fitRows } from "@/agent/fit";
 import { wireContactForms } from "./contact";
-import { CHEV, connectPanel, esc, fitPanel, harnessPanel, homeIntro, ICON, indexPanel, profilePart, projectPanel, resumePanel, shortlistPanel } from "@/render/html";
+import { answerHtml, CHEV, connectPanel, esc, fitPanel, harnessPanel, homeIntro, ICON, indexPanel, profilePart, projectPanel, resumePanel, shortlistPanel } from "@/render/html";
 import { fine, fmt, installImageHandling, paintClocks, readShortlist, reduce, runSim, startClock, wait, wireArch, writeShortlist } from "./shared";
 
 type Meta = { mode: string; model?: string; ms?: number; tools?: number; fallback?: boolean };
@@ -44,9 +44,14 @@ export function mountAgent(shell: HTMLElement): () => void {
     if (reveal && !into) { reveal = false; requestAnimationFrame(() => el.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" })); }
     return el;
   }
+  // a project named in an answer opens that project
+  const wireAnswer = (el: ParentNode) => el.querySelectorAll<HTMLButtonElement>(".msg .pj[data-openp]").forEach((b) => (b.onclick = () => void send(`Open ${P.get(b.dataset.openp!)!.title}`)));
   async function say(text: string, opts: { big?: boolean } = {}) {
     const words = text.split(/(\s+)/), slot = target?.querySelector(".ttext") ?? undefined;
-    const el = add(`<div class="msg${lastAgentRun ? " cont" : ""}"><span class="mark${down ? " degraded" : ""}" aria-hidden="true"><i></i></span><div class="text${opts.big ? " big" : ""}"><span class="sr">${esc(text)}</span><span aria-hidden="true">${words.map((w, i) => (/\s+/.test(w) ? w : `<span class="w" style="animation-delay:${Math.min(i * 12, 500)}ms">${esc(w)}</span>`)).join("")}</span></div></div>`, slot);
+    // the plain sentence for screen readers; the formatted one (paragraphs, project links, figures) for the eye
+    const shown = opts.big ? words.map((w, i) => (/\s+/.test(w) ? w : `<span class="w" style="animation-delay:${Math.min(i * 12, 500)}ms">${esc(w)}</span>`)).join("") : answerHtml(text);
+    const el = add(`<div class="msg${lastAgentRun ? " cont" : ""}"><span class="mark${down ? " degraded" : ""}" aria-hidden="true"><i></i></span><div class="text${opts.big ? " big" : ""}"><span class="sr">${esc(text)}</span><span class="tv" aria-hidden="true">${shown}</span></div></div>`, slot);
+    wireAnswer(el);
     lastAgentRun = true;
     await wait(Math.min(words.length * 12, 500) + 80);
     return el;
@@ -196,6 +201,11 @@ export function mountAgent(shell: HTMLElement): () => void {
     try { await navigator.clipboard.writeText(text); if (note) note.textContent = ok; } catch { if (note) note.textContent = "Couldn’t reach the clipboard"; }
   }
 
+  function citeFold(el: HTMLElement, p: Project) {
+    const d = document.createElement("details"); d.className = "cite";
+    d.innerHTML = `<summary><span class="lbl">source</span><b>${esc(p.title)}</b><span class="co">${esc(p.oneLiner)}</span>${CHEV}</summary>`;
+    el.replaceWith(d); d.appendChild(el);
+  }
   function showPanel(kind: string, id?: string, opts: { compact?: boolean } = {}): HTMLElement | undefined {
     const key = `${kind}:${id || ""}`, existing = col.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`);
     // asked again: draw it again here, in the reply, instead of pointing back up the page
@@ -562,7 +572,10 @@ export function mountAgent(shell: HTMLElement): () => void {
         if (["search_projects", "switch_mode"].includes(e.name)) plan.done(pending);
       } else if (e.type === "panel") {
         if (plan && pending != null) plan.done(pending);
-        showPanel(e.panel.kind, e.panel.id, { compact: compactNext && e.panel.kind === "project" }); if (e.panel.kind === "project") compactNext = true;
+        const pel = showPanel(e.panel.kind, e.panel.id, { compact: compactNext && e.panel.kind === "project" }); if (e.panel.kind === "project") compactNext = true;
+        // a project the question didn't name is evidence for the answer, not the answer: shown as a folded citation
+        const pp = e.panel.id ? P.get(e.panel.id) : undefined;
+        if (pel && pp && (e.panel.kind === "project" || e.panel.kind === "architecture") && !new RegExp(`\\b(${pp.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|${pp.id})\\b`, "i").test(text)) citeFold(pel, pp);
         await wait(160);
       } else if (e.type === "frontend" && e.name === "switch_mode") { saveSession(); setTimeout(() => { location.href = e.args.mode === "classic" ? "/" : "/agent"; }, 900); }
       else if (e.type === "approval") { if (plan && pending != null) plan.done(pending); approvalCard(e.action); }
@@ -710,6 +723,7 @@ export function mountAgent(shell: HTMLElement): () => void {
       const fresh = d.firstElementChild as HTMLElement; fresh.dataset.key = key; el.replaceWith(fresh);
     });
     col.querySelectorAll<HTMLElement>(".panel").forEach(wirePanel);
+    wireAnswer(col);
     q(".composer").prepend(q(".row2")); q(".composer").appendChild(form); q(".composer").classList.remove("hidden");
     col.lastElementChild?.scrollIntoView({ block: "end" }); chips(["Everything he’s built", "How does this site work?", "Get resume"]);
     setState({ onScreen: [...shown].filter((x) => !x.includes(":")) });
