@@ -6,7 +6,8 @@ const SECTIONS: [string, string, string, string?][] = [
   ["projects", "Projects", "M2.5 2.5h4.5v4.5h-4.5zM9 2.5h4.5v4.5h-4.5zM2.5 9h4.5v4.5h-4.5zM9 9h4.5v4.5h-4.5z"],
   ["principles", "How I build", "M3 3h3.5v3.5h-3.5zM9.5 9.5h3.5v3.5h-3.5zM6.5 4.75h3.25v4.75", "Build"],
   ["events", "Events", "M2.5 3.5h11v10h-11zM2.5 6.5h11M5.5 2v3M10.5 2v3"],
-  ["outside", "Outside work", "M2.5 2.5h11v11h-11zM5 2.5v11M11 2.5v11M2.5 5.5h2.5M2.5 10.5h2.5M11 5.5h2.5M11 10.5h2.5", "Outside"],
+  // "Films" goes to the Outside work section on the home page, where his picks start
+  ["outside", "Films", "M2.5 2.5h11v11h-11zM5 2.5v11M11 2.5v11M2.5 5.5h2.5M2.5 10.5h2.5M11 5.5h2.5M11 10.5h2.5"],
   ["contact", "Contact", "M2.5 3.5h11v9h-11zM2.5 4l5.5 4.5 5.5-4.5"],
 ];
 
