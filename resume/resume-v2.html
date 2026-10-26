@@ -1,0 +1,125 @@
+<!doctype html>
+<!-- His resume in his own Word design (Calibri, centred name, a rule under every heading, italic dates on the right),
+     rebuilt for ATS parsers: one column, real text in reading order, standard section names, no icons or tables.
+     Build: node resume/build-v2.mjs  →  resume/Syed-Mohammad-Rizwan-Resume.pdf -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Syed Mohammad Rizwan – Resume</title>
+<meta name="author" content="Syed Mohammad Rizwan">
+<style>
+  @font-face { font-family: Cal; src: url("file:///Applications/Microsoft%20PowerPoint.app/Contents/Resources/DFonts/Calibri.ttf"); font-weight: 400; font-style: normal; }
+  @font-face { font-family: Cal; src: url("file:///Applications/Microsoft%20PowerPoint.app/Contents/Resources/DFonts/Calibrib.ttf"); font-weight: 700; font-style: normal; }
+  @font-face { font-family: Cal; src: url("file:///Applications/Microsoft%20PowerPoint.app/Contents/Resources/DFonts/Calibrii.ttf"); font-weight: 400; font-style: italic; }
+  @font-face { font-family: Cal; src: url("file:///Applications/Microsoft%20PowerPoint.app/Contents/Resources/DFonts/Calibriz.ttf"); font-weight: 700; font-style: italic; }
+  @page { size: Letter; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* US Letter like his original: 612 x 792pt, 67pt side margins */
+  body { width: 8.5in; height: 11in; padding: 30pt 62pt 20pt 62pt; font: 9.8pt/1.2 Cal, Calibri, sans-serif; color: #000; font-variant-ligatures: none; font-kerning: normal; }
+  a { color: inherit; text-decoration: none; }
+  h1 { text-align: center; font-size: 18.6pt; font-weight: 700; letter-spacing: .02em; line-height: 1.1; }
+  .contact { text-align: center; font-size: 9.3pt; margin-top: 2pt; white-space: nowrap; }
+  .contact a { color: #0b4fd6; text-decoration: underline; }
+  h2 { font-size: 12.1pt; font-weight: 700; margin: 7pt 0 3pt; padding-bottom: 1pt; border-bottom: .36pt solid #000; }
+  p, li { font-size: 9.8pt; }
+  ul { list-style: none; }
+  /* bullet is in-flow text (not absolutely positioned) so every PDF extractor reads it at the start of its line */
+  ul.b li { padding-left: 11pt; text-indent: -9.5pt; margin-bottom: .8pt; }
+  ul.b li::before { content: "\2022"; display: inline-block; width: 9.5pt; text-indent: 0; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12pt; }
+  .row .t b { font-weight: 700; }
+  .row .t i, .row .d { font-style: italic; }
+  .row .d { flex: none; text-align: right; min-width: 104pt; }
+  .entry { margin-bottom: 3pt; }
+  .entry ul { margin-top: 1.5pt; }
+  .skills li { margin-bottom: 1.2pt; }
+  .skills b { font-weight: 700; }
+  /* 5pt between education rows keeps pdftotext from stacking the three dates into one column block */
+  .edu .row { margin-bottom: 5pt; }
+  .edu .sub { font-style: italic; margin: -1pt 0 2pt; }
+  .proj .link { font-style: italic; color: #333; }
+</style>
+</head>
+<body>
+  <h1>SYED MOHAMMAD RIZWAN</h1>
+  <p class="contact">Bengaluru, India | +91 9110373624 | <a href="mailto:mohammad22cse@gmail.com">mohammad22cse@gmail.com</a> | <a href="https://www.linkedin.com/in/rizwan2004cs">linkedin.com/in/rizwan2004cs</a> | <a href="https://github.com/rizwan2004cs">github.com/rizwan2004cs</a></p>
+
+  <h2>Profile</h2>
+  <p>Software engineer who builds AI agents and full-stack products that hold up in real use: multi-agent systems that keep working when a model fails, retrieval that cites its sources, and assistants that act only after the user confirms.</p>
+
+  <h2>Skills</h2>
+  <ul class="b skills">
+    <li><b>Languages:</b> Python, TypeScript, JavaScript, Java, SQL · <b>Concepts:</b> Data Structures, Object-Oriented Programming (OOP), Database Management Systems (DBMS)</li>
+    <li><b>AI and LLMs:</b> Large Language Models (LLMs), LangGraph, multi-agent systems, Retrieval-Augmented Generation (RAG), Pinecone, tool calling with Groq, OpenAI and Gemini, model fallbacks</li>
+    <li><b>Web and data:</b> FastAPI, Node.js, Express.js, Spring Boot, React, Next.js, React Native, PostgreSQL, Supabase, MongoDB</li>
+    <li><b>Cloud and DevOps:</b> Azure App Service, Azure Functions, Azure OpenAI, Azure DevOps, Azure SQL, Power Platform, Docker, GitHub Actions, Git</li>
+    <li><b>Security:</b> web application Vulnerability Assessment and Penetration Testing (VAPT), Nessus, Burp Suite, Wireshark</li>
+  </ul>
+
+  <h2>Experience</h2>
+  <div class="entry">
+    <div class="row"><span class="t"><b>Associate Software Engineer (R&amp;D)</b> — <i>Novulis Consulting, Bengaluru</i></span><span class="d">Jun 2026 – Present</span></div>
+    <ul class="b">
+      <li>Research and evaluate emerging technologies; build prototypes and proofs of concept to validate new product ideas.</li>
+      <li>Build scalable full-stack applications on Azure (App Service, Functions, Azure OpenAI, SQL) and Power Platform.</li>
+      <li>Work with cross-functional teams through code reviews, testing and continuous improvement.</li>
+    </ul>
+  </div>
+  <div class="entry">
+    <div class="row"><span class="t"><b>Software Engineering Intern (R&amp;D)</b> — <i>Novulis Consulting, Remote</i></span><span class="d">Mar 2026 – May 2026</span></div>
+    <ul class="b"><li>Worked with the R&amp;D team on full-stack development and AI prototypes; converted to a full-time role in June 2026.</li></ul>
+  </div>
+  <div class="entry">
+    <div class="row"><span class="t"><b>Cyber Security Intern (Web Application VAPT)</b> — <i>Supraja Technologies, Vijayawada</i></span><span class="d">Jun 2025 – Sep 2025</span></div>
+    <ul class="b">
+      <li>Performed web application vulnerability assessment and penetration testing, finishing with a project.</li>
+      <li>Ran security assessments and threat analysis with the team, using Nessus, Burp Suite and Wireshark.</li>
+    </ul>
+  </div>
+
+  <h2>Projects</h2>
+  <div class="entry proj">
+    <div class="row"><span class="t"><b>FinBoom</b> — <i>offline-first net-worth tracker · <a href="https://github.com/rizwan2004cs/finboom">github.com/rizwan2004cs/finboom</a></i></span><span class="d">2026</span></div>
+    <ul class="b">
+      <li>Assistant turns speech or text into one validated action, saved only after the user confirms; no model database access.</li>
+      <li>Next.js, React, TypeScript PWA with an offline queue on Supabase (row-level security); 129 commits, GitHub Actions CI.</li>
+    </ul>
+  </div>
+  <div class="entry proj">
+    <div class="row"><span class="t"><b>CCR Compliance Advisor</b> — <i>RAG agent for California regulations</i></span><span class="d">2026</span></div>
+    <ul class="b">
+      <li>Async crawler (Crawl4AI) collected 74,975 of 74,997 regulation sections (99.97%), with checkpoints so a crash resumes.</li>
+      <li>Pinecone retrieval (top 8); answers only from retrieved sections, one citation per claim; Streamlit and Groq on Render.</li>
+    </ul>
+  </div>
+  <div class="entry proj">
+    <p><b>Health-care Application</b> — MERN-stack hospital system: patient records, appointments, multi-role access.</p>
+    <p><b>Keylogger</b> — security research project on how keystroke-logging malware works, to inform detection.</p>
+  </div>
+
+  <h2>Achievements</h2>
+  <ul class="b">
+    <li><b>Won $115</b> at Superteam Capture the Flag v2 (Solana security CTF), Superteam × LocalHost, Bengaluru, Jul 2026.</li>
+  </ul>
+
+  <h2>Leadership</h2>
+  <div class="row"><span class="t"><b>IEEE Student Branch, NBKRIST</b> — <i>Finance Team Lead (2025 – 2026), Treasurer (2024 – 2025)</i></span><span class="d">Feb 2024 – Jan 2026</span></div>
+
+  <h2>Certifications</h2>
+  <ul class="b">
+    <li>SQL (Intermediate) — HackerRank</li>
+    <li>Advanced Python: Language Features — LinkedIn Learning</li>
+    <li>Java (Basic) — HackerRank</li>
+    <li>Postman API Fundamentals Student Expert — Postman/LetsUpgrade</li>
+    <li>Git and GitHub Bootcamp — LetsUpgrade</li>
+  </ul>
+
+  <h2>Education</h2>
+  <div class="edu">
+    <div class="row"><span class="t"><b>B.Tech, Computer Science and Engineering</b> — <i>NBKR Institute of Science and Technology</i></span><span class="d">2022 – 2026</span></div>
+    <p class="sub">Bachelor of Technology · CGPA 9.09, First Class with Distinction</p>
+    <div class="row"><span class="t"><b>Intermediate (MPC)</b> — <i>Sri Chaitanya Jr College</i> · CGPA 9.72</span><span class="d">2020 – 2022</span></div>
+    <div class="row"><span class="t"><b>SSC</b> — <i>Himalaya E.M. High School</i> · Marks 593/600</span><span class="d">2020</span></div>
+  </div>
+</body>
+</html>

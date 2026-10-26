@@ -1,0 +1,122 @@
+import { EventEncoder } from "@ag-ui/encoder";
+import { z } from "zod";
+import { isProjectId } from "@/content/data";
+import { newIds, runError, runFinished, runStarted, toAgui } from "./agui";
+import { cacheKey, makeCache, type AnswerCache } from "./cache";
+import { groqScreen, modelChain } from "./models";
+import { router } from "./router";
+import { runAgent, SYSTEM } from "./run";
+import { ALL_FACTS_SOURCE, TOOL_DEFS, toolContext } from "./tools";
+import type { AgentEvent, ModelClient, RunMeta, Screen } from "./types";
+
+// modelRunsPerDay: Groq's free tier allows 1,000 requests/day per model and a run makes 2–3, so ~600 runs across both models.
+// turnChars fits a pasted job description; bodyBytes fits six of them
+// the prompt, the tools and every fact the tools return: changing any of them must not serve old answers
+const PROMPT_HASH = [...`${SYSTEM}${JSON.stringify(TOOL_DEFS)}${ALL_FACTS_SOURCE}${toolContext("show_harness")}`].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7).toString(36);
+
+export const LIMITS = { bodyBytes: 24576, turnChars: 2000, turns: 6, shown: 20, perMinute: 12, modelRunsPerDay: 600 } as const;
+const SHOWN_OK = new Set(["profile", "index", "harness", "done:resume", "done:contact"]);
+
+const Body = z.object({
+  turns: z.array(z.string()).min(1),
+  shown: z.array(z.string()).optional().default([]),
+  killModel: z.boolean().optional().default(false),
+  threadId: z.string().max(80).optional(),
+});
+
+export interface HandlerDeps {
+  models: () => ModelClient[];
+  screen: Screen;
+  cache: AnswerCache;
+  now: () => number;
+}
+
+export function defaultDeps(env = process.env): HandlerDeps {
+  const groqKeys = [env.GROQ_API_KEY, ...(env.GROQ_API_KEYS_FALLBACK ?? "").split(",")].map((k) => k?.trim() ?? "").filter(Boolean);
+  return {
+    models: () => modelChain(groqKeys, env.GEMINI_API_KEY?.trim() || undefined),
+    screen: groqScreen(groqKeys),
+    cache: makeCache(),
+    now: () => Date.now(),
+  };
+}
+
+// Per-IP sliding window and a daily model budget. In-memory per warm instance; Vercel WAF adds the hard edge limit.
+const hits = new Map<string, number[]>();
+let budget = { day: "", runs: 0 };
+export function rateLimited(ip: string, now: number): boolean {
+  const recent = (hits.get(ip) ?? []).filter((t) => now - t < 60_000);
+  recent.push(now);
+  hits.set(ip, recent);
+  if (hits.size > 5000) hits.delete(hits.keys().next().value as string);
+  return recent.length > LIMITS.perMinute;
+}
+function overBudget(now: number): boolean {
+  const day = new Date(now).toISOString().slice(0, 10);
+  if (budget.day !== day) budget = { day, runs: 0 };
+  return budget.runs >= LIMITS.modelRunsPerDay;
+}
+export const _resetLimits = () => { hits.clear(); budget = { day: "", runs: 0 }; };
+
+/** POST /api/agent → AG-UI event stream (SSE). Never throws to the client; every run ends with RUN_FINISHED or RUN_ERROR. */
+export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"): Promise<Response> {
+  const len = Number(req.headers.get("content-length") ?? 0);
+  if (len > LIMITS.bodyBytes) return new Response("payload too large", { status: 413 });
+  const raw = await req.text();
+  if (raw.length > LIMITS.bodyBytes) return new Response("payload too large", { status: 413 });
+  let parsed: z.infer<typeof Body>;
+  try { parsed = Body.parse(JSON.parse(raw)); } catch { return new Response("bad request", { status: 400 }); }
+
+  const turns = parsed.turns.map((t) => t.trim().slice(0, LIMITS.turnChars)).filter(Boolean).slice(-LIMITS.turns);
+  if (!turns.length) return new Response("bad request", { status: 400 });
+  const shown = parsed.shown.map(String).filter((s) => isProjectId(s) || SHOWN_OK.has(s)).slice(0, LIMITS.shown);
+  const now = deps.now();
+  if (rateLimited(ip, now)) return new Response("slow down", { status: 429, headers: { "Retry-After": "60" } });
+
+  const encoder = new EventEncoder({ accept: req.headers.get("accept") ?? undefined });
+  const { threadId: newThread, runId } = newIds();
+  const threadId = parsed.threadId ?? newThread;
+  const ctl = new AbortController();
+  req.signal?.addEventListener("abort", () => ctl.abort());
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const te = new TextEncoder();
+      const send = (e: Parameters<typeof encoder.encode>[0]) => { try { controller.enqueue(te.encode(encoder.encode(e))); } catch { /* client gone */ } };
+      const emit = (ev: AgentEvent) => toAgui(ev).forEach(send);
+      send(runStarted(threadId, runId));
+      try {
+        const key = `${cacheKey(turns, shown)}:${PROMPT_HASH}`;
+        const hit = !parsed.killModel ? deps.cache.get(key) : undefined;
+        let meta: RunMeta;
+        if (hit) {
+          emit({ type: "trace", step: "cache", detail: "same question answered before · replayed, 0 tokens", level: "ok" });
+          hit.forEach(emit);
+          meta = { mode: "cache" };
+        } else {
+          const recorded: AgentEvent[] = [];
+          const record = (ev: AgentEvent) => { if (ev.type !== "trace") recorded.push(ev); emit(ev); };
+          const budgetOut = overBudget(now);
+          if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
+          meta = await runAgent({ turns, shown, killModel: parsed.killModel || budgetOut }, record, { models: deps.models(), screen: deps.screen, signal: ctl.signal });
+          if (meta.mode === "model" || meta.mode === "partial") budget.runs++;
+          if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
+        }
+        send(runFinished(threadId, runId, meta));
+      } catch (err) {
+        console.error("agent run failed", err);
+        // last line of defence: the deterministic router still answers
+        try {
+          emit({ type: "trace", step: "fallback", detail: "unexpected error · deterministic router", level: "err" });
+          router(turns.at(-1)!, emit);
+          send(runFinished(threadId, runId, { mode: "router" }));
+        } catch { send(runError("The agent hit an error. Try again.")); }
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() { ctl.abort(); },
+  });
+
+  return new Response(stream, { headers: { "Content-Type": encoder.getContentType(), "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });
+}
