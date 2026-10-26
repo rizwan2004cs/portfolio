@@ -429,3 +429,22 @@ describe("golden · panels only for questions about him or his work", () => {
     expect(r.of("panel").map((p) => p.panel.kind)).toEqual(["index"]);
   });
 });
+
+describe("golden · life outside work, and projects nobody asked about", () => {
+  it("fitness, sports and hobbies get one honest line and no panel", async () => {
+    for (const q of ["does he do weighlfting", "does he do body weightlifting", "does he go to the gym?", "what are his hobbies?", "does he play cricket"]) {
+      const r = await turn({ turns: [q] }, [never()]);
+      expect(r.text).toMatch(/only covers his work/); expect(r.of("panel")).toHaveLength(0);
+    }
+    const app = await turn({ turns: ["did he build a fitness app?"] }, [scripted("a", [say("None of his projects is a fitness app.", call("suggest", { options: ["x"] }))])]);
+    expect(app.text).not.toMatch(/only covers his work/);
+  });
+  it("a project the model opens under a message about nothing in his work is blocked", async () => {
+    const m = scripted("a", [say("He keeps busy.", call("open_project", { id: "pack", view: "architecture" }), call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["is he a morning person?"] }, [m]);
+    expect(r.of("panel")).toHaveLength(0);
+    expect(r.of("trace").some((t) => /the message isn’t about his work/.test(t.detail))).toBe(true);
+    const tech = await turn({ turns: ["how good is he in tech?"] }, [scripted("a", [say("His strongest evidence is PACK.", call("open_project", { id: "pack" }), call("suggest", { options: ["x"] }))])]);
+    expect(tech.of("panel").map((p) => p.panel.id)).toEqual(["pack"]);
+  });
+});

@@ -6,7 +6,7 @@ import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
-import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, offScope, personal, PERSONAL_REPLY, REFUSAL, stripCode } from "./scope";
+import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, lifestyle, LIFESTYLE_REPLY, offScope, personal, PERSONAL_REPLY, REFUSAL, stripCode } from "./scope";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
 
@@ -85,6 +85,12 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
     emit({ type: "trace", step: "scope", detail: "off-scope request refused · 0 tokens", level: "warn" });
     emit({ type: "text", text: REFUSAL });
     emit({ type: "suggest", options: DEFAULT_NEXT });
+    return { mode: "scope" };
+  }
+  if (lifestyle(last) && !personal(last)) {
+    emit({ type: "trace", step: "scope", detail: "a question about his life outside work · fixed reply, no model, no panel · 0 tokens", level: "info" });
+    emit({ type: "text", text: LIFESTYLE_REPLY });
+    emit({ type: "suggest", options: ["Open VerseYou", "Everything he’s built", "Get resume"] });
     return { mode: "scope" };
   }
   if (personal(last)) {

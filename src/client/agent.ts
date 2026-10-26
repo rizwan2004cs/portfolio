@@ -201,6 +201,11 @@ export function mountAgent(shell: HTMLElement): () => void {
     try { await navigator.clipboard.writeText(text); if (note) note.textContent = ok; } catch { if (note) note.textContent = "Couldn’t reach the clipboard"; }
   }
 
+  function citeFold(el: HTMLElement, p: Project) {
+    const d = document.createElement("details"); d.className = "cite";
+    d.innerHTML = `<summary><span class="lbl">source</span><b>${esc(p.title)}</b><span class="co">${esc(p.oneLiner)}</span>${CHEV}</summary>`;
+    el.replaceWith(d); d.appendChild(el);
+  }
   function showPanel(kind: string, id?: string, opts: { compact?: boolean } = {}): HTMLElement | undefined {
     const key = `${kind}:${id || ""}`, existing = col.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`);
     // asked again: draw it again here, in the reply, instead of pointing back up the page
@@ -567,7 +572,10 @@ export function mountAgent(shell: HTMLElement): () => void {
         if (["search_projects", "switch_mode"].includes(e.name)) plan.done(pending);
       } else if (e.type === "panel") {
         if (plan && pending != null) plan.done(pending);
-        showPanel(e.panel.kind, e.panel.id, { compact: compactNext && e.panel.kind === "project" }); if (e.panel.kind === "project") compactNext = true;
+        const pel = showPanel(e.panel.kind, e.panel.id, { compact: compactNext && e.panel.kind === "project" }); if (e.panel.kind === "project") compactNext = true;
+        // a project the question didn't name is evidence for the answer, not the answer: shown as a folded citation
+        const pp = e.panel.id ? P.get(e.panel.id) : undefined;
+        if (pel && pp && (e.panel.kind === "project" || e.panel.kind === "architecture") && !new RegExp(`\\b(${pp.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|${pp.id})\\b`, "i").test(text)) citeFold(pel, pp);
         await wait(160);
       } else if (e.type === "frontend" && e.name === "switch_mode") { saveSession(); setTimeout(() => { location.href = e.args.mode === "classic" ? "/" : "/agent"; }, 900); }
       else if (e.type === "approval") { if (plan && pending != null) plan.done(pending); approvalCard(e.action); }

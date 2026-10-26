@@ -23,6 +23,10 @@ export const stripCode = (t: string) => t.replace(/```[\s\S]*?(```|$)/g, " ").sp
 // line and no panel, never by a model (which could guess) and never with his profile card under it.
 const PERSONAL = /\b(girl ?friends?|boy ?friends?|gf|wife|husband|fianc[eé]e?|married|marriage|dating|crush|love life|relationship status|is he single|religion|religious|caste|politic(s|al)|how old is (he|rizwan)|his (age|address|family|parents|father|mother|dad|mom|siblings?|brother|sister))\b/i;
 export const personal = (text: string) => PERSONAL.test(text);
+// his life outside work (fitness, sports, hobbies, looks) is not on this site either, apart from the poetry he writes
+const LIFESTYLE = /\b(gym|work ?outs?|weigh\w*|lift(ing|s)?|body ?build\w*|bodybuilding|fitness|exercis\w*|sports?|cricket|football|soccer|basketball|badminton|running|marathon|yoga|swim\w*|hobb(y|ies)|movies?|films?|music|songs?|singer|dance|danc\w*|travel\w*|food|diet|vegetarian|height|how tall|his weight|how does he look|good.looking|handsome|physique|games he plays|play(s)? (games|any sport))\b/i;
+export const lifestyle = (text: string) => LIFESTYLE.test(text) && !/\b(app|project|built|build|agent|dashboard|platform)\b/i.test(text);
+export const LIFESTYLE_REPLY = "His write-up only covers his work. Outside it, the one thing it mentions is that he writes poetry, which became VerseYou.";
 export const PERSONAL_REPLY = "That’s personal, so I’ll leave it to him. I cover his work: projects, experience and how he builds.";
 
 export const REFUSAL = "Outside my lane. I only show Rizwan’s work.";

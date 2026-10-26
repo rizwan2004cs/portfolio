@@ -97,7 +97,7 @@ export function projectPanel(p: Project, opts: { compact?: boolean; arch?: boole
     return `<article class="panel compact" data-id="${esc(p.id)}">${pic || `<div class="shot noimg" aria-hidden="true"><span>${esc(p.title)}</span><small>${esc((p.keywords ?? p.tags).slice(0, 3).join(" · "))}</small></div>`}<div class="body"><div class="ph"><h3>${esc(p.title)}</h3><small>${teamMeta(p, true)}</small></div><p class="one">${esc(p.oneLiner)}</p><div class="links"><button class="btn" data-expand="${esc(p.id)}">Open</button>${links(p)}</div></div></article>`;
   const facts = opts.arch ? p.facts : p.facts.slice(0, 3);
   return `<article class="panel" data-id="${esc(p.id)}">${opts.arch ? archBlock(p) : pic}
-    <div class="body"><div class="ph"><h3>${esc(p.title)}</h3><small>${teamMeta(p)}</small></div><p class="one">${esc(p.oneLiner)}</p>
+    <div class="body"><div class="ph${teamMeta(p).length > 48 ? " stack" : ""}"><h3>${esc(p.title)}</h3><small>${teamMeta(p)}</small></div><p class="one">${esc(p.oneLiner)}</p>
     ${factsHtml(facts)}
     <div class="chips">${p.stack.map((s) => `<span class="chip">${esc(s)}</span>`).join("")}</div>
     <div class="links">${links(p)}${opts.permalink ? `<a class="btn" href="/work/${esc(p.id)}">Full write-up</a>` : ""}${opts.arch || !p.pipeline?.length ? "" : `<button class="btn" data-arch="${esc(p.id)}">Internals</button>`}<button class="btn sl" data-sl="${esc(p.id)}" aria-pressed="${!!opts.shortlisted}">${BOOKMARK}Shortlist</button></div></div>
