@@ -98,7 +98,12 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
 
   // the guard judges only the newest message: an earlier "try to break it" must not taint every later question.
   // With the model killed it is skipped entirely; the deterministic router can't be steered by an injection.
-  const g = input.killModel ? { ok: true, note: "skipped · model offline, router can't be injected" } : await deps.screen(last, deps.signal);
+  // one-answer questions (greetings, availability, prizes, who built it) never need a model, so they never risk one:
+  // worked out first, so they also skip the guard's round trip (nothing is left for an injection to steer)
+  const factual: AgentEvent[] = [];
+  const isFact = factAnswer(subject, (e) => factual.push(e));
+  const g = input.killModel ? { ok: true, note: "skipped · model offline, router can't be injected" }
+    : isFact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await deps.screen(last, deps.signal);
   emit({ type: "trace", step: "guard", detail: g.note, level: g.ok ? "ok" : "warn" });
   if (!g.ok) {
     emit({ type: "text", text: GUARD_REFUSAL });
@@ -174,8 +179,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   };
 
   // one-answer questions (availability, experience, who built it) never need a model, so they never risk one
-  const factual: AgentEvent[] = [];
-  if (factAnswer(subject, (e) => factual.push(e))) {
+  if (isFact) {
     emit({ type: "trace", step: "facts", detail: "a question with one factual answer · answered from his facts, no model call", level: "ok" });
     factual.forEach(out);
     return finish({ mode: "facts" });

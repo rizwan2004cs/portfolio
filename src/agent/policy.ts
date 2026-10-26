@@ -67,6 +67,13 @@ export function checkToolCall(call: { name: string; args: Record<string, unknown
     if (focus) { args.focus = focus; detail = `showed only his ${focus === "events" ? "events and prizes" : focus}: that’s what you asked about`; }
   }
 
+  // the list and his profile answer questions about his work and about him; under "hello" or "can you hear me" they are noise
+  const WORKY = /\b(built|build|made|projects?|work|portfolio|everything|shipped|apps?|experience|skills?|stack|hire|role|job|resume|cv)\b/i;
+  if (name === "list_projects" && !WORKY.test(ctx.last) && !projectFilter(ctx.last, undefined, true))
+    return { action: "drop", detail: "blocked the project list: the message doesn’t ask about his work", reason: "the visitor did not ask about his projects; answer briefly and show nothing" };
+  if (name === "show_profile" && !ABOUT_HIM.test(ctx.last) && !profileFocus(ctx.last) && !/\b(he|him|his|rizwan|syed|who)\b/i.test(ctx.last) && !WORKY.test(ctx.last))
+    return { action: "drop", detail: "blocked his profile: the message isn’t about him", reason: "the visitor did not ask about Rizwan; answer briefly and show nothing" };
+
   const ask = ASKS[name];
   if (ask && (!ask[0].test(ctx.last) || ctx.shown.includes(`done:${ask[1]}`)))
     return { action: "drop", detail: `blocked ${name}: the visitor didn’t ask for it`, reason: "visitor did not ask for this" };
