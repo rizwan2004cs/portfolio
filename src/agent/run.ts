@@ -6,7 +6,7 @@ import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
-import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, abusive, ABUSE_REPLY, accusation, ACCUSE_REPLY, lifestyle, LIFESTYLE_REPLY, offScope, personal, PERSONAL_REPLY, REFUSAL, stripCode } from "./scope";
+import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, abusive, ABUSE_REPLY, accusation, ACCUSE_REPLY, CLAIM_REPLY, isClaim, lifestyle, LIFESTYLE_REPLY, offScope, personal, PERSONAL_REPLY, REFUSAL, stripCode } from "./scope";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
 
@@ -106,7 +106,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // what a visitor says about him, not what he built: one fixed line each, no model to guess, no panel to imply
   const fixed: [boolean, string, string][] = [
     [abusive(last), "abusive message", ABUSE_REPLY],
-    [personal(last), "a question about his private life", PERSONAL_REPLY],
+    [personal(last), isClaim(last) ? "a claim about his private life" : "a question about his private life", isClaim(last) ? CLAIM_REPLY : PERSONAL_REPLY],
     [accusation(last), "an accusation about him", ACCUSE_REPLY],
   ];
   const hit = fixed.find(([on]) => on);

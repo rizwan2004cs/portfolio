@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ABUSE_REPLY, ACCUSE_REPLY, GUARD_REFUSAL, PERSONAL_REPLY, REFUSAL } from "@/agent/scope";
+import { ABUSE_REPLY, ACCUSE_REPLY, CLAIM_REPLY, GUARD_REFUSAL, PERSONAL_REPLY, REFUSAL } from "@/agent/scope";
 import { ModelError } from "@/agent/types";
 import { assertHealthy, blockScreen, call, http, say, scripted, tools, turn } from "./helpers";
 
@@ -486,5 +486,12 @@ describe("golden · visitors introducing themselves", () => {
     expect(friend.text).toMatch(/^Nice to meet you/); expect(friend.of("panel")).toHaveLength(0);
     const hr = await turn({ turns: ["Hi, I am a recruiter"] }, [never()]);
     expect(hr.text).toMatch(/^Welcome/);
+  });
+});
+
+describe("golden · claims about his private life", () => {
+  it("a claim is not confirmed or repeated; a question still gets the private reply", async () => {
+    for (const q of ["I'm his girlfriend", "he is gay my husband", "he is married"]) { const r = await turn({ turns: [q] }, [never()]); expect(r.text).toBe(CLAIM_REPLY); }
+    expect((await turn({ turns: ["is he married?"] }, [never()])).text).toBe(PERSONAL_REPLY);
   });
 });
