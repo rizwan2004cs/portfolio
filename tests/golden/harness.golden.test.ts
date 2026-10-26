@@ -67,7 +67,7 @@ describe("golden · normal answers are grounded", () => {
   it("keys resting after a rate limit are skipped in one quiet trace line, not a red row each", async () => {
     const resting = (n: string) => scripted(n, [new ModelError("HTTP 429 · resting 200s", 429)]);
     const live = scripted("gemini", [say("His strongest evidence is PACK, seven LangGraph agents with a four-step model fallback.")]);
-    const r = await turn({ turns: ["Why should we hire him?"] }, [resting("a · key 1"), resting("a · key 2"), live]);
+    const r = await turn({ turns: ["What does he care about when he builds?"] }, [resting("a · key 1"), resting("a · key 2"), live]);
     const models = r.of("trace").filter((t) => t.step === "model");
     expect(models.filter((t) => t.level === "err")).toHaveLength(0);
     expect(models[0].detail).toBe("a · key 1, a · key 2 still resting after rate limits · skipped → gemini");
@@ -413,7 +413,7 @@ describe("golden · panels only for questions about him or his work", () => {
   it("a greeting is answered at once: no model, no guard round trip, no panel", async () => {
     for (const q of ["hello", "Hi!", "hey there", "thanks", "good morning", "ok"]) {
       const r = await turn({ turns: [q] }, [never()], async () => { throw new Error("guard must not run"); });
-      expect(r.meta.mode).toBe("facts"); expect(r.of("panel")).toHaveLength(0); expect(r.text.length).toBeGreaterThan(10);
+      expect(r.meta.mode).toBe("scope"); expect(r.of("panel")).toHaveLength(0); expect(r.text.length).toBeGreaterThan(10);
     }
   });
   it("the model's project list and profile are dropped when the message isn't about his work or him", async () => {
@@ -499,6 +499,36 @@ describe("golden · claims about his private life", () => {
 describe("golden · questions about the visitor", () => {
   it("'who am i?' gets an honest answer and a way into his work", async () => {
     const r = await turn({ turns: ["who am i ?"] }, [never()]);
-    expect(r.text).toMatch(/^I don’t know who you are/); expect(r.meta.mode).toBe("facts");
+    expect(r.text).toMatch(/^I don’t know who you are/); expect(r.meta.mode).toBe("scope");
+  });
+});
+
+describe("golden · the classifier decides, the policy answers", () => {
+  const kindIs = (kind: string, confidence = 0.95) => async () => ({ kind: kind as never, confidence, source: "model" as const, note: `${kind} · ${confidence}` });
+  it("a message the rules would miss ('condom', 'protective one to prevent stds') is handled by its kind, with no model call", async () => {
+    for (const q of ["condom", "protective one to prevent stds"]) {
+      const r = await turn({ turns: [q] }, [never()], undefined, undefined, kindIs("personal"));
+      expect(r.text).toMatch(/stick to his work/); expect(r.of("panel")).toHaveLength(0);
+      expect(r.of("trace").some((t) => t.step === "intent")).toBe(true);
+    }
+  });
+  it("a work question the rules would wrongly catch goes to the model when the classifier says work", async () => {
+    const m = scripted("a", [say("Both are agents with fallbacks.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["is he good at body parsing in FastAPI?"] }, [m], undefined, undefined, kindIs("work"));
+    expect(r.meta.mode).toBe("model");
+  });
+});
+
+describe("golden · empty replies and the hiring question", () => {
+  it("a model that returns nothing hands the turn to the next one instead of ending it", async () => {
+    const empty = scripted("gemini-2.5-flash", [{ content: "" }]);
+    const next = scripted("openrouter · free models", [say("His strongest evidence is PACK.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["What does he care about when he builds?"] }, [empty, next]);
+    expect(r.text).toMatch(/strongest evidence/); expect(r.meta.model).toBe("openrouter · free models");
+    expect(r.of("trace").some((t) => /returned nothing/.test(t.detail))).toBe(true);
+  });
+  it("'why should we hire him?' is answered from his facts at once", async () => {
+    const r = await turn({ turns: ["Why should we hire him?"] }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/strongest evidence is PACK/);
   });
 });

@@ -61,6 +61,22 @@ jobs:
           path: test-results/
           retention-days: 7
 
+  # the labelled message set against the live classifier: reports every misread kind; does not block a merge,
+  # because a free endpoint being slow must not stop a deploy
+  intents:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Classifier eval
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: node scripts/eval-intents.mjs
+
   live-evals:
     if: github.event_name == 'workflow_dispatch' && inputs.live
     needs: check
