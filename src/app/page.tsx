@@ -10,7 +10,7 @@ import { ldJson, profilePage } from "@/seo/jsonld";
 
 export const metadata: Metadata = {
   title: { absolute: `${SITE.name} — AI Engineer in Bangalore · Work, experience, toolkit` },
-  description: `${PROFILE.summary} Seven projects: multi-agent LangGraph, cited RAG, voice agents and full-stack products.`,
+  description: `${PROFILE.summary} ${PROJECTS.length} projects: multi-agent LangGraph, cited RAG, voice agents and full-stack products.`,
   alternates: { canonical: "/" },
 };
 

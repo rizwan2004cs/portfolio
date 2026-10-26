@@ -5,8 +5,13 @@ import { Header } from "@/components/Header";
 import { EXPERIENCE, PROJECTS } from "@/content/data";
 import { homeIntro } from "@/render/html";
 import { ldJson, profilePage } from "@/seo/jsonld";
+import { SITE } from "@/content/site";
 
-export const metadata: Metadata = { title: "Agent", alternates: { canonical: "/agent" } };
+export const metadata: Metadata = {
+  title: "Ask his AI agent",
+  description: `Ask ${SITE.name}'s AI agent about his projects, experience and fit for a role. It shows its work: guard, model fallbacks and a grounding check on every answer.`,
+  alternates: { canonical: "/agent" },
+};
 
 // Server-rendered shell: crawlable home content plus every element the client controller binds to.
 export default function AgentPage() {
