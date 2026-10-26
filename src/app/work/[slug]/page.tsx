@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { PROJECTS, projectById } from "@/content/data";
 import { SITE } from "@/content/site";
 import { archBlock, diagramSize, esc, factsHtml, img } from "@/render/html";
-import { ldJson, projectWork } from "@/seo/jsonld";
+import { ldJson, projectCrumbs, projectWork } from "@/seo/jsonld";
 
 export const dynamicParams = false;
 export const generateStaticParams = () => PROJECTS.map((p) => ({ slug: p.id }));
@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!p) return {};
   return {
     title: p.title,
-    description: `${p.oneLiner} ${p.facts[0] ?? ""} Built by ${SITE.name}, AI engineer in Bangalore.`.trim(),
+    description: `${p.oneLiner} ${p.facts[0] ?? ""} Built by ${SITE.name}, AI engineer in Bengaluru.`.trim(),
     alternates: { canonical: `/work/${p.id}` },
     // the card image is work/[slug]/opengraph-image.tsx: name, one-liner, stack and screenshot
     openGraph: { type: "article", title: `${p.title} · ${SITE.name}`, description: p.oneLiner, url: `/work/${p.id}` },
@@ -66,6 +66,7 @@ export default async function WorkPage({ params }: Params) {
       </main>
       <div id="peek" aria-hidden="true"><div className="badge">VIEW</div><div className="card" id="peekCard" /></div>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson(projectWork(p)) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson(projectCrumbs(p)) }} />
       <ClassicIsland />
     </div>
   );

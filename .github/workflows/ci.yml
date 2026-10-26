@@ -1,10 +1,13 @@
-# Build, types, lint, unit + golden tests, then the browser suite. Every push and pull request runs it
-# through deploy.yml (which deploys only what passes), so it is not triggered twice from here.
+# Build, types, lint, unit + golden tests, then the browser suite, on every push and pull request.
+# Vercel's Git integration deploys (previews for pull requests, production for main); branch protection
+# on main requires this "check" job to pass before a pull request can merge.
 # No model keys here: the e2e server answers from the deterministic router, so runs are free and repeatable.
 name: CI
 
 on:
-  workflow_call:
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       live:
