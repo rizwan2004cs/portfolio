@@ -865,3 +865,10 @@ form.cform:focus-within { border-color:transparent; }
 .cform .cfnote { font:400 13px/18px var(--f-sans); color:var(--soft); }
 .cform.sent .cfnote { color:var(--ok); }
 @media (max-width:600px) { .cform .cfrow { grid-template-columns:1fr; } .cform input, .cform textarea { font-size:16px; } }
+
+/* agent answers: short paragraphs, project names as quiet links, figures in bold */
+.msg .text .tv p + p { margin-top:10px; }
+.msg .text b { font-weight:600; font-variant-numeric:tabular-nums; }
+.msg .text .pj { all:unset; cursor:pointer; font-weight:600; text-decoration:underline; text-decoration-color:var(--line); text-decoration-thickness:1px; text-underline-offset:3px; transition:color var(--fast) var(--ease), text-decoration-color var(--fast) var(--ease); }
+@media (hover:hover) and (pointer:fine) { .msg .text .pj:hover { color:var(--accent); text-decoration-color:currentColor; } }
+.msg .text.big .tv p { margin:0; }

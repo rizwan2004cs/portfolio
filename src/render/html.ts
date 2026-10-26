@@ -4,7 +4,7 @@ import SIZES from "@/content/diagram-sizes.json";
 import RESUME from "@/content/resume.json";
 import type { Profile, Project } from "@/content/types";
 import type { FitRow } from "@/agent/fit";
-import { EDUCATION, EVENTS, EXPERIENCE, roleDetail } from "@/content/data";
+import { EDUCATION, EVENTS, EXPERIENCE, PROJECTS, roleDetail } from "@/content/data";
 
 export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 export const safeUrl = (u: unknown) => (/^(https?:|mailto:|\/)/.test(String(u)) ? String(u) : "#");
@@ -129,6 +129,29 @@ export function profilePart(pr: Profile, focus?: string) {
   if (focus === "work") return part("Work", EXPERIENCE.map((x) => row(x.when, `<b>${esc(x.role)}</b> · ${esc(x.title)}`, esc(roleDetail(x)))).join(""));
   if (focus === "education") return part("Education", [row(EDUCATION.years, `<b>${esc(EDUCATION.degree)}</b> · ${esc(EDUCATION.school)}`, esc(`CGPA ${EDUCATION.cgpa}, ${EDUCATION.classAwarded}`)), ...EDUCATION.earlier.map(([s, g]) => row("", esc(s), esc(g)))].join(""));
   return profilePanel(pr);
+}
+
+/** An agent answer, made readable: two sentences to a paragraph, project names bold and clickable (they open the
+ *  project), figures in bold. Every word is its own span so the answer can fade in word by word. Escapes everything. */
+const TITLES = [...PROJECTS].sort((a, b) => b.title.length - a.title.length);
+const TOKEN = new RegExp(`(${TITLES.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|((?:\\$|₹)?\\d[\\d,]*(?:\\.\\d+)?(?:%|k\\b|\\+)?)`, "g");
+export function answerHtml(text: string): string {
+  const sentences = text.trim().split(/(?<=[.!?])\s+(?=[A-Z“"(])/);
+  const paras: string[] = [];
+  // short answers stay one paragraph; long ones break every two sentences
+  for (let i = 0; i < sentences.length; i += sentences.length > 2 ? 2 : sentences.length) paras.push(sentences.slice(i, i + (sentences.length > 2 ? 2 : sentences.length)).join(" "));
+  let n = 0;
+  const words = (t: string) => t.split(/(\s+)/).map((w) => (/^\s+$/.test(w) || !w ? w : `<span class="w" style="animation-delay:${Math.min(n++ * 12, 500)}ms">${esc(w)}</span>`)).join("");
+  return paras.map((para) => {
+    let out = "", last = 0;
+    for (const m of para.matchAll(TOKEN)) {
+      out += words(para.slice(last, m.index));
+      const p = m[1] ? TITLES.find((x) => x.title === m[1]) : undefined;
+      out += p ? `<button type="button" class="pj" tabindex="-1" data-openp="${esc(p.id)}">${words(m[0])}</button>` : `<b>${words(m[0])}</b>`;
+      last = m.index! + m[0].length;
+    }
+    return `<p>${out}${words(para.slice(last))}</p>`;
+  }).join("");
 }
 
 /** Classic Work rows (Akshay-style). */

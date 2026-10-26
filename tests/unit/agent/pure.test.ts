@@ -299,3 +299,15 @@ describe("suggestion chips", () => {
     expect(tidyOptions([null, 3, {}])).toEqual([]);
   });
 });
+
+describe("answer formatting", () => {
+  it("breaks long answers into two-sentence paragraphs, links project names and bolds figures", async () => {
+    const { answerHtml } = await import("@/render/html");
+    const h = answerHtml("His strongest evidence is PACK, built in a weekend. CCR Compliance Advisor indexed 74,975 sections. FinBoom has 129 commits. Gaps are Kubernetes and AWS.");
+    expect(h.match(/<p>/g)).toHaveLength(2);
+    expect(h).toContain('data-openp="pack"'); expect(h).toContain('data-openp="ccr"'); expect(h).toContain('data-openp="finboom"');
+    expect(h).toMatch(/<b><span[^>]*>74,975<\/span><\/b>/);
+    expect(answerHtml("Short answer. Two sentences.").match(/<p>/g)).toHaveLength(1);
+    expect(answerHtml("<img src=x onerror=alert(1)>")).not.toContain("<img");
+  });
+});
