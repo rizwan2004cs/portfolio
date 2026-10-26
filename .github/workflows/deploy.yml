@@ -63,11 +63,12 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "### Deployed to $TARGET: $url" >> "$GITHUB_STEP_SUMMARY"
 
-      # production must answer: the home page, the agent, the resume and the agent API
+      # production must answer on its public address: the home page, the agent, the resume and a write-up.
+      # (the per-deploy URL sits behind Vercel's login and answers 302, so it can't be the one checked)
       - name: Smoke check
         if: env.TARGET == 'production'
         env:
-          URL: ${{ steps.deploy.outputs.url }}
+          URL: ${{ vars.SITE_URL || 'https://portfolio-omega-flax-41.vercel.app' }}
         run: |
           for path in / /agent /resume.pdf /work/pack; do
             code=$(curl -s -o /dev/null -w '%{http_code}' --retry 3 --retry-delay 5 "$URL$path")
