@@ -30,14 +30,14 @@ export const FILMS: FilmGroup[] = [
   {
     theme: "Soul-searching and a life refresh",
     films: [
-      { title: "The Secret Life of Walter Mitty", imdb: "tt0359950", tmdb: 116745, poster: "/iAo1hlzsPV9XpYcLQp6Ud065tGO.jpg", year: "2013", kind: "Movie", note: "It plays like a full travel vlog, and shows how we race to find something out there that is already within us, unnoticed." },
+      { title: "The Secret Life of Walter Mitty", imdb: "tt0359950", tmdb: 116745, poster: "/iAo1hlzsPV9XpYcLQp6Ud065tGO.jpg", year: "2013", kind: "Movie", note: "It plays like a full travel vlog, and shows how we race to find something out there that is already within us, unnoticed. The photographer who waits for the snow leopard and never takes the shot says it best.", quote: "Beautiful things don’t ask for attention." },
       { title: "Meiyazhagan", imdb: "tt26758372", tmdb: 1136423, poster: "/ngDEH7YqVaMCAD4LpNxRl6ScJnw.jpg", year: "2024", kind: "Movie", lang: "Tamil", note: "A three-hour conversation that feels like a complete life refresh. It pulls you in so deeply you feel you were right there with them." },
     ],
   },
   {
     theme: "Curiosity and challenging the system",
     films: [
-      { title: "Silo", imdb: "tt14688458", tmdb: 125988, poster: "/oyzAYNByiHhaWe4Hfi1PUs7qrEL.jpg", year: "2023", kind: "TVSeries", note: "A sci-fi series set in a future where no one is allowed to ask questions, until a single question is asked and everything begins to change." },
+      { title: "Silo", imdb: "tt14688458", tmdb: 125988, poster: "/r2QXomqKjkKHVtYGGtkf2l2Y7go.jpg", year: "2023", kind: "TVSeries", note: "A sci-fi series set in a future where no one is allowed to ask questions, until a single question is asked and everything begins to change." },
     ],
   },
 ];
