@@ -474,7 +474,7 @@
     .trbtn { display:inline-flex; }
     .clock, .pill .m { display:none; }
     .feed { padding:0 var(--s4); }
-    .panel, .tools, .approval, .meta, .idline, .plan, .choice { margin-left:0; }
+    .panel, details.cite, .tools, .approval, .meta, .idline, .plan, .choice { margin-left:0; }
     .choice .opts { grid-template-columns:1fr; }
     .cinner { grid-template-columns:1fr; padding-left:var(--s3); }
     .crow { grid-template-columns:56px 1fr 16px; } .crow .cy { display:none; } .cthumb { width:56px; height:35px; }
@@ -874,7 +874,8 @@ form.cform:focus-within { border-color:transparent; }
 .msg .text.big .tv p { margin:0; }
 
 /* a project shown as evidence for a general answer: one folded line that opens to the full panel */
-details.cite { border:1px solid var(--line); background:var(--bg); }
+/* sits where the panel would: same indent and the same space before the "answered by" line under it */
+details.cite { margin:0 0 var(--s6) 40px; border:1px solid var(--line); background:var(--bg); }
 details.cite > summary { list-style:none; display:grid; grid-template-columns:auto auto 1fr 16px; align-items:center; gap:var(--s3); padding:10px var(--s4); cursor:pointer; min-width:0; }
 details.cite > summary::-webkit-details-marker { display:none; }
 details.cite > summary .lbl { font:400 11px/16px var(--f-mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }

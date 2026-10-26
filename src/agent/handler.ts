@@ -4,6 +4,7 @@ import { isProjectId } from "@/content/data";
 import { newIds, runError, runFinished, runStarted, toAgui } from "./agui";
 import { cacheKey, makeCache, type AnswerCache } from "./cache";
 import { groqScreen, modelChain } from "./models";
+import { decisionClassifier, type Classifier } from "./classify";
 import { router } from "./router";
 import { waitUntil } from "@vercel/functions";
 import * as Sentry from "@sentry/nextjs";
@@ -31,6 +32,8 @@ const Body = z.object({
 export interface HandlerDeps {
   models: () => ModelClient[];
   screen: Screen;
+  /** the outer agent that sorts each message into a kind (src/agent/behavior.ts) */
+  classify?: Classifier;
   cache: AnswerCache;
   now: () => number;
   /** stores each finished turn (Neon in production); absent locally and in tests */
@@ -44,6 +47,7 @@ export function defaultDeps(env = process.env): HandlerDeps {
   return {
     models: () => modelChain(groqKeys, env.GEMINI_API_KEY?.trim() || undefined, fetch, env.OPENROUTER_API_KEY?.trim() || undefined),
     screen: groqScreen(groqKeys),
+    classify: decisionClassifier(env.OPENROUTER_API_KEY?.trim() || undefined),
     cache: makeCache(),
     now: () => Date.now(),
     log: neonTurnLog(env.DATABASE_URL),
@@ -111,7 +115,7 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           const record = (ev: AgentEvent) => { if (ev.type !== "trace") recorded.push(ev); emit(ev); };
           const budgetOut = overBudget(now);
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
-          meta = await runAgent({ turns, shown, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, signal: ctl.signal });
+          meta = await runAgent({ turns, shown, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, signal: ctl.signal });
           if (meta.mode === "model" || meta.mode === "partial") budget.runs++;
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
         }

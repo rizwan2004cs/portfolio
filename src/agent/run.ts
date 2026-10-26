@@ -6,7 +6,9 @@ import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
-import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, abusive, ABUSE_REPLY, accusation, ACCUSE_REPLY, lifestyle, LIFESTYLE_REPLY, offScope, personal, PERSONAL_REPLY, REFUSAL, stripCode } from "./scope";
+import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
+import { BEHAVIOR, ruleKind } from "./behavior";
+import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
 
@@ -44,6 +46,8 @@ export interface RunDeps {
   models: ModelClient[];
   screen: Screen;
   signal: AbortSignal;
+  /** sorts each message into a kind first; without it the word rules decide */
+  classify?: Classifier;
 }
 
 const MAX_STEPS = 4;
@@ -103,23 +107,17 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
     emit({ type: "suggest", options: DEFAULT_NEXT });
     return { mode: "scope" };
   }
-  // what a visitor says about him, not what he built: one fixed line each, no model to guess, no panel to imply
-  const fixed: [boolean, string, string][] = [
-    [abusive(last), "abusive message", ABUSE_REPLY],
-    [personal(last), "not about his work", PERSONAL_REPLY],
-    [accusation(last), "an accusation about him", ACCUSE_REPLY],
-  ];
-  const hit = fixed.find(([on]) => on);
-  if (hit) {
-    emit({ type: "trace", step: "scope", detail: `${hit[1]} · fixed reply, no model, no panel · 0 tokens`, level: "info" });
-    emit({ type: "text", text: hit[2] });
-    emit({ type: "suggest", options: ["Everything he’s built", "Why should we hire him?", "Get resume"] });
-    return { mode: "scope" };
-  }
-  if (lifestyle(last) && !personal(last)) {
-    emit({ type: "trace", step: "scope", detail: "a question about his life outside work · fixed reply, no model, no panel · 0 tokens", level: "info" });
-    emit({ type: "text", text: LIFESTYLE_REPLY });
-    emit({ type: "suggest", options: ["Open VerseYou", "Everything he’s built", "Get resume"] });
+  // the outer agent: every message is sorted into one kind first (src/agent/behavior.ts says what each kind gets).
+  // The prompt guard runs at the same time, so sorting adds no wait to the turns that do reach a model.
+  const guarding = input.killModel ? null : deps.screen(last, deps.signal).catch(() => ({ ok: true, note: "unavailable · let through (tools are closed-world)" }));
+  // a visitor who took the model offline gets no AI anywhere, the classifier included
+  const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal));
+  const kind = decide(sorted);
+  emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
+  if (kind !== "work") {
+    emit({ type: "trace", step: "policy", detail: `${kind} · fixed reply from the behaviour policy, no model, no panel · 0 tokens`, level: "info" });
+    emit({ type: "text", text: BEHAVIOR[kind].reply!(last) });
+    emit({ type: "suggest", options: BEHAVIOR[kind].chips });
     return { mode: "scope" };
   }
   // earlier off-scope turns never reach the model
@@ -132,7 +130,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   const factual: AgentEvent[] = [];
   const isFact = factAnswer(subject, (e) => factual.push(e));
   const g = input.killModel ? { ok: true, note: "skipped · model offline, router can't be injected" }
-    : isFact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await deps.screen(last, deps.signal);
+    : isFact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await guarding!;
   emit({ type: "trace", step: "guard", detail: g.note, level: g.ok ? "ok" : "warn" });
   if (!g.ok) {
     emit({ type: "text", text: GUARD_REFUSAL });
@@ -247,6 +245,8 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
         let answered = false;
         const s0 = Date.now();
         const msg = await model.complete(messages, deps.signal);
+        // an empty reply with nothing said yet is a failure like any other: the next model in the chain gets the turn
+        if (!msg.content?.trim() && !msg.tool_calls?.length && !texts.length && deps.models[mi + 1]) throw new ModelError("returned nothing");
         flushSkips(model.name); // this model answered: say which resting keys were passed over to reach it
         const leak = leakedCalls(msg.content ?? "");
         if (leak.calls.length) {
@@ -357,7 +357,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
       if (deps.signal.aborted) return { mode: "aborted" };
       const status = e instanceof ModelError ? e.status : undefined, rest = e instanceof Error && /resting (\d+s)/.exec(e.message)?.[1];
       const why = rest ? `rate-limited (HTTP 429) · resting ${rest}` : status === 429 ? "rate-limited (HTTP 429)" : status && status >= 500 ? `provider error (HTTP ${status})`
-        : status ? `rejected (HTTP ${status})` : e instanceof Error && e.name === "TimeoutError" ? "timed out" : "failed";
+        : status ? `rejected (HTTP ${status})` : e instanceof Error && e.name === "TimeoutError" ? "timed out" : e instanceof Error && e.message === "returned nothing" ? "returned nothing" : "failed";
       // say where the run goes next: another key for the same model, the next model, another provider, or the router
       const next = deps.models[mi + 1], base0 = (n: string) => n.split(" · ")[0];
       const provider = (n: string) => (/gemini/i.test(n) ? "gemini" : /openrouter/i.test(n) ? "openrouter" : "groq");
