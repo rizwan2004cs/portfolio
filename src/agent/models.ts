@@ -61,12 +61,21 @@ export function geminiModel(key: string, fetchImpl: typeof fetch = fetch): Model
   return chatModel(GEMINI_MODEL, GEMINI, key, { model: GEMINI_MODEL, temperature: 0.3, max_tokens: 500, reasoning_effort: "low" }, fetchImpl);
 }
 
+const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
+/** Free OpenRouter models that call tools; OpenRouter tries them in order inside one request (it allows three). */
+export const OPENROUTER_MODELS = ["nvidia/nemotron-3.5-lightning:free", "thinkingmachines/inkling-small:free", "google/gemma-4-31b-it:free"] as const;
+/** Free models on OpenRouter: a third provider and quota, after Gemini and before the router. */
+export function openRouterModel(key: string, fetchImpl: typeof fetch = fetch): ModelClient {
+  return chatModel("openrouter · free models", OPENROUTER, key, { model: OPENROUTER_MODELS[0], models: [...OPENROUTER_MODELS], temperature: 0.3, max_tokens: 500 }, fetchImpl);
+}
+
 /** The model chain: each Groq model on every key (a throttled key hands the same model to the next),
- *  then Gemini on its own quota, then the caller falls back to the deterministic router. */
-export function modelChain(groqKeys: string[], geminiKey: string | undefined, fetchImpl: typeof fetch = fetch): ModelClient[] {
+ *  then Gemini on its own quota, then free OpenRouter models, then the caller falls back to the deterministic router. */
+export function modelChain(groqKeys: string[], geminiKey: string | undefined, fetchImpl: typeof fetch = fetch, openRouterKey?: string): ModelClient[] {
   return [
     ...MODEL_IDS.flatMap((id) => groqKeys.map((k, i) => groqModel(id, k, fetchImpl, i + 1, groqKeys.length))),
     ...(geminiKey ? [geminiModel(geminiKey, fetchImpl)] : []),
+    ...(openRouterKey ? [openRouterModel(openRouterKey, fetchImpl)] : []),
   ];
 }
 

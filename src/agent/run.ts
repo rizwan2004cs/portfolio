@@ -73,6 +73,21 @@ const MAX_DROPS = 2;
  *  Invariant: every completed turn emits at least one text event and one suggest event. */
 const ROUTER = "deterministic router answered · no AI, 0 tokens";
 
+/** Drops sentences that announce something on screen ("Here is his resume", "Opening PACK") when it isn't there. */
+const ANNOUNCES = /^(here(’|')?s|here is|here are|opening|showing|pulling up|i(’|')?ve opened|i opened|i(’|')?m opening|let me (show|open)|below is|see (the|his) )/i;
+export function narrated(text: string, shownNow: string): { text: string; cut: number } {
+  let cut = 0;
+  const kept = text.split(/(?<=[.!?])\s+/).filter((sentence) => {
+    if (!ANNOUNCES.test(sentence.trim())) return true;
+    const resume = /\bresume|\bcv\b/i.test(sentence), contact = /\b(contact|email|phone)\b/i.test(sentence);
+    const project = PROJECTS.find((p) => new RegExp(`\\b${p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(sentence));
+    const ok = resume ? /resume/.test(shownNow) : contact ? /contact/.test(shownNow) : project ? shownNow.includes(project.title) : shownNow.trim().length > 0;
+    if (!ok) cut++;
+    return ok;
+  });
+  return { text: kept.join(" ").trim(), cut };
+}
+
 export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Promise<RunMeta> {
   const last = input.turns.at(-1) ?? "";
   // "how does it handle failures?" after "Show me PACK" is about PACK: resolve the pronoun for the policy checks
@@ -91,14 +106,14 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // what a visitor says about him, not what he built: one fixed line each, no model to guess, no panel to imply
   const fixed: [boolean, string, string][] = [
     [abusive(last), "abusive message", ABUSE_REPLY],
-    [personal(last), "a question about his private life", PERSONAL_REPLY],
+    [personal(last), "not about his work", PERSONAL_REPLY],
     [accusation(last), "an accusation about him", ACCUSE_REPLY],
   ];
   const hit = fixed.find(([on]) => on);
   if (hit) {
     emit({ type: "trace", step: "scope", detail: `${hit[1]} · fixed reply, no model, no panel · 0 tokens`, level: "info" });
     emit({ type: "text", text: hit[2] });
-    emit({ type: "suggest", options: DEFAULT_NEXT });
+    emit({ type: "suggest", options: ["Everything he’s built", "Why should we hire him?", "Get resume"] });
     return { mode: "scope" };
   }
   if (lifestyle(last) && !personal(last)) {
@@ -311,7 +326,13 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
         const coveredAfterAll = subjectProject ? bestFact([...eventLinesFor(last), ...subjectProject.facts], last, subjectProject.title) : null;
         const unverifiedGap = !looked && !!coveredAfterAll && /doesn.t cover|not covered|isn.t covered|no (details|information)\b/i.test(gr.text);
         if (unverifiedGap) emit({ type: "trace", step: "grounding", detail: "removed “not covered”: his facts do answer this", level: "warn" });
-        else if (!gr.dropped.length || gr.total > gr.dropped.length || (visible && (lastTitle || gr.extracted))) out({ type: "text", text: dedupeSentences(gr.text) });
+        else if (!gr.dropped.length || gr.total > gr.dropped.length || (visible && (lastTitle || gr.extracted))) {
+          // "Here is his resume." / "Opening CCR's architecture." with nothing opened is a claim about the screen that isn't true
+          const shownNow = `${asked ?? ""} ${lastKind} ${lastProject?.title ?? ""}`;
+          const said = narrated(dedupeSentences(gr.text), shownNow);
+          if (said.cut) emit({ type: "trace", step: "grounding", detail: `removed ${said.cut} sentence${said.cut > 1 ? "s" : ""} describing something that wasn’t shown`, level: "warn" });
+          if (said.text) out({ type: "text", text: said.text });
+        }
         if (spoke) openNamed(gr.text);
         if (spoke && !visible) showContext();
       }
@@ -339,7 +360,8 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
         : status ? `rejected (HTTP ${status})` : e instanceof Error && e.name === "TimeoutError" ? "timed out" : "failed";
       // say where the run goes next: another key for the same model, the next model, another provider, or the router
       const next = deps.models[mi + 1], base0 = (n: string) => n.split(" · ")[0];
-      const then = !next ? "→ deterministic router" : base0(next.name) === base0(model.name) ? `→ trying ${next.name.split(" · ")[1] ?? "the next key"}` : /gemini/i.test(next.name) ? `→ switching provider: ${next.name}` : `→ falling back to ${base0(next.name)}`;
+      const provider = (n: string) => (/gemini/i.test(n) ? "gemini" : /openrouter/i.test(n) ? "openrouter" : "groq");
+      const then = !next ? "→ deterministic router" : base0(next.name) === base0(model.name) ? `→ trying ${next.name.split(" · ")[1] ?? "the next key"}` : provider(next.name) !== provider(model.name) ? `→ switching provider: ${next.name}` : `→ falling back to ${base0(next.name)}`;
       if (rest) resting.push(model.name);
       else { flushSkips(model.name); emit({ type: "trace", step: "model", detail: `${model.name} ${why} ${then}`, level: "err" }); }
       if (messages.length > base.length) handoff = true;

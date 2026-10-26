@@ -16,7 +16,9 @@ export function opikClient(env = process.env): Opik | undefined {
   return client ?? undefined;
 }
 
-const PROVIDER = (name: string) => (/gemini/i.test(name) ? "google_ai" : "groq");
+// production, preview or local: real visitors are the "production" ones
+const ENV = process.env.VERCEL_ENV ?? "local";
+const PROVIDER = (name: string) => (/gemini/i.test(name) ? "google_ai" : /openrouter/i.test(name) ? "openrouter" : "groq");
 const error = (e: unknown) => ({ exceptionType: e instanceof Error ? e.name : "Error", message: e instanceof Error ? e.message.slice(0, 500) : String(e), traceback: e instanceof Error ? (e.stack ?? "").slice(0, 2000) : "" });
 
 export interface TurnTrace {
@@ -27,7 +29,7 @@ export interface TurnTrace {
 }
 
 export function traceTurn(c: Opik, t: { question: string; turns: string[]; session?: string; killed: boolean; country?: string }): TurnTrace {
-  const trace = c.trace({ name: "agent-turn", input: { question: t.question, turns: t.turns }, threadId: t.session, metadata: { killed: t.killed, country: t.country }, tags: ["portfolio"] });
+  const trace = c.trace({ name: "agent-turn", input: { question: t.question, turns: t.turns }, threadId: t.session, metadata: { killed: t.killed, country: t.country }, tags: ["portfolio", ENV] });
   return {
     // each model in the chain gets its own llm span, so a 429 on key 1 and the fallback that answered both show
     models: (list) => list.map((m) => ({
@@ -56,10 +58,12 @@ export function traceTurn(c: Opik, t: { question: string; turns: string[]; sessi
     end: async ({ meta, events, error: err }) => {
       const answer = events.filter((e): e is Extract<AgentEvent, { type: "text" }> => e.type === "text").map((e) => e.text).join(" ").trim();
       const steps = events.filter((e): e is Extract<AgentEvent, { type: "trace" }> => e.type === "trace").map(({ step, detail, level }) => ({ step, detail, level }));
+      // the question goes on the closing update too: if the opening create is lost, the trace still says what was asked
       trace.update({
+        input: { question: t.question, turns: t.turns }, threadId: t.session,
         output: { answer, panels: events.flatMap((e) => (e.type === "panel" ? [e.panel] : [])) },
         metadata: { mode: meta?.mode, model: meta?.model, fallback: meta?.fallback, tools: meta?.tools, harness: steps },
-        tags: ["portfolio", meta?.mode ?? "unknown"],
+        tags: ["portfolio", ENV, meta?.mode ?? "unknown"],
         ...(err ? { errorInfo: { exceptionType: "AgentError", message: err, traceback: "" } } : {}),
       }).end();
       await c.flush();

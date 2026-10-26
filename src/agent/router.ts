@@ -1,4 +1,4 @@
-import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, PROJECTS, projectById, roleDetail, TOOLKIT, toolUses, WHY_HIM } from "@/content/data";
+import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, mentionsTool, PROJECTS, projectById, roleDetail, TOOLKIT, toolUses, WHY_HIM } from "@/content/data";
 import type { Project } from "@/content/types";
 import type { Emit } from "./types";
 import { bestFact } from "./grounding";
@@ -96,7 +96,10 @@ export function router(lastUser: string, emit: Emit): void {
   // his jobs: where he works, what he does there, his internships
   if (!clear && re(/\bnovulis\b|\bsupraja\b|where (does|did) he work|\b(his|current) (job|role|employer|company)\b|\bintern(ship)?s?\b|what does he do\b/)) {
     // only the roles asked about: Novulis, Supraja, or the internships; everything for "where does he work"
-    const pick = EXPERIENCE.filter((x) => (re(/\bnovulis\b/) ? x.title.startsWith("Novulis") && (!re(/what does he do|currently|right now|\bnow\b/) || !!x.now) : re(/\bsupraja\b/) ? x.title.startsWith("Supraja") : re(/\bintern/) ? !!x.minor : re(/where does he work|\b(current|job|employer|company)\b/) ? !!x.now : true));
+    // "what does he do with azure": only the roles that mention it
+    const tool = TOOLKIT.flatMap(([, l]) => l).find((t) => mentionsTool(lastUser, t) && !/^(REST APIs|Render)$/.test(t));
+    const withTool = tool ? EXPERIENCE.filter((x) => mentionsTool(x.body, tool)) : [];
+    const pick = withTool.length ? withTool : EXPERIENCE.filter((x) => (re(/\bnovulis\b/) ? x.title.startsWith("Novulis") && (!re(/what does he do|currently|right now|\bnow\b/) || !!x.now) : re(/\bsupraja\b/) ? x.title.startsWith("Supraja") : re(/\bintern/) ? !!x.minor : re(/where does he work|\b(current|job|employer|company)\b/) ? !!x.now : true));
     say(pick.map((x) => `${x.role} at ${x.title}, ${x.when}: ${roleDetail(x).replace(/\.$/, "")}.`).join(" ")); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return;
   }
   if (re(/\b(resume|cv)\b/)) { say("Here’s his resume, once you approve."); call("offer_resume"); call("suggest", { options: ["Everything he’s built", "Contact Rizwan"] }); return; }
@@ -130,6 +133,18 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   if (SMALL_TALK.test(lastUser.trim())) {
     say(smallTalkReply(lastUser));
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
+  }
+  // "who am I?", "do you know me?": the agent knows nothing about visitors and says so, then offers his work
+  if (re(/^\s*(who am i|who i am|do you know (me|who i am)|what(’|')?s my name|what is my name|guess who (i am|this is)|remember me)\b/)) {
+    say("I don’t know who you are, and I don’t keep track of visitors. I can show you what Rizwan has built.");
+    call("suggest", { options: ["Everything he’s built", "Why should we hire him?", "Get resume"] }); return true;
+  }
+  // "I'm his friend", "I'm a recruiter at X": a visitor introducing themselves gets a welcome and a way in, not "outside my lane"
+  const who = lastUser.match(/^\s*(?:hi[,!.\s]*|hey[,!.\s]*|hello[,!.\s]*)?(?:i\s*(?:’|')?\s*a?m|i am|this is)\s+(?:his\s+|a\s+|an\s+|the\s+)?(friend|best friend|classmate|batchmate|college ?mate|roommate|colleague|co-?worker|teammate|manager|mentor|teacher|professor|senior|junior|brother|sister|cousin|relative|recruiter|hiring manager|hr|talent \w+|founder|engineer|developer|student)\b/i);
+  if (who && lastUser.trim().split(/\s+/).length <= 14) {
+    const role = who[1].toLowerCase(), hiring = /recruiter|hiring|hr|talent|founder|manager/.test(role) && !/^his\b/i.test(lastUser.replace(/^.*?(?:am|this is)\s+/i, ""));
+    say(hiring ? "Welcome. Paste the role’s requirements and I’ll map them to his work, or start with his strongest projects." : `Nice to meet you. I can show you what he’s been building, or you can reach him directly.`);
+    call("suggest", { options: hiring ? ["Why should we hire him?", "Everything he’s built", "Get resume"] : ["Everything he’s built", "Has he won anything?", "Contact Rizwan"] }); return true;
   }
   // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
   if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && !topicsIn(lastUser).length && !profileFocus(lastUser)
@@ -188,7 +203,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   }
   // how this site works: the same answer the browser gives, never a project panel
   if (/\b(how does (this|the) (site|agent|portfolio|chat) work|how (is|was) (this|the) (site|agent) (built|made))\b/i.test(lastUser)) {
-    say("Every message passes a prompt guard and a scope filter. Known questions are answered in the browser; the rest go to a model chain (gpt-oss-120b, gpt-oss-20b, Gemini) with a deterministic router behind it, and every sentence is checked against his facts.");
+    say("Every message passes a prompt guard and a scope filter. Known questions are answered in the browser; the rest go to a model chain (gpt-oss-120b, gpt-oss-20b, Gemini, then free OpenRouter models) with a deterministic router behind it, and every sentence is checked against his facts.");
     call("show_harness"); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }
   if (clear && re(/\b(alone|solo|by himself|on his own|team(mates?)?|who else|with whom|his (part|role|contribution)|versus|vs\.?|who did what|split|what did he (do|build) (in|on|for))\b/)) {

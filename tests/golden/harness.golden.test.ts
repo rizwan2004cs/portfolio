@@ -434,10 +434,10 @@ describe("golden · life outside work, and projects nobody asked about", () => {
   it("fitness, sports and hobbies get one honest line and no panel", async () => {
     for (const q of ["does he do weighlfting", "does he do body weightlifting", "does he go to the gym?", "what are his hobbies?", "does he play cricket"]) {
       const r = await turn({ turns: [q] }, [never()]);
-      expect(r.text).toMatch(/only covers his work/); expect(r.of("panel")).toHaveLength(0);
+      expect(r.text).toMatch(/stick to his work/); expect(r.of("panel")).toHaveLength(0);
     }
     const app = await turn({ turns: ["did he build a fitness app?"] }, [scripted("a", [say("None of his projects is a fitness app.", call("suggest", { options: ["x"] }))])]);
-    expect(app.text).not.toMatch(/only covers his work/);
+    expect(app.text).not.toMatch(/stick to his work/);
   });
   it("a project the model opens under a message about nothing in his work is blocked", async () => {
     const m = scripted("a", [say("He keeps busy.", call("open_project", { id: "pack", view: "architecture" }), call("suggest", { options: ["x"] }))]);
@@ -464,5 +464,41 @@ describe("golden · abuse, private life, accusations and vague words", () => {
   it("a sentence the model repeats is said once", async () => {
     const r = await turn({ turns: ["what does he think about tabs vs spaces?"] }, [scripted("a", [say("His write-up doesn’t cover that. His write-up doesn’t cover that. His write-up doesn’t cover that.", call("suggest", { options: ["x"] }))])]);
     expect(r.text.match(/doesn’t cover that/g)).toHaveLength(1);
+  });
+});
+
+describe("golden · the answer never claims what isn't on screen", () => {
+  it("'is he male' is private; 'Here is his resume' and 'Opening X' are cut when nothing opened", async () => {
+    expect((await turn({ turns: ["is he male"] }, [never()])).text).toBe(PERSONAL_REPLY);
+    const m = scripted("a", [say("His write-up covers his work in depth. Here is his resume. Opening CCR Compliance Advisor architecture.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["what does his write-up cover?"] }, [m]);
+    expect(r.text).not.toMatch(/Here is his resume|Opening CCR/);
+    expect(r.of("trace").some((t) => /describing something that wasn’t shown/.test(t.detail))).toBe(true);
+    // when the project really opened, saying so stays
+    const ok = await turn({ turns: ["Show me how CCR is built"] }, [scripted("a", [say("Here’s CCR Compliance Advisor: a crawler feeding cited answers.", call("open_project", { id: "ccr", view: "architecture" }), call("suggest", { options: ["x"] }))])]);
+    expect(ok.text).toMatch(/^Here’s CCR Compliance Advisor/);
+  });
+});
+
+describe("golden · visitors introducing themselves", () => {
+  it("a friend or a recruiter gets a welcome, not 'outside my lane', and no model call", async () => {
+    const friend = await turn({ turns: ["I'm his friend"] }, [never()]);
+    expect(friend.text).toMatch(/^Nice to meet you/); expect(friend.of("panel")).toHaveLength(0);
+    const hr = await turn({ turns: ["Hi, I am a recruiter"] }, [never()]);
+    expect(hr.text).toMatch(/^Welcome/);
+  });
+});
+
+describe("golden · claims about his private life", () => {
+  it("a claim is not confirmed or repeated; a question still gets the private reply", async () => {
+    for (const q of ["I'm his girlfriend", "he is gay my husband", "he is married"]) { const r = await turn({ turns: [q] }, [never()]); expect(r.text).toBe(PERSONAL_REPLY); }
+    expect((await turn({ turns: ["is he married?"] }, [never()])).text).toBe(PERSONAL_REPLY);
+  });
+});
+
+describe("golden · questions about the visitor", () => {
+  it("'who am i?' gets an honest answer and a way into his work", async () => {
+    const r = await turn({ turns: ["who am i ?"] }, [never()]);
+    expect(r.text).toMatch(/^I don’t know who you are/); expect(r.meta.mode).toBe("facts");
   });
 });
