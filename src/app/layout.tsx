@@ -34,9 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <CursorTrail />
-        {/* cookieless page views and real-visitor loading times, read in the Vercel dashboard */}
-        <Analytics />
-        <SpeedInsights />
+        {/* cookieless page views and real-visitor loading times, read in the Vercel dashboard; their scripts
+            are served only on Vercel, so local and CI servers skip them instead of logging 404s */}
+        {process.env.VERCEL && <><Analytics /><SpeedInsights /></>}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson(siteGraph) }} />
       </body>
     </html>
