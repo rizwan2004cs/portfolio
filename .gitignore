@@ -1,0 +1,21 @@
+node_modules/
+.next/
+.next-*/
+out/
+.vercel/
+.scratch/
+.superpowers/
+coverage/
+playwright-report/
+test-results/
+next-env.d.ts
+*.tsbuildinfo
+.env
+.env*.local
+.DS_Store
+
+# kept locally, not published: the first prototype, superseded resume PDFs, internal build plans
+/spike/
+/resume/original*.pdf
+/docs/superpowers/
+.vercel
