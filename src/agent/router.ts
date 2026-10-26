@@ -1,4 +1,4 @@
-import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, PROJECTS, projectById, roleDetail, TOOLKIT, toolUses, WHY_HIM } from "@/content/data";
+import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, mentionsTool, PROJECTS, projectById, roleDetail, TOOLKIT, toolUses, WHY_HIM } from "@/content/data";
 import type { Project } from "@/content/types";
 import type { Emit } from "./types";
 import { bestFact } from "./grounding";
@@ -96,7 +96,10 @@ export function router(lastUser: string, emit: Emit): void {
   // his jobs: where he works, what he does there, his internships
   if (!clear && re(/\bnovulis\b|\bsupraja\b|where (does|did) he work|\b(his|current) (job|role|employer|company)\b|\bintern(ship)?s?\b|what does he do\b/)) {
     // only the roles asked about: Novulis, Supraja, or the internships; everything for "where does he work"
-    const pick = EXPERIENCE.filter((x) => (re(/\bnovulis\b/) ? x.title.startsWith("Novulis") && (!re(/what does he do|currently|right now|\bnow\b/) || !!x.now) : re(/\bsupraja\b/) ? x.title.startsWith("Supraja") : re(/\bintern/) ? !!x.minor : re(/where does he work|\b(current|job|employer|company)\b/) ? !!x.now : true));
+    // "what does he do with azure": only the roles that mention it
+    const tool = TOOLKIT.flatMap(([, l]) => l).find((t) => mentionsTool(lastUser, t) && !/^(REST APIs|Render)$/.test(t));
+    const withTool = tool ? EXPERIENCE.filter((x) => mentionsTool(x.body, tool)) : [];
+    const pick = withTool.length ? withTool : EXPERIENCE.filter((x) => (re(/\bnovulis\b/) ? x.title.startsWith("Novulis") && (!re(/what does he do|currently|right now|\bnow\b/) || !!x.now) : re(/\bsupraja\b/) ? x.title.startsWith("Supraja") : re(/\bintern/) ? !!x.minor : re(/where does he work|\b(current|job|employer|company)\b/) ? !!x.now : true));
     say(pick.map((x) => `${x.role} at ${x.title}, ${x.when}: ${roleDetail(x).replace(/\.$/, "")}.`).join(" ")); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return;
   }
   if (re(/\b(resume|cv)\b/)) { say("Here’s his resume, once you approve."); call("offer_resume"); call("suggest", { options: ["Everything he’s built", "Contact Rizwan"] }); return; }
