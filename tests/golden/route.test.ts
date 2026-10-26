@@ -100,3 +100,24 @@ describe("route · AG-UI stream", () => {
     expect(evs.some((e) => e.type === "TEXT_MESSAGE_CONTENT")).toBe(true);
   });
 });
+
+describe("route · turn log", () => {
+  it("each finished turn is logged once, after the answer, with no IP address", async () => {
+    const rows: import("@/server/log").TurnLog[] = [];
+    const d = { ...deps(), log: async (r: import("@/server/log").TurnLog) => { rows.push(r); } };
+    await events(await handleAgent(post({ turns: ["voice agents"], threadId: "t-1" }, { "x-vercel-ip-country": "IN" }), d, "9.9.9.9"));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rows).toHaveLength(1);
+    const [row] = rows;
+    expect(row).toMatchObject({ session: "t-1", turn: 1, question: "voice agents", country: "IN", killed: false });
+    expect(row.meta?.mode).toBe("model");
+    expect(row.events.some((e) => e.type === "text")).toBe(true);
+    expect(row.events.some((e) => e.type === "trace")).toBe(true);
+    expect(JSON.stringify(row)).not.toContain("9.9.9.9");
+  });
+  it("a failing log never breaks the answer", async () => {
+    const d = { ...deps(), log: async () => { throw new Error("db down"); } };
+    const evs = await events(await handleAgent(post({ turns: ["voice agents"] }), d));
+    expect(evs.at(-1).type).toBe("RUN_FINISHED");
+  });
+});
