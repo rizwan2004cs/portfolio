@@ -7,7 +7,7 @@ export interface ContactDeps {
   /** stores the message, returns its id; absent without a database */
   save?: (m: ContactMessage & { country?: string }) => Promise<number>;
   /** sends the email; absent without RESEND_API_KEY */
-  send?: (m: ContactMessage) => Promise<void>;
+  send?: (m: ContactMessage & { country?: string }) => Promise<void>;
   /** records whether the email went out */
   mark?: (id: number, delivered: boolean, error?: string) => Promise<void>;
   now: () => number;
@@ -42,10 +42,10 @@ export async function handleContact(req: Request, deps: ContactDeps, ip = "anon"
   // a bot that filled the hidden field gets the same reply as a person, so it learns nothing
   if (body.website) return json({ ok: true });
   if (limited(ip, deps.now())) return json({ ok: false, error: "That’s a few messages already. Email him directly instead." }, 429);
-  const msg: ContactMessage = { name: body.name, email: body.email, message: body.message, source: body.source };
+  const msg = { name: body.name, email: body.email, message: body.message, source: body.source, country: req.headers.get("x-vercel-ip-country") ?? undefined };
 
   let id: number | undefined;
-  try { id = await deps.save?.({ ...msg, country: req.headers.get("x-vercel-ip-country") ?? undefined }); }
+  try { id = await deps.save?.(msg); }
   catch (e) { console.error("contact save failed", e instanceof Error ? e.message : e); }
   if (!deps.send) return id ? json({ ok: true }) : json({ ok: false, error: "The form isn’t set up yet. Email him directly." }, 503);
   try {
@@ -58,6 +58,28 @@ export async function handleContact(req: Request, deps: ContactDeps, ip = "anon"
     if (id) { await deps.mark?.(id, false, error).catch(() => {}); return json({ ok: true }); } // saved: he will still see it
     return json({ ok: false, error: "Couldn’t send that. Email him directly." }, 502);
   }
+}
+
+const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+/** The notification email, in the site's look: the message first, then who sent it and a one-click reply.
+ *  Every value a visitor typed is escaped; tables and inline styles because that is what mail clients render. */
+export function contactEmail(m: ContactMessage & { country?: string }, at = new Date()) {
+  const when = at.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  const from = m.source === "agent" ? "the agent" : "the Classic page";
+  const reply = `mailto:${encodeURIComponent(m.email)}?subject=${encodeURIComponent("Re: your message on mohammad-rizwan.tech")}`;
+  const mono = "font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#6b6964;letter-spacing:.04em";
+  const html = `<!doctype html><html><body style="margin:0;background:#f9f8f5;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#171717">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border:1px solid #171717">
+  <tr><td style="padding:20px 28px;border-bottom:1px solid #e4e1db;${mono}"><span style="display:inline-block;width:8px;height:8px;background:#1f7a45;margin-right:8px"></span>NEW MESSAGE · MOHAMMAD-RIZWAN.TECH</td></tr>
+  <tr><td style="padding:28px 28px 8px"><div style="font-size:22px;line-height:28px;font-weight:600;letter-spacing:-.01em">${esc(m.name)}</div>
+    <div style="margin-top:4px"><a href="mailto:${esc(m.email)}" style="color:#5b3df5;font-size:14px;text-decoration:none">${esc(m.email)}</a></div></td></tr>
+  <tr><td style="padding:16px 28px 24px"><div style="font-size:16px;line-height:26px;white-space:pre-wrap;border-left:2px solid #171717;padding-left:16px">${esc(m.message)}</div></td></tr>
+  <tr><td style="padding:0 28px 28px"><a href="${reply}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-size:14px;padding:11px 18px">Reply to ${esc(m.name.split(/\s+/)[0])} →</a></td></tr>
+  <tr><td style="padding:16px 28px;border-top:1px solid #e4e1db;${mono}">Sent from ${from} · ${esc(when)} IST${m.country ? ` · ${esc(m.country)}` : ""}</td></tr>
+</table></td></tr></table></body></html>`;
+  const text = `${m.message}\n\n— ${m.name} <${m.email}>\nSent from ${from} of mohammad-rizwan.tech, ${when} IST. Reply to this email to answer them.`;
+  return { subject: `New message from ${m.name} · mohammad-rizwan.tech`, html, text };
 }
 
 const TO = "mohammad22cse@gmail.com";
@@ -80,8 +102,7 @@ export function defaultContactDeps(env = process.env): ContactDeps {
         signal: AbortSignal.timeout(8000),
         body: JSON.stringify({
           from: FROM, to: [TO], reply_to: m.email,
-          subject: `Portfolio: message from ${m.name}`,
-          text: `${m.message}\n\n— ${m.name} <${m.email}>\nSent from the ${m.source === "agent" ? "agent" : "Classic"} page of mohammad-rizwan.tech. Reply to this email to answer them.`,
+          ...contactEmail(m),
         }),
       });
       if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 200)}`);

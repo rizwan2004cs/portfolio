@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // e2e builds into its own folder (NEXT_DIST_DIR=.next-e2e) so tests never clobber a running local server
@@ -23,4 +24,8 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// With the Sentry auth token (set on Vercel by the integration) the build uploads source maps, so stack traces
+// point at the real source; without it (local, CI) the config is left exactly as it is.
+export default process.env.SENTRY_AUTH_TOKEN
+  ? withSentryConfig(nextConfig, { org: process.env.SENTRY_ORG, project: process.env.SENTRY_PROJECT, authToken: process.env.SENTRY_AUTH_TOKEN, silent: true, telemetry: false })
+  : nextConfig;
