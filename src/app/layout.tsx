@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Doto, Geist, Geist_Mono, Instrument_Serif, Space_Grotesk } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { CursorTrail } from "@/components/CursorTrail";
 import { SITE } from "@/content/site";
 import { ldJson, siteGraph } from "@/seo/jsonld";
@@ -32,6 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <CursorTrail />
+        {/* cookieless page views and real-visitor loading times, read in the Vercel dashboard; their scripts
+            are served only on Vercel, so local and CI servers skip them instead of logging 404s */}
+        {process.env.VERCEL && <><Analytics /><SpeedInsights /></>}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson(siteGraph) }} />
       </body>
     </html>

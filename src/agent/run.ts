@@ -6,7 +6,7 @@ import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
-import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
+import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, offScope, personal, PERSONAL_REPLY, REFUSAL, stripCode } from "./scope";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
 
@@ -84,6 +84,12 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   if (offScope(last)) {
     emit({ type: "trace", step: "scope", detail: "off-scope request refused · 0 tokens", level: "warn" });
     emit({ type: "text", text: REFUSAL });
+    emit({ type: "suggest", options: DEFAULT_NEXT });
+    return { mode: "scope" };
+  }
+  if (personal(last)) {
+    emit({ type: "trace", step: "scope", detail: "a question about his private life · fixed reply, no model, no panel · 0 tokens", level: "info" });
+    emit({ type: "text", text: PERSONAL_REPLY });
     emit({ type: "suggest", options: DEFAULT_NEXT });
     return { mode: "scope" };
   }
@@ -243,6 +249,12 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
             emit({ type: "trace", step: "harness", detail: "rejected malformed tool args", level: "warn" });
             messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ error: "malformed arguments" }) });
             drops++;
+            continue;
+          }
+          // "Outside my lane." with his profile card under it reads as an answer: a refusal shows nothing
+          if (tc.function.name !== "suggest" && texts.some(isRefusal)) {
+            emit({ type: "trace", step: "policy", detail: `skipped ${tc.function.name}: the answer is a refusal, so nothing goes on screen`, level: "info" });
+            messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ error: "not allowed: you refused this question; show nothing" }) });
             continue;
           }
           const d = checkToolCall({ name: tc.function.name, args }, { last, subject, shown: input.shown, openedThisRun: opened });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GUARD_REFUSAL, REFUSAL } from "@/agent/scope";
+import { GUARD_REFUSAL, PERSONAL_REPLY, REFUSAL } from "@/agent/scope";
 import { ModelError } from "@/agent/types";
 import { assertHealthy, blockScreen, call, http, say, scripted, tools, turn } from "./helpers";
 
@@ -385,5 +385,26 @@ describe("golden · harness repairs", () => {
   it("a non-Latin legitimate question is answered, not refused", async () => {
     const r = await turn({ turns: ["PACK के बारे में बताओ"] }, [scripted("a", [{ content: null }])]);
     expect(r.meta.mode).toBe("router"); expect(r.of("panel")[0]?.panel.id).toBe("pack"); assertHealthy(r);
+  });
+});
+
+describe("golden · private life and refusals", () => {
+  it("questions about his private life get one fixed line, no model and no panel", async () => {
+    for (const q of ["Who is rizwans girlfriend?", "Is he married?", "How old is he?", "what is his religion"]) {
+      const r = await turn({ turns: [q] }, [never()]);
+      expect(r.text).toBe(PERSONAL_REPLY); expect(r.meta.mode).toBe("scope"); expect(r.of("panel")).toHaveLength(0);
+    }
+    // work questions that share a word are still work questions
+    const work = await turn({ turns: ["What is the relationship between PACK and CCR?"] }, [scripted("a", [say("Both are agents with model fallbacks.", call("suggest", { options: ["x"] }))])]);
+    expect(work.text).not.toBe(PERSONAL_REPLY);
+  });
+  it("a refusal never comes with a panel, even when the model calls one in the same reply", async () => {
+    const r = await turn({ turns: ["Tell me some gossip about him"] }, [scripted("a", [say("Outside my lane.", call("show_profile"), call("suggest", { options: ["x"] }))])]);
+    expect(r.of("panel")).toHaveLength(0);
+    expect(r.of("trace").some((t) => /skipped show_profile: the answer is a refusal/.test(t.detail))).toBe(true); assertHealthy(r);
+  });
+  it("salary questions point to him, with his contact details behind approval", async () => {
+    const r = await turn({ turns: ["What is his expected CTC?"] }, [never()]);
+    expect(r.text).toMatch(/ask him directly/); expect(r.of("approval")[0].action).toBe("contact");
   });
 });
