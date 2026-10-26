@@ -33,7 +33,7 @@ export const ABUSE_REPLY = "Let’s keep it to his work. Ask about a project or 
 // accusations about him: nothing on the site says so, and the agent never guesses about a person
 const ACCUSE = /\b(betray\w*|fired|sacked|terminated|laid off|scam\w*|fraud\w*|cheat(ed|er|s|ing)?|stole|steal\w*|lied|liar|lying|criminal|arrest\w*|jail\w*|prison|lawsuit|sued|scandal\w*|plagiar\w*|blacklist\w*|misconduct|harass\w*)\b/i;
 export const accusation = (text: string) => ACCUSE.test(text) && scoreProjects(text)[0].s < 4;
-export const ACCUSE_REPLY = "Nothing on this site says that, and I won’t guess about a person. His work history and projects are here if you want to check them.";
+export const ACCUSE_REPLY = "Nothing on this site supports that, and I don’t speculate about people. His work history and projects are here to check.";
 // his life outside work (fitness, sports, hobbies, looks) is not on this site either, apart from the poetry he writes
 const LIFESTYLE = /\b(gym|work ?outs?|weigh\w*|lift(ing|s)?|body ?build\w*|bodybuilding|fitness|exercis\w*|sports?|cricket|football|soccer|basketball|badminton|running|marathon|yoga|swim\w*|hobb(y|ies)|movies?|films?|music|songs?|singer|dance|danc\w*|travel\w*|food|diet|vegetarian|height|how tall|his weight|how does he look|good.looking|handsome|physique|games he plays|play(s)? (games|any sport))\b/i;
 export const lifestyle = (text: string) => LIFESTYLE.test(text) && !/\b(app|project|built|build|agent|dashboard|platform)\b/i.test(text);

@@ -48,3 +48,17 @@ describe("the outer agent under free-tier limits", () => {
     expect(calls).toBe(2);
   });
 });
+
+describe("the curator's fixes", () => {
+  it("an unsure non-sensitive pick declines when the sensitive kinds together outweigh work", () => {
+    // "protective one to prevent stds": off_topic at 0.33 used to become work and reach the model
+    expect(decide({ kind: "off_topic", confidence: 0.33, source: "model", note: "", probabilities: { off_topic: 0.33, personal: 0.3, abusive: 0.2, work: 0.1 } })).toBe("personal");
+    expect(decide({ kind: "small_talk", confidence: 0.4, source: "model", note: "", probabilities: { small_talk: 0.4, work: 0.5, personal: 0.05 } })).toBe("work");
+  });
+  it("the previous message goes to the classifier, so a follow-up keeps its topic", async () => {
+    let state: Record<string, string> = {};
+    const f = (async (_u: string, init: RequestInit) => { state = JSON.parse(String(init.body)).state; return new Response(JSON.stringify({ answers: { kind: { choice: "personal", confidence: 0.9 } } })); }) as unknown as typeof fetch;
+    await decisionClassifier("k", f)("count", sig(), "what's his body count");
+    expect(state.previous_visitor_message).toBe("what's his body count"); expect(state.visitor_message).toBe("count");
+  });
+});

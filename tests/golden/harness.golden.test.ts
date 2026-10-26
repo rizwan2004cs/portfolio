@@ -499,7 +499,7 @@ describe("golden · claims about his private life", () => {
 describe("golden · questions about the visitor", () => {
   it("'who am i?' gets an honest answer and a way into his work", async () => {
     const r = await turn({ turns: ["who am i ?"] }, [never()]);
-    expect(r.text).toMatch(/^I don’t know who you are/); expect(r.meta.mode).toBe("scope");
+    expect(r.text).toMatch(/^I can’t tell who you are/); expect(r.meta.mode).toBe("scope");
   });
 });
 
