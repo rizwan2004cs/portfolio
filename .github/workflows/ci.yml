@@ -69,10 +69,20 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      # each run spends ~1 free-tier request per message, from the same daily budget the live site uses:
+      # only when the policy, the classifier or the labelled set changed, or when started by hand
+      - name: Did the behaviour change?
+        id: changed
+        run: |
+          base=${{ github.event.pull_request.base.sha || github.event.before }}
+          if [ "${{ github.event_name }}" = workflow_dispatch ] || git diff --name-only "$base" HEAD 2>/dev/null | grep -qE '^(src/agent/(behavior|classify)\.ts|tests/fixtures/intents\.json|scripts/eval-intents\.mjs)$'; then echo run=1 >> "$GITHUB_OUTPUT"; else echo "behaviour unchanged: skipping"; fi
       - name: Classifier eval
+        if: steps.changed.outputs.run == '1'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: node scripts/eval-intents.mjs
