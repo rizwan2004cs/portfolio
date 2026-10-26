@@ -134,6 +134,13 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
     say(smallTalkReply(lastUser));
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
   }
+  // "I'm his friend", "I'm a recruiter at X": a visitor introducing themselves gets a welcome and a way in, not "outside my lane"
+  const who = lastUser.match(/^\s*(?:hi[,!.\s]*|hey[,!.\s]*|hello[,!.\s]*)?(?:i\s*(?:’|')?\s*a?m|i am|this is)\s+(?:his\s+|a\s+|an\s+|the\s+)?(friend|best friend|classmate|batchmate|college ?mate|roommate|colleague|co-?worker|teammate|manager|mentor|teacher|professor|senior|junior|brother|sister|cousin|relative|recruiter|hiring manager|hr|talent \w+|founder|engineer|developer|student)\b/i);
+  if (who && lastUser.trim().split(/\s+/).length <= 14) {
+    const role = who[1].toLowerCase(), hiring = /recruiter|hiring|hr|talent|founder|manager/.test(role) && !/^his\b/i.test(lastUser.replace(/^.*?(?:am|this is)\s+/i, ""));
+    say(hiring ? "Welcome. Paste the role’s requirements and I’ll map them to his work, or start with his strongest projects." : `Nice to meet you. I can show you what he’s been building, or you can reach him directly.`);
+    call("suggest", { options: hiring ? ["Why should we hire him?", "Everything he’s built", "Get resume"] : ["Everything he’s built", "Has he won anything?", "Contact Rizwan"] }); return true;
+  }
   // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
   if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && !topicsIn(lastUser).length && !profileFocus(lastUser)
     && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything)\b/)) {

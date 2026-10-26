@@ -479,3 +479,12 @@ describe("golden · the answer never claims what isn't on screen", () => {
     expect(ok.text).toMatch(/^Here’s CCR Compliance Advisor/);
   });
 });
+
+describe("golden · visitors introducing themselves", () => {
+  it("a friend or a recruiter gets a welcome, not 'outside my lane', and no model call", async () => {
+    const friend = await turn({ turns: ["I'm his friend"] }, [never()]);
+    expect(friend.text).toMatch(/^Nice to meet you/); expect(friend.of("panel")).toHaveLength(0);
+    const hr = await turn({ turns: ["Hi, I am a recruiter"] }, [never()]);
+    expect(hr.text).toMatch(/^Welcome/);
+  });
+});
