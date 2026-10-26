@@ -29,7 +29,9 @@ async function recentTraces() {
       const at = Math.max(Date.parse(t.start_time) || 0, Date.parse(t.last_updated_at) || 0);
       if (at < since) { seenOld ||= at > 0; continue; } // a real old trace means later pages are older still
       const scored = (t.feedback_scores ?? []).some((s) => s.name === "answer_relevance");
-      if (!scored && JUDGED_MODES.has(t.metadata?.mode) && t.input?.question && t.output?.answer) out.push(t);
+      // real visitors only: local and preview runs, and runs with no model at all, are not the live agent
+      const offline = JSON.stringify(t.metadata?.harness ?? "").includes("no model configured") || (t.tags ?? []).some((x) => x === "local" || x === "preview");
+      if (!scored && !offline && JUDGED_MODES.has(t.metadata?.mode) && t.input?.question && t.output?.answer) out.push(t);
     }
     if (content.length < 100 || seenOld) break;
   }

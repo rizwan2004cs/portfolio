@@ -22,7 +22,7 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 60_000,
-    // no model keys at all: every answer comes from the deterministic router, so runs are free and repeatable
-    env: { GROQ_API_KEY: "", GROQ_API_KEYS_FALLBACK: "", GEMINI_API_KEY: "" },
+    // no model, tracing, database or mail keys at all (test runs must never reach Opik, Neon or an inbox): every answer comes from the deterministic router, so runs are free and repeatable
+    env: { GROQ_API_KEY: "", GROQ_API_KEYS_FALLBACK: "", GEMINI_API_KEY: "", OPENROUTER_API_KEY: "", OPIK_API_KEY: "", DATABASE_URL: "", RESEND_API_KEY: "", NEXT_PUBLIC_SENTRY_DSN: "" },
   },
 });
