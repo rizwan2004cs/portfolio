@@ -365,5 +365,7 @@ test.describe("films page", () => {
     expect(await (await request.get("/sitemap.xml")).text()).toContain("/films");
     await page.goto("/");
     await expect(page.locator('.about a[href="/films"]')).toHaveCount(1);
+    await expect(page.locator("#outside .opicks li")).toHaveCount(4);
+    await expect(page.locator('#outside .omore[href="/films#whiplash"]')).toHaveCount(1);
   });
 });

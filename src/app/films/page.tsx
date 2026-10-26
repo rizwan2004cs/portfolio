@@ -5,14 +5,14 @@ import { FILM_COUNT, FILMS, imdbUrl, posterUrl, watchUrl, type Film } from "@/co
 import { SITE } from "@/content/site";
 import { ldJson } from "@/seo/jsonld";
 
-const TITLE = "Films that shaped how I work · Syed Mohammad Rizwan";
-const DESCRIPTION = `${FILM_COUNT} films and a series that shaped how Syed Mohammad Rizwan, an AI engineer in Bengaluru, thinks about learning, courage and curiosity, in his own words.`;
+const TITLE = "Motivational films that shaped how I work · Syed Mohammad Rizwan";
+const DESCRIPTION = "Motivational and feel-good movies, plus a sci-fi series, that shaped how Syed Mohammad Rizwan works: inspirational films on courage and fresh starts.";
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
   description: DESCRIPTION,
   alternates: { canonical: "/films" },
-  keywords: ["Syed Mohammad Rizwan", "Mohammad Rizwan", "favourite films", "films that inspire", ...FILMS.flatMap((g) => g.films.map((f) => f.title))],
+  keywords: ["motivational movies", "feel-good movies", "inspirational films", "movies that change your perspective", "life-changing movies", "Syed Mohammad Rizwan", ...FILMS.flatMap((g) => g.films.map((f) => f.title))],
   openGraph: { type: "article", title: TITLE, description: DESCRIPTION, url: "/films" },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
@@ -27,7 +27,7 @@ function Poster({ f, hue }: { f: Film; hue: number }) {
     <a className="ftile" href={imdbUrl(f)} target="_blank" rel="noopener" style={{ ["--fh" as string]: hue }} aria-label={`${f.title} on IMDb`}>
       <span className="fi" aria-hidden="true">{initials(f.title)}</span>
       <span className="fy" aria-hidden="true">{f.kind === "TVSeries" ? "series" : f.year}</span>
-      <img src={posterUrl(f)} srcSet={`${posterUrl(f, 92)} 92w, ${posterUrl(f, 185)} 185w`} sizes="72px" alt={`${f.title} (${f.year}) poster`} width={72} height={108} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+      <img src={posterUrl(f)} srcSet={`${posterUrl(f, 185)} 185w, ${posterUrl(f, 342)} 342w`} sizes="(max-width:600px) 88px, 120px" alt={`${f.title} (${f.year}) poster`} width={120} height={180} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
     </a>
   );
 }
@@ -47,7 +47,7 @@ const graph = {
     numberOfItems: FILM_COUNT,
     itemListElement: FILMS.flatMap((g) => g.films).map((f, i) => ({
       "@type": "ListItem", position: i + 1, url: `${SITE.url}/films#${slug(f.title)}`,
-      item: { "@type": f.kind, name: f.title, image: posterUrl(f, 342), sameAs: imdbUrl(f), ...(f.kind === "Movie" ? { dateCreated: f.year } : { startDate: f.year }), ...(f.lang ? { inLanguage: f.lang } : {}), description: f.note },
+      item: { "@type": f.kind, name: f.title, genre: f.tags, image: posterUrl(f, 342), sameAs: imdbUrl(f), ...(f.kind === "Movie" ? { dateCreated: f.year } : { startDate: f.year }), ...(f.lang ? { inLanguage: f.lang } : {}), description: f.note },
     })),
   },
 };
@@ -58,10 +58,10 @@ export default function FilmsPage() {
     <div className="classic-page">
       <Header mode="work" />
       <main className="classic grid-bg" id="classic">
-        <article className="wk films">
+        <article className="wk films wide">
           <nav className="crumbs" aria-label="Breadcrumb"><a href="/">Syed Mohammad Rizwan</a> / Films</nav>
           <h1>Films that shaped how I work</h1>
-          <p className="lede">Off the clock I watch a lot. These are the ones that stayed: about learning at any age, taking the leap, chasing the next level, and asking the one question nobody asks.</p>
+          <p className="lede">Off the clock I watch a lot. These are the motivational and feel-good films that stayed with me: about learning at any age, taking the leap, chasing the next level, and asking the one question nobody asks.</p>
           {FILMS.map((g, gi) => (
             <section key={g.theme} className="fgroup" aria-labelledby={`fg-${gi}`}>
               <h2 id={`fg-${gi}`}>{g.theme}</h2>
@@ -71,6 +71,8 @@ export default function FilmsPage() {
                     <Poster f={f} hue={(n++ * 47 + gi * 90) % 360} />
                     <div>
                       <h3>{f.title} <small>{f.kind === "TVSeries" ? `series · ${f.year}–` : f.year}{f.lang ? ` · ${f.lang}` : ""}</small></h3>
+                      <p className="ftags">{f.tags.map((t) => <span key={t}>{t}</span>)}</p>
+                      <p className="ftake">{f.take}</p>
                       <p>{f.note}</p>
                       {f.quote && <blockquote>“{f.quote}”</blockquote>}
                       <p className="flinks"><a href={imdbUrl(f)} target="_blank" rel="noopener">IMDb ↗</a><a href={watchUrl(f)} target="_blank" rel="noopener">Where to watch ↗</a></p>
