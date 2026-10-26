@@ -41,3 +41,15 @@ describe("contact form", () => {
     expect((await handleContact(post(good), d, "3.3.3.3")).status).toBe(200);
   });
 });
+
+describe("contact email", () => {
+  it("escapes what the visitor typed and offers a one-click reply", async () => {
+    const { contactEmail } = await import("@/server/contact");
+    const e = contactEmail({ name: "Eve <script>", email: "eve@example.com", message: "<img src=x onerror=alert(1)>\nsecond line", source: "agent", country: "IN" }, new Date("2026-10-27T00:00:00Z"));
+    expect(e.html).not.toContain("<script>"); expect(e.html).not.toContain("<img src=x");
+    expect(e.html).toContain("&lt;img src=x");
+    expect(e.html).toContain("mailto:eve%40example.com");
+    expect(e.subject).toBe("New message from Eve <script> · mohammad-rizwan.tech");
+    expect(e.text).toContain("second line");
+  });
+});

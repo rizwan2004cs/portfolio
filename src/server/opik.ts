@@ -10,7 +10,7 @@ let client: Opik | null | undefined;
 export function opikClient(env = process.env): Opik | undefined {
   if (client === undefined) {
     client = env.OPIK_API_KEY
-      ? new Opik({ apiKey: env.OPIK_API_KEY, workspaceName: env.OPIK_WORKSPACE ?? "mohammad-rizwan", projectName: env.OPIK_PROJECT_NAME ?? "portfolio-agent", apiUrl: env.OPIK_URL_OVERRIDE ?? "https://www.comet.com/opik/api" })
+      ? new Opik({ apiKey: env.OPIK_API_KEY, workspaceName: env.OPIK_WORKSPACE ?? "mohammad-rizwan", projectName: env.OPIK_PROJECT_NAME ?? "Portfolio agent", apiUrl: env.OPIK_URL_OVERRIDE ?? "https://www.comet.com/opik/api" })
       : null;
   }
   return client ?? undefined;

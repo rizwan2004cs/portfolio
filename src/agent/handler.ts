@@ -6,6 +6,7 @@ import { cacheKey, makeCache, type AnswerCache } from "./cache";
 import { groqScreen, modelChain } from "./models";
 import { router } from "./router";
 import { waitUntil } from "@vercel/functions";
+import * as Sentry from "@sentry/nextjs";
 import { neonTurnLog, type TurnLogger } from "@/server/log";
 import { opikClient, traceTurn, type TurnTrace } from "@/server/opik";
 import { runAgent, SYSTEM } from "./run";
@@ -118,6 +119,7 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
       } catch (err) {
         console.error("agent run failed", err);
         error = err instanceof Error ? err.message.slice(0, 300) : "unknown error";
+        Sentry.captureException(err); // the visitor still gets an answer from the router below
         // last line of defence: the deterministic router still answers
         try {
           emit({ type: "trace", step: "fallback", detail: "unexpected error · deterministic router", level: "err" });
