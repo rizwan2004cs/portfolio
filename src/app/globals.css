@@ -637,14 +637,15 @@
   .secnav a[aria-current="true"] { color:var(--ink); }
   .secnav a[aria-current="true"]::after { transform:none; }
   @media (hover:hover) and (pointer:fine) { .secnav a:hover { color:var(--ink); } }
-  /* narrower screens: the section links move to their own scrollable row under the name, instead of disappearing */
+  /* narrower screens: the section links move to their own row under the name, instead of disappearing */
   :root { --hdr:52px; }
   @media (max-width:1100px) {
-    body:has(.secnav) { --hdr:89px; }
+    body:has(.secnav) { --hdr:85px; }
     .site-header:has(.secnav) { flex-wrap:wrap; height:auto; }
     .site-header:has(.secnav) > .who, .site-header:has(.secnav) > .rt { height:52px; display:flex; align-items:center; }
-    .secnav { position:static; transform:none; order:3; flex:1 0 100%; height:36px; align-items:center; gap:var(--s5); overflow-x:auto; scrollbar-width:none; border-top:1px solid var(--line); margin:0 calc(-1 * var(--s4)); padding:0 var(--s4); }
-    .secnav a { flex:none; }
+    /* every section in view at once: equal columns, never a sideways scroll that hides one */
+    .secnav { position:static; transform:none; order:3; flex:1 0 100%; display:grid; grid-template-columns:repeat(6, 1fr); align-items:stretch; gap:0; height:34px; border-top:1px solid var(--line); margin:0 calc(-1 * var(--s4)); padding:0; overflow:visible; }
+    .secnav a { justify-content:center; min-width:0; }
   }
   @media (prefers-reduced-motion: no-preference) { html { scroll-behavior:smooth; } }
   .csec { scroll-margin-top:var(--hdr); }
@@ -803,8 +804,8 @@
 
   /* section nav, DeepEval-style: icon + label; the current section sits in corner brackets over a hatch, hover previews it */
   .secnav { gap:var(--s2); }
-  .secnav a { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; font:400 14px/20px var(--f-sans); letter-spacing:0; text-transform:none; color:var(--muted); }
-  .secnav a svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.3; stroke-linejoin:round; flex:none; }
+  .secnav a { display:inline-flex; align-items:center; gap:5px; padding:4px 8px; font:400 13px/18px var(--f-sans); letter-spacing:0; text-transform:none; color:var(--muted); }
+  .secnav a svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.3; stroke-linejoin:round; flex:none; }
   .secnav a::after { display:none; }
   .secnav a[aria-current="true"] { color:var(--ink); font-weight:500; }
   .secnav a[aria-current="true"]::before { opacity:1; transform:none; }
@@ -948,3 +949,18 @@ details.cite > .panel { border:0; margin:0; }
 @media (hover:hover) and (pointer:fine) { .opicks .opost:hover img { transform:scale(1.03); } .opicks .omore:hover, #outside .csh a:hover { color:var(--accent); } }
 @media (prefers-reduced-motion:reduce) { .opicks .opost img { transition:none; } }
 @media (max-width:600px) { .opicks li { grid-template-columns:72px 1fr; gap:var(--s4); } .opicks .opost { width:72px; height:108px; } .opicks .otake { font-size:19px; } }
+
+/* the short label ("Build") only on phones */
+.secnav .ls { display:none; }
+/* phones: a tab bar under the name: icon over a short label, six across, all visible */
+@media (max-width:600px) {
+  body:has(.secnav) { --hdr:100px; }
+  .secnav { height:48px; }
+  .secnav a { flex-direction:column; gap:2px; padding:5px 1px; font-size:10.5px; line-height:13px; letter-spacing:0; text-align:center; }
+  .secnav a svg { width:16px; height:16px; }
+  .secnav .lf { display:none; }
+  .secnav .ls { display:inline; }
+  .secnav a[aria-current="true"] { color:var(--accent); }
+  .secnav a[aria-current="true"]::before { opacity:0; }
+  .secnav a[aria-current="true"] svg { stroke-width:1.6; }
+}
