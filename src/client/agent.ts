@@ -3,6 +3,7 @@
 import { EXPERIENCE, PROFILE, PROJECTS } from "@/content/data";
 import type { Project } from "@/content/types";
 import { fitRows } from "@/agent/fit";
+import { wireContactForms } from "./contact";
 import { CHEV, connectPanel, esc, fitPanel, harnessPanel, homeIntro, ICON, indexPanel, profilePart, projectPanel, resumePanel, shortlistPanel } from "@/render/html";
 import { fine, fmt, installImageHandling, paintClocks, readShortlist, reduce, runSim, startClock, wait, wireArch, writeShortlist } from "./shared";
 
@@ -176,6 +177,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     el.querySelectorAll<HTMLButtonElement>("[data-slcopy]").forEach((b) => (b.onclick = () => void copyNote(el, shortlistNotes(), "Copied · paste into your notes")));
     el.querySelectorAll<HTMLButtonElement>("[data-slshare]").forEach((b) => (b.onclick = () => void copyNote(el, `${location.origin}/agent?shortlist=${(S.shortlist as string[]).join(",")}`, "Link copied · it opens this shortlist")));
     wireArch(el, (label, outcome) => logEv("CUSTOM", `simulation · ${label} → ${outcome}`));
+    wireContactForms(el);
   }
   /* ---------- shortlist: pick projects, copy them as notes or share the set ---------- */
   const shortlisted = () => (S.shortlist as string[]).map((id) => P.get(id)).filter((p): p is Project => !!p);

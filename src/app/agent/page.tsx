@@ -40,6 +40,8 @@ export default function AgentPage() {
                     <input id="inp" name="q" placeholder="Ask about Rizwan’s work…" autoComplete="off" aria-label="Message the agent" maxLength={2000} />
                     <button type="submit">Send</button>
                   </form>
+                  {/* said before the first message is sent: what is stored, and what is not */}
+                  <p className="lognote">Questions and answers are stored to improve the agent. No IP addresses.</p>
                 </div>
                 <nav className="home-ssr-links" aria-label="Projects">
                   {PROJECTS.map((p) => <a key={p.id} href={`/work/${p.id}`}>{p.title}</a>)}

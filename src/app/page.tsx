@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { ClassicIntro } from "@/components/Intro";
 import { CERTS, EDUCATION, EVENTS, EXPERIENCE, EXPERIENCE_BY_ORG, MARQUEE_A, MARQUEE_B, PRINCIPLES, PROFILE, PROJECTS, projectById, roleDetail, SIDE, TOOLKIT } from "@/content/data";
 import { SITE } from "@/content/site";
-import { classicRows, esc, STAR } from "@/render/html";
+import { classicRows, esc, STAR, contactForm } from "@/render/html";
 import { ldJson, profilePage } from "@/seo/jsonld";
 
 export const metadata: Metadata = {
@@ -173,6 +173,7 @@ export default function ClassicPage() {
             <div className="csh"><h2 id="h-contact"><span className="no">09</span>Contact</h2><span data-clock="label" /></div>
             {/* opens a Gmail compose (works without a mail app) and copies the address, saying so */}
             <p className="cbig"><a href={`https://mail.google.com/mail/?view=cm&to=${PROFILE.links.email}`} target="_blank" rel="noopener" data-copy={PROFILE.links.email}>{PROFILE.links.email.split("@")[0]}<wbr />@{PROFILE.links.email.split("@")[1]}</a><span className="copied" role="status" aria-live="polite" /></p>
+            <div className="cfwrap" dangerouslySetInnerHTML={{ __html: `<h4>Or leave a message</h4>${contactForm("classic")}` }} />
             <div className="cta" style={{ marginTop: "var(--s6)" }}>
               <a className="btn dark" href="/agent?new">Or ask my agent <span className="arr">↗</span></a>
               {PROFILE.links.phone && <Ext href={`https://wa.me/${PROFILE.links.phone.replace(/\D/g, "")}`}>WhatsApp</Ext>}
