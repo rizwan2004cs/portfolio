@@ -134,6 +134,11 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
     say(smallTalkReply(lastUser));
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
   }
+  // "who am I?", "do you know me?": the agent knows nothing about visitors and says so, then offers his work
+  if (re(/^\s*(who am i|who i am|do you know (me|who i am)|what(’|')?s my name|what is my name|guess who (i am|this is)|remember me)\b/)) {
+    say("I don’t know who you are, and I don’t keep track of visitors. I can show you what Rizwan has built.");
+    call("suggest", { options: ["Everything he’s built", "Why should we hire him?", "Get resume"] }); return true;
+  }
   // "I'm his friend", "I'm a recruiter at X": a visitor introducing themselves gets a welcome and a way in, not "outside my lane"
   const who = lastUser.match(/^\s*(?:hi[,!.\s]*|hey[,!.\s]*|hello[,!.\s]*)?(?:i\s*(?:’|')?\s*a?m|i am|this is)\s+(?:his\s+|a\s+|an\s+|the\s+)?(friend|best friend|classmate|batchmate|college ?mate|roommate|colleague|co-?worker|teammate|manager|mentor|teacher|professor|senior|junior|brother|sister|cousin|relative|recruiter|hiring manager|hr|talent \w+|founder|engineer|developer|student)\b/i);
   if (who && lastUser.trim().split(/\s+/).length <= 14) {

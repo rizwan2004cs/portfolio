@@ -37,12 +37,8 @@ export const ACCUSE_REPLY = "Nothing on this site says that, and I won’t guess
 // his life outside work (fitness, sports, hobbies, looks) is not on this site either, apart from the poetry he writes
 const LIFESTYLE = /\b(gym|work ?outs?|weigh\w*|lift(ing|s)?|body ?build\w*|bodybuilding|fitness|exercis\w*|sports?|cricket|football|soccer|basketball|badminton|running|marathon|yoga|swim\w*|hobb(y|ies)|movies?|films?|music|songs?|singer|dance|danc\w*|travel\w*|food|diet|vegetarian|height|how tall|his weight|how does he look|good.looking|handsome|physique|games he plays|play(s)? (games|any sport))\b/i;
 export const lifestyle = (text: string) => LIFESTYLE.test(text) && !/\b(app|project|built|build|agent|dashboard|platform)\b/i.test(text);
-export const LIFESTYLE_REPLY = "His write-up only covers his work. Outside it, the one thing it mentions is that he writes poetry, which became VerseYou.";
-/** A claim, not a question ("I'm his girlfriend", "he is gay"): nothing to confirm, and never repeated back as fact. */
-export const isClaim = (text: string) => !/\?\s*$/.test(text.trim()) && !/^\s*(is|was|are|does|did|do|has|have|can|could|will|would|who|what|when|where|why|how|which|tell|any)\b/i.test(text)
-  && /\b(i\s*(’|')?\s*m|i am|i was|he is|he(’|')s|he was|he has|he had|rizwan is|syed is|we are|we(’|')re|we were|my (husband|wife|boyfriend|girlfriend|partner|fianc\w*|crush|bf|gf))\b/i.test(text);
-export const CLAIM_REPLY = "I can’t confirm that, and I don’t share anything about his personal life. I only cover his work: projects, experience and how he builds.";
-export const PERSONAL_REPLY = "That’s personal, so I’ll leave it to him. I cover his work: projects, experience and how he builds.";
+export const LIFESTYLE_REPLY = "I stick to his work. One thing outside it shows up there: he writes poetry, which became VerseYou.";
+export const PERSONAL_REPLY = "I stick to his work. Ask about a project, his experience, or paste a job description to see how he fits.";
 
 export const REFUSAL = "Outside my lane. I only show Rizwan’s work.";
 export const GUARD_REFUSAL = "That reads like an attempt to rewrite my instructions, so I’ll skip it.";
