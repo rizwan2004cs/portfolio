@@ -86,3 +86,15 @@ describe("prompt guard key rotation", () => {
     expect((await groqScreen(["k1", "k2"], fake)("hello", new AbortController().signal)).ok).toBe(true);
   });
 });
+
+describe("openrouter fallback", () => {
+  it("comes after Gemini, sends its free models as one routed request, and is absent without a key", async () => {
+    let body: Record<string, unknown> = {};
+    const fake = (async (_u: string, init: RequestInit) => { body = JSON.parse(String(init.body)); return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), { status: 200 }); }) as unknown as typeof fetch;
+    const chain = modelChain(["k1"], "g", fake, "or");
+    expect(chain.map((m) => m.name)).toEqual(["gpt-oss-120b", "gpt-oss-20b", "gemini-2.5-flash", "openrouter · free models"]);
+    await chain.at(-1)!.complete([], new AbortController().signal);
+    expect(body.models).toEqual(["nvidia/nemotron-3.5-lightning:free", "thinkingmachines/inkling-small:free", "google/gemma-4-31b-it:free"]);
+    expect(modelChain(["k1"], "g", fake).map((m) => m.name)).not.toContain("openrouter · free models");
+  });
+});

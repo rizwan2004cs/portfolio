@@ -188,7 +188,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   }
   // how this site works: the same answer the browser gives, never a project panel
   if (/\b(how does (this|the) (site|agent|portfolio|chat) work|how (is|was) (this|the) (site|agent) (built|made))\b/i.test(lastUser)) {
-    say("Every message passes a prompt guard and a scope filter. Known questions are answered in the browser; the rest go to a model chain (gpt-oss-120b, gpt-oss-20b, Gemini) with a deterministic router behind it, and every sentence is checked against his facts.");
+    say("Every message passes a prompt guard and a scope filter. Known questions are answered in the browser; the rest go to a model chain (gpt-oss-120b, gpt-oss-20b, Gemini, then free OpenRouter models) with a deterministic router behind it, and every sentence is checked against his facts.");
     call("show_harness"); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }
   if (clear && re(/\b(alone|solo|by himself|on his own|team(mates?)?|who else|with whom|his (part|role|contribution)|versus|vs\.?|who did what|split|what did he (do|build) (in|on|for))\b/)) {
