@@ -847,7 +847,7 @@
 /* contact form (Classic contact section and the agent's contact panel) */
 .cfwrap { margin-top:var(--s6); padding-top:var(--s6); border-top:1px solid var(--line); max-width:720px; }
 .connect .cfwrap { margin:0; padding:var(--s4); border-top:1px solid var(--line); max-width:none; }
-.cfwrap h4 { font:500 20px/28px var(--f-grotesk); letter-spacing:-.01em; margin-bottom:var(--s4); }
+.cfwrap h3, .cfwrap h4 { font:500 20px/28px var(--f-grotesk); letter-spacing:-.01em; margin-bottom:var(--s4); }
 /* the agent's chat box styles bare "form": undo them here, so this reads as a form, not a box */
 form.cform { display:grid; gap:var(--s4); max-width:none; margin:0; border:0; background:none; box-shadow:none; transition:none; }
 form.cform:focus-within { border-color:transparent; }
@@ -892,3 +892,14 @@ details.cite > .panel { border:0; margin:0; }
 /* a long team line goes under the title, left-aligned, instead of a ragged right-aligned block */
 .ph.stack { display:block; }
 .ph.stack small { display:block; text-align:left; margin-top:var(--s1); }
+
+/* project pages: who built it, and the projects next to it */
+.wk .byline { margin-top:var(--s8); font-size:15px; line-height:24px; color:var(--soft); }
+.wk .byline a { color:var(--ink); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px; }
+.wk .related { margin-top:var(--s6); }
+.wk .related h2 { font:500 20px/28px var(--f-grotesk); letter-spacing:-.01em; margin-bottom:var(--s3); }
+.wk .related ul { list-style:none; display:grid; gap:var(--s2); }
+.wk .related li { display:flex; gap:var(--s3); align-items:baseline; flex-wrap:wrap; font-size:15px; line-height:22px; }
+.wk .related li a { color:var(--ink); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px; }
+.wk .related li span { color:var(--muted); }
+@media (hover:hover) and (pointer:fine) { .wk .byline a:hover, .wk .related li a:hover { color:var(--accent); text-decoration-color:currentColor; } }

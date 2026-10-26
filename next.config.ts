@@ -20,7 +20,11 @@ const nextConfig: NextConfig = {
     ];
   },
   async redirects() {
-    return [{ source: "/classic", destination: "/", permanent: true }];
+    return [
+      { source: "/classic", destination: "/", permanent: true },
+      // one address for every page: www would otherwise be a second copy of the whole site
+      { source: "/:path*", has: [{ type: "host", value: "www.mohammad-rizwan.tech" }], destination: "https://mohammad-rizwan.tech/:path*", permanent: true },
+    ];
   },
 };
 
