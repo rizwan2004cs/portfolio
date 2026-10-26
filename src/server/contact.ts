@@ -66,7 +66,8 @@ const esc = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 export function contactEmail(m: ContactMessage & { country?: string }, at = new Date()) {
   const when = at.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
   const from = m.source === "agent" ? "the agent" : "the Classic page";
-  const reply = `mailto:${encodeURIComponent(m.email)}?subject=${encodeURIComponent("Re: your message on mohammad-rizwan.tech")}`;
+  // the address stays as typed (it passed the email check): Gmail leaves "%40" undecoded and the To field comes up empty
+  const reply = `mailto:${m.email}?subject=${encodeURIComponent("Re: your message on mohammad-rizwan.tech")}`;
   const mono = "font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#6b6964;letter-spacing:.04em";
   const html = `<!doctype html><html><body style="margin:0;background:#f9f8f5;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#171717">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
@@ -75,7 +76,7 @@ export function contactEmail(m: ContactMessage & { country?: string }, at = new 
   <tr><td style="padding:28px 28px 8px"><div style="font-size:22px;line-height:28px;font-weight:600;letter-spacing:-.01em">${esc(m.name)}</div>
     <div style="margin-top:4px"><a href="mailto:${esc(m.email)}" style="color:#5b3df5;font-size:14px;text-decoration:none">${esc(m.email)}</a></div></td></tr>
   <tr><td style="padding:16px 28px 24px"><div style="font-size:16px;line-height:26px;white-space:pre-wrap;border-left:2px solid #171717;padding-left:16px">${esc(m.message)}</div></td></tr>
-  <tr><td style="padding:0 28px 28px"><a href="${reply}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-size:14px;padding:11px 18px">Reply to ${esc(m.name.split(/\s+/)[0])} →</a></td></tr>
+  <tr><td style="padding:0 28px 28px"><a href="${esc(reply)}" style="display:inline-block;background:#171717;color:#fff;text-decoration:none;font-size:14px;padding:11px 18px">Reply to ${esc(m.name.split(/\s+/)[0])} →</a></td></tr>
   <tr><td style="padding:16px 28px;border-top:1px solid #e4e1db;${mono}">Sent from ${from} · ${esc(when)} IST${m.country ? ` · ${esc(m.country)}` : ""}</td></tr>
 </table></td></tr></table></body></html>`;
   const text = `${m.message}\n\n— ${m.name} <${m.email}>\nSent from ${from} of mohammad-rizwan.tech, ${when} IST. Reply to this email to answer them.`;

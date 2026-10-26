@@ -126,6 +126,11 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   const last = lastUser.toLowerCase(), re = (r: RegExp) => r.test(last), say = (text: string) => emit({ type: "text", text });
   const call = (name: tools.ToolName, args: Record<string, unknown> = {}) => { emit({ type: "tool", name, args }); tools.runTool(name, args, emit); };
   const ranked = scoreProjects(last), best = ranked[0], clear = best.s >= 4 || (best.s >= 2 && ranked[1].s < best.s);
+  // "hello", "thanks", "ok": a greeting gets a greeting and a few ways in, never a panel or a model call
+  if (SMALL_TALK.test(lastUser.trim())) {
+    say(/^(thanks|thank you|thx|ty|cheers)\b/i.test(lastUser.trim()) ? "Anytime. Ask about another project, or grab his resume." : "Hi! I’m Rizwan’s agent. Ask about his projects or experience, or paste a job description to see how he fits.");
+    call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
+  }
   if (re(/\bopen to (work|roles?|opportunit\w*|new)|\bavailab(le|ility)\b|looking for (a )?(job|role|work|opportunit)|notice period|join(ing)? date|can he join|\b(salary|ctc|compensation|expected pay|pay expectations?|salary package)\b/)) {
     say("This site doesn’t say; ask him directly. His email, phone and LinkedIn are on his profile."); call("offer_contact"); call("suggest", { options: ["Get resume", "Everything he’s built"] }); return true;
   }
@@ -190,5 +195,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   }
   return false;
 }
+
+export const SMALL_TALK = /^(hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (morning|afternoon|evening|night)|gm|thanks|thank you|thx|ty|cheers|ok(ay)?|cool|nice|great|awesome|got it|bye|see you)( there| rizwan| agent| again)?[\s!.?,:)]*$/i;
 
 export const isJobDescription = (t: string) => t.length > 140 || /\b(job description|jd|requirements?|we need|we're looking for|we are looking for|must have|nice to have|is he a fit|good fit)\b/i.test(t);

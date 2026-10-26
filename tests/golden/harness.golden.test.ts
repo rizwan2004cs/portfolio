@@ -408,3 +408,24 @@ describe("golden · private life and refusals", () => {
     expect(r.text).toMatch(/ask him directly/); expect(r.of("approval")[0].action).toBe("contact");
   });
 });
+
+describe("golden · panels only for questions about him or his work", () => {
+  it("a greeting is answered at once: no model, no guard round trip, no panel", async () => {
+    for (const q of ["hello", "Hi!", "hey there", "thanks", "good morning", "ok"]) {
+      const r = await turn({ turns: [q] }, [never()], async () => { throw new Error("guard must not run"); });
+      expect(r.meta.mode).toBe("facts"); expect(r.of("panel")).toHaveLength(0); expect(r.text.length).toBeGreaterThan(10);
+    }
+  });
+  it("the model's project list and profile are dropped when the message isn't about his work or him", async () => {
+    const m = scripted("a", [say("I can hear you fine.", call("list_projects"), call("show_profile"), call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["can you hear me?"] }, [m]);
+    expect(r.of("panel")).toHaveLength(0);
+    expect(r.of("trace").some((t) => /blocked the project list/.test(t.detail))).toBe(true);
+    expect(r.of("trace").some((t) => /blocked his profile/.test(t.detail))).toBe(true); assertHealthy(r);
+  });
+  it("…but still shown when the question is about his work", async () => {
+    const m = scripted("a", [say("He has built ten projects.", call("list_projects"), call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["Why is his work interesting?"] }, [m]);
+    expect(r.of("panel").map((p) => p.panel.kind)).toEqual(["index"]);
+  });
+});
