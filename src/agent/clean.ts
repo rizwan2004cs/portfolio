@@ -73,3 +73,9 @@ function bareArgs(text: string): ReturnType<typeof leakedCalls> {
   }
   return { text: text.slice(0, at).replace(/[\s(:,-]+$/, "").trim(), calls };
 }
+
+/** "His write-up doesn't cover that." four times is one sentence: drop exact repeats, keep the first. */
+export function dedupeSentences(text: string): string {
+  const seen = new Set<string>();
+  return text.split(/(?<=[.!?])\s+/).filter((x) => { const k = x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); if (!k || seen.has(k)) return false; seen.add(k); return true; }).join(" ");
+}

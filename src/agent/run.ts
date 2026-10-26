@@ -1,12 +1,12 @@
 import { EVENTS, EXPERIENCE, experienceLine, GAPS, PROFILE, PROJECTS, projectById, TOOLKIT, toolUses, WHY_HIM } from "@/content/data";
 import type { Project } from "@/content/types";
-import { clean, leakedCalls, repairLeak } from "./clean";
+import { clean, dedupeSentences, leakedCalls, repairLeak } from "./clean";
 import { bestFact, groundAnswer } from "./grounding";
 import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
-import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, lifestyle, LIFESTYLE_REPLY, offScope, personal, PERSONAL_REPLY, REFUSAL, stripCode } from "./scope";
+import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, abusive, ABUSE_REPLY, accusation, ACCUSE_REPLY, lifestyle, LIFESTYLE_REPLY, offScope, personal, PERSONAL_REPLY, REFUSAL, stripCode } from "./scope";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
 
@@ -32,6 +32,7 @@ How to answer:
 - The toolkit lists skills (call it "his toolkit", never "his resume"); "used in" names where a tool shows. A tool with no "used in" is toolkit only: say so plainly. Never tie a tool to a project or job unless the toolkit or a project fact says so, and never describe his job at Novulis Consulting beyond its Work line. Each Work line describes only its own role: never carry one role's duties to another.
 - Recruiter questions get real answers from the lines above: "why hire him" from Why him, "weaknesses" from Gaps, "years of experience" from Experience, "did he build it alone" from the project's team, "is he open to work" with the Availability line. Never call anything "production-ready", "at scale" or "in production" unless a fact says so.
 - A stack item is only a name: say what it does only when a fact says so ("built on Lovable", never "Lovable's safety layer").
+- Never state or guess anything about his body, gender, sexuality, age, relationships, family, religion or health, and never repeat a claim about him the knowledge doesn't support: say "His write-up only covers his work."
 - Use only the knowledge above. If it doesn't cover something, say "His write-up doesn't cover that" for the specific thing. Never guess, never generalise, never say whether he is looking for a job.
 - Show, don't just tell: open the most relevant project with open_project (view="architecture" for engineering questions), at most two per answer; list_projects for "what has he built", with ids when they ask for a kind of project ("his AI projects"); show_profile for questions about him, with focus="events" for events or prizes and focus="work" for his jobs; show_harness only for questions about this site itself. Don't re-open anything listed as already on screen.
 - Third person ("his", "Rizwan's"). No markdown, no lists, no apologies, no "Would you like…".
@@ -87,16 +88,23 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
     emit({ type: "suggest", options: DEFAULT_NEXT });
     return { mode: "scope" };
   }
+  // what a visitor says about him, not what he built: one fixed line each, no model to guess, no panel to imply
+  const fixed: [boolean, string, string][] = [
+    [abusive(last), "abusive message", ABUSE_REPLY],
+    [personal(last), "a question about his private life", PERSONAL_REPLY],
+    [accusation(last), "an accusation about him", ACCUSE_REPLY],
+  ];
+  const hit = fixed.find(([on]) => on);
+  if (hit) {
+    emit({ type: "trace", step: "scope", detail: `${hit[1]} · fixed reply, no model, no panel · 0 tokens`, level: "info" });
+    emit({ type: "text", text: hit[2] });
+    emit({ type: "suggest", options: DEFAULT_NEXT });
+    return { mode: "scope" };
+  }
   if (lifestyle(last) && !personal(last)) {
     emit({ type: "trace", step: "scope", detail: "a question about his life outside work · fixed reply, no model, no panel · 0 tokens", level: "info" });
     emit({ type: "text", text: LIFESTYLE_REPLY });
     emit({ type: "suggest", options: ["Open VerseYou", "Everything he’s built", "Get resume"] });
-    return { mode: "scope" };
-  }
-  if (personal(last)) {
-    emit({ type: "trace", step: "scope", detail: "a question about his private life · fixed reply, no model, no panel · 0 tokens", level: "info" });
-    emit({ type: "text", text: PERSONAL_REPLY });
-    emit({ type: "suggest", options: DEFAULT_NEXT });
     return { mode: "scope" };
   }
   // earlier off-scope turns never reach the model
@@ -303,7 +311,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
         const coveredAfterAll = subjectProject ? bestFact([...eventLinesFor(last), ...subjectProject.facts], last, subjectProject.title) : null;
         const unverifiedGap = !looked && !!coveredAfterAll && /doesn.t cover|not covered|isn.t covered|no (details|information)\b/i.test(gr.text);
         if (unverifiedGap) emit({ type: "trace", step: "grounding", detail: "removed “not covered”: his facts do answer this", level: "warn" });
-        else if (!gr.dropped.length || gr.total > gr.dropped.length || (visible && (lastTitle || gr.extracted))) out({ type: "text", text: gr.text });
+        else if (!gr.dropped.length || gr.total > gr.dropped.length || (visible && (lastTitle || gr.extracted))) out({ type: "text", text: dedupeSentences(gr.text) });
         if (spoke) openNamed(gr.text);
         if (spoke && !visible) showContext();
       }

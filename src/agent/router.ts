@@ -4,7 +4,7 @@ import type { Emit } from "./types";
 import { bestFact } from "./grounding";
 import { fitLine, fitRows, roughRequirements } from "./fit";
 import { EVENT_LINES } from "./tools";
-import { eventsIn, profileFocus, projectFilter, REASONING } from "./intent";
+import { eventsIn, profileFocus, projectFilter, REASONING, topicsIn } from "./intent";
 // runTool is imported lazily to keep router <-> tools free of a load-order cycle
 import * as tools from "./tools";
 
@@ -129,6 +129,12 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   // "hello", "thanks", "ok": a greeting gets a greeting and a few ways in, never a panel or a model call
   if (SMALL_TALK.test(lastUser.trim())) {
     say(smallTalkReply(lastUser));
+    call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
+  }
+  // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
+  if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && !topicsIn(lastUser).length && !profileFocus(lastUser)
+    && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything)\b/)) {
+    say(`Not sure what you mean by “${lastUser.trim().slice(0, 40)}”. Ask about a project, his experience, or paste a job description.`);
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
   }
   if (re(/\bopen to (work|roles?|opportunit\w*|new)|\bavailab(le|ility)\b|looking for (a )?(job|role|work|opportunit)|notice period|join(ing)? date|can he join|\b(salary|ctc|compensation|expected pay|pay expectations?|salary package)\b/)) {
