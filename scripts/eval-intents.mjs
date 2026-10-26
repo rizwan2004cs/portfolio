@@ -13,24 +13,29 @@ const cases = JSON.parse(readFileSync(file, "utf8"));
 const src = readFileSync(new URL("../src/agent/behavior.ts", import.meta.url), "utf8");
 const criteria = Object.fromEntries([...src.matchAll(/^\s{2}(\w+): \{\s*(?:\n\s*)?describe: "([^"]+)"/gm)].map((m) => [m[1], m[2]]));
 const SENSITIVE = ["personal", "abusive", "accusation"];
-const decide = (kind, conf) => (kind === "work" || conf >= 0.5 || SENSITIVE.includes(kind) ? kind : "work");
+// the same rule as decide() in src/agent/classify.ts
+const decide = (kind, conf, p = {}) => {
+  if (kind === "work" || conf >= 0.5 || SENSITIVE.includes(kind)) return kind;
+  const s = SENSITIVE.map((k) => [k, p[k] ?? 0]).sort((a, b) => b[1] - a[1]);
+  return s.reduce((n, [, v]) => n + v, 0) > (p.work ?? 0) ? s[0][0] : "work";
+};
 
 const rows = [];
 for (const c of cases) {
-  let kind = "error", conf = 0;
+  let kind = "error", conf = 0, probs = {};
   for (let attempt = 0; attempt < 3 && kind === "error"; attempt++) {
     try {
       const r = await fetch("https://openrouter.ai/api/alpha/decisions", {
         method: "POST", signal: AbortSignal.timeout(20_000),
         headers: { Authorization: `Bearer ${key}`, "content-type": "application/json", "X-OpenRouter-Title": "portfolio intent eval" },
-        body: JSON.stringify({ model: "baseten/mammoth-1:free", state: { site: "A portfolio site for Syed Mohammad Rizwan, an AI engineer, with an AI agent visitors chat with.", visitor_message: c.text }, questions: { kind: { type: "choice", instructions: "What kind of message is this?", criteria } } }),
+        body: JSON.stringify({ model: "baseten/mammoth-1:free", state: { site: "A portfolio site for Syed Mohammad Rizwan, an AI engineer, with an AI agent visitors chat with.", visitor_message: c.text }, questions: { kind: { type: "choice", instructions: "What kind of message is visitor_message? A short follow-up takes the kind of the message before it.", criteria } } }),
       });
-      if (r.ok) { const a = (await r.json()).answers?.kind; kind = a?.choice ?? "error"; conf = Number(a?.confidence ?? 0); }
+      if (r.ok) { const a = (await r.json()).answers?.kind; kind = a?.choice ?? "error"; conf = Number(a?.confidence ?? 0); probs = a?.probabilities ?? {}; }
       else await new Promise((res) => setTimeout(res, 2000));
     } catch { /* retried */ }
   }
   if (kind === "error" && rows.length === 0) { console.log("classifier unreachable (free-tier daily limit?): skipping, not failing"); process.exit(0); }
-  const acted = decide(kind, conf), ok = [c.kind, ...(c.accept ?? [])].includes(acted);
+  const acted = decide(kind, conf, probs), ok = [c.kind, ...(c.accept ?? [])].includes(acted);
   rows.push({ ...c, got: kind, acted, conf, ok });
   await new Promise((res) => setTimeout(res, 900)); // free tier: about one request a second
 }
