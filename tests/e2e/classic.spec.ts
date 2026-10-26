@@ -6,10 +6,12 @@ const PROJECTS: Project[] = JSON.parse(readFileSync(new URL("../../src/content/p
 const noSideScroll = (page: import("@playwright/test").Page) => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
 
 test.describe("classic", () => {
-  test("all nine sections render with real content", async ({ page }) => {
+  test("all ten sections render with real content", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("h1")).toHaveText("Syed Mohammad Rizwan");
-    for (const h of ["About", "Work", "Projects", "How I build", "Toolkit", "Hackathons & events", "Side builds & open source", "Education & certifications", "Contact"]) await expect(page.locator("h2", { hasText: h })).toBeVisible();
+    // headings carry their number ("01About"): match the name at the end, so "Work" doesn't also match "Outside work"
+    for (const h of ["About", "Work", "Projects", "How I build", "Toolkit", "Hackathons & events", "Side builds & open source", "Education & certifications", "Outside work", "Contact"])
+      await expect(page.locator("h2", { hasText: new RegExp(`^\\d+${h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) })).toBeVisible();
     await expect(page.locator(".prow")).toHaveCount(PROJECTS.length);
     await expect(page.locator(".cbig a")).toHaveText("mohammad22cse@gmail.com");
     await expect(page.getByText(/open to roles/i)).toHaveCount(0);

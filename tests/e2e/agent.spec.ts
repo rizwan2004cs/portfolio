@@ -352,3 +352,20 @@ test.describe("agent · the panel shows what was asked", () => {
     await expect(page.locator('#trace li.r[data-turn="1"]').first()).toBeVisible();
   });
 });
+
+test.describe("films page", () => {
+  test("lists every pick with a tile, is linked from About, and is in the sitemap", async ({ page, request }) => {
+    await page.goto("/films");
+    await expect(page.locator("h1")).toHaveText("Films that shaped how I work");
+    await expect(page.locator(".film")).toHaveCount(8);
+    await expect(page.locator(".film .ftile").first()).toBeVisible();
+    await expect(page.locator(".film .ftile img").first()).toHaveAttribute("src", /^https:\/\/image\.tmdb\.org\//);
+    await expect(page.locator('.film .flinks a[href^="https://www.imdb.com/title/tt"]')).toHaveCount(8);
+    await expect(page.locator(".tmdb")).toContainText("not endorsed or certified by TMDB");
+    expect(await (await request.get("/sitemap.xml")).text()).toContain("/films");
+    await page.goto("/");
+    await expect(page.locator('.about a[href="/films"]')).toHaveCount(1);
+    await expect(page.locator("#outside .opicks li")).toHaveCount(4);
+    await expect(page.locator('#outside .omore[href="/films#whiplash"]')).toHaveCount(1);
+  });
+});

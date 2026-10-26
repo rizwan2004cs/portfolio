@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { ClassicIntro } from "@/components/Intro";
 import { CERTS, EDUCATION, EVENTS, EXPERIENCE, EXPERIENCE_BY_ORG, MARQUEE_A, MARQUEE_B, PRINCIPLES, PROFILE, PROJECTS, projectById, roleDetail, SIDE, TOOLKIT } from "@/content/data";
 import { SITE } from "@/content/site";
+import { FILM_COUNT, FILMS, posterUrl } from "@/content/films";
 import { classicRows, esc, STAR, contactForm } from "@/render/html";
 import { ldJson, profilePage } from "@/seo/jsonld";
 
@@ -65,7 +66,7 @@ export default function ClassicPage() {
                 {/* the one sentence that says who this is, in the words people search: his full name, the short form, the city both ways */}
                 <p className="lead">I’m Syed Mohammad Rizwan (Mohammad Rizwan, or just Rizwan), an AI engineer in Bengaluru (Bangalore) and {EXPERIENCE[0].role} at {EXPERIENCE[0].title}.</p>
                 <p className="lead2">{PROFILE.summary.replace(/^Builds/, "I build")}</p>
-                <p className="lead2">Off the clock I write poetry and build tools for myself. When an open-source app I use is missing something, I fork it and add it, and send it upstream when others need it too.</p>
+                <p className="lead2">Off the clock I write poetry, watch <a href="/films">films that shape how I work</a>, and build tools for myself. When an open-source app I use is missing something, I fork it and add it, and send it upstream when others need it too.</p>
                 <dl className="kv">
                   {[["Based in", PROFILE.location], ["Focus", "Reliable AI agents"], ["Studied", "B.Tech CSE, NBKRIST"]].map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
                 </dl>
@@ -171,8 +172,24 @@ export default function ClassicPage() {
             </div>
           </section>
 
+          {/* outside work: four of his film picks, the rest on /films */}
+          <section className="csec" id="outside" aria-labelledby="h-outside">
+            <div className="csh"><h2 id="h-outside"><span className="no">09</span>Outside work</h2><a href="/films">All {FILM_COUNT} picks ↗</a></div>
+            <p className="olede">Films that shaped how I work, and what each one left me with.</p>
+            <ul className="opicks">
+              {FILMS.flatMap((g) => g.films).filter((f) => ["The Intern", "Whiplash", "The Secret Life of Walter Mitty", "Silo"].includes(f.title)).map((f) => (
+                <li key={f.title}>
+                  <a className="opost" href={`/films#${f.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`}>
+                    <img src={posterUrl(f, 185)} alt={`${f.title} (${f.year}) poster`} width={96} height={144} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+                  </a>
+                  <div><h3>{f.title}</h3><p className="otake">{f.take}</p><a className="omore" href={`/films#${f.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`}>Read why ↗</a></div>
+                </li>
+              ))}
+            </ul>
+          </section>
+
           <section className="csec ccontact" id="contact" aria-labelledby="h-contact">
-            <div className="csh"><h2 id="h-contact"><span className="no">09</span>Contact</h2><span data-clock="label" /></div>
+            <div className="csh"><h2 id="h-contact"><span className="no">10</span>Contact</h2><span data-clock="label" /></div>
             {/* opens a Gmail compose (works without a mail app) and copies the address, saying so */}
             <p className="cbig"><a href={`https://mail.google.com/mail/?view=cm&to=${PROFILE.links.email}`} target="_blank" rel="noopener" data-copy={PROFILE.links.email}>{PROFILE.links.email.split("@")[0]}<wbr />@{PROFILE.links.email.split("@")[1]}</a><span className="copied" role="status" aria-live="polite" /></p>
             <div className="cfwrap" dangerouslySetInnerHTML={{ __html: `<h3>Or leave a message</h3>${contactForm("classic")}` }} />
