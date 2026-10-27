@@ -357,3 +357,13 @@ describe("typos", () => {
     expect(fixTypos("Kerala Immersion")).toBe("Kerala Immersion");
   });
 });
+
+describe("hinglish", () => {
+  it("reads common Hinglish as the English the router keys on", async () => {
+    const { hinglish } = await import("@/agent/typos");
+    expect(hinglish("kya usko python aata hai")).toBe("does he know python");
+    expect(hinglish("uska experience kitna hai")).toBe("how much experience does he have");
+    expect(hinglish("usne kya banaya")).toBe("he what built");
+    expect(hinglish("does he know python")).toBe("does he know python");
+  });
+});

@@ -334,7 +334,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
     say("Every message passes a prompt guard and a scope filter. Known questions are answered in the browser; the rest go to a model chain (gpt-oss-120b, gpt-oss-20b, Gemini, then free OpenRouter models) with a deterministic router behind it, and every sentence is checked against his facts.");
     call("show_harness"); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }
-  if (clear && re(/\b(alone|solo|by himself|on his own|team(mates?)?|who else|with whom|his (part|role|contribution)|versus|vs\.?|who did what|split|what did he (do|build) (in|on|for))\b/)) {
+  if (clear && re(/\b(alone|solo|by himself|on his own|team(mates?)?|who else|with whom|his (part|role|contribution)|who did what|split|what did he (do|build) (in|on|for))\b/)) {
     const solo = /^solo\b/i.test(best.p.team), split = /:\s*he\s/.test(best.p.team);
     say(`${best.p.title}: ${best.p.team}.${!solo && !split ? " The write-up doesn’t split who built which part." : ""}`); call("open_project", { id: best.p.id }); call("suggest", { options: ctxNext(best.p) }); return true;
   }

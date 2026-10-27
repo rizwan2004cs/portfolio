@@ -818,3 +818,15 @@ describe("golden · films, outside work, and how old this site is", () => {
     expect((await fixed(["what's new on the site"])).text).toMatch(/^This site’s content was last updated/);
   });
 });
+
+describe("golden · Hinglish reaches his facts; 'vs' is a comparison, not a team question", () => {
+  const fixed = async (q: string) => turn({ turns: [q] }, [never()]);
+  it("'uska experience kitna hai' gets the experience line", async () => {
+    const r = await fixed("uska experience kitna hai");
+    expect(r.text).toMatch(/^He has been full-time at Novulis Consulting since June 2026/); expect(r.of("trace").some((t) => t.step === "typos")).toBe(true);
+    expect((await fixed("kya usko python aata hai")).text).toMatch(/^Yes: Python shows in /);
+  });
+  it("'PACK vs FinBoom which is more complex' is not answered with PACK's team line", async () => {
+    expect((await fixed("PACK vs FinBoom which is more complex")).text).not.toMatch(/^PACK: Team of two/);
+  });
+});
