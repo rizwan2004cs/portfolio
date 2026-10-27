@@ -80,7 +80,7 @@ export function skillAsked(text: string): string | undefined {
     ?? t.match(/^(?:any|got)\s+(.{1,40}?)\s+(?:experience|skills?)$/i);
   if (!m) return undefined;
   const thing = m[1].replace(/^(a|an|the|any|some)\s+/i, "").replace(/\s+(or not|too|as well|well)$/i, "").trim();
-  if (!thing || /\b(him|rizwan|you|this|that|it|project|job|work|hire|anything|everything|something|more|else|masters?|master(’|')s|phd|degree|mba|m\.?tech|diploma|certif\w*|resume|cv|linkedin|github)\b/i.test(thing)) return undefined;
+  if (!thing || /\b(him|rizwan|you|this|that|it|project|job|work|hire|anything|everything|something|more|else|masters?|master(’|')s|phd|degree|mba|m\.?tech|diploma|certif\w*|resume|cv|linkedin|github|stack|toolkit|skills?|experience|architecture|internals|team|demo|links?|code|source|tests?)\b/i.test(thing)) return undefined;
   return thing;
 }
 
@@ -147,7 +147,7 @@ export function skillsOverview(text: string): SkillAnswer | undefined {
 }
 
 /** Questions about this agent itself: what it runs on, who built it, whether it is an AI. */
-export const SITE_TECH = /\b(this|the) (site|website|portfolio|agent|bot)\b[^?]{0,30}\b(stack|built|tech|made|runs? on|framework|hosted|powered)\b|\b(stack|tech|framework|backend)\b[^?]{0,24}\b(this|the) (site|website|portfolio|agent)\b|\b(which|what)\s+(api|apis|model|models|llm|llms|backend|stack|framework|provider|language)s?\b[^?]{0,20}\b(you|u|this (site|agent|bot)|it)\b|\bare you (an? )?(ai|bot|llm|chatbot|real|human|model|agent)\b|\bwhat (are|r) you\b|\b(who|what) (built|made|created|wrote|trained) (you|this (site|agent|bot))\b|\byour (api|backend|stack|models?|guard\w*|architecture|tech|llm|code|prompt|framework)\b|\bmodel armou?r\b|^\s*guard ?rails?\s*\??\s*$|\b(this site'?s|the site'?s|the agent'?s) (stack|backend|model|guard\w*)\b|\bhow (do|does) (you|this agent) (work|answer|decide)\b|\bbuilt (on|with) (next|vercel|react)\b/i;
+export const SITE_TECH = /\b(this|the) (site|website|portfolio|agent|bot)\b[^?]{0,30}\b(stack|built|tech|made|runs? on|framework|hosted|powered)\b|\b(stack|tech|framework|backend)\b[^?]{0,24}\b(this|the) (site|website|portfolio|agent)\b|\b(which|what)\s+(api|apis|model|models|llm|llms|backend|stack|framework|provider|language)s?\b[^?]{0,20}\b(you|u|this (site|agent|bot)|it)\b|\bare you (an? )?(ai|bot|llm|chatbot|real|human|model|agent)\b|\bwhat (are|r) you\b|\bwho (are|r) (you|u)\b|\bwhat(’|')?s your name\b|\byour name\b|\bwhat are you called\b|\b(who|what) (built|made|created|wrote|trained) (you|this (site|agent|bot))\b|\byour (api|backend|stack|models?|guard\w*|architecture|tech|llm|code|prompt|framework)\b|\bmodel armou?r\b|^\s*guard ?rails?\s*\??\s*$|\b(this site'?s|the site'?s|the agent'?s) (stack|backend|model|guard\w*)\b|\bhow (do|does) (you|this agent) (work|answer|decide)\b|\bbuilt (on|with) (next|vercel|react)\b/i;
 export function siteTechAnswer(text: string): SkillAnswer {
   const guard = /guard|armou?r|safe|inject|jailbreak/i.test(text);
   return {

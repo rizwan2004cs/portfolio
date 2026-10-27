@@ -7,6 +7,9 @@ import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
 import { ATTACK_REPLY, BAD_OUTPUT, CODEY, GUARD_REFUSAL, isAttack, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
+import { fixTypos } from "./typos";
+import { skillAsked } from "./skills";
+import { topicsIn } from "./intent";
 import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind } from "./behavior";
 import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
@@ -92,12 +95,25 @@ export function narrated(text: string, shownNow: string): { text: string; cut: n
   return { text: kept.join(" ").trim(), cut };
 }
 
+/** Whether the router has something to say for a message as it stands: a fact answer, a project it names, or a skill. */
+function answerable(text: string): boolean {
+  let any = false; factAnswer(text, () => { any = true; });
+  return any || clearPick(text) !== undefined || skillAsked(text) !== undefined || topicsIn(text).length > 0 || /\b(projects?|built|everything|shipped|work)\b/i.test(text);
+}
+
 export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Promise<RunMeta> {
-  const last = input.turns.at(-1) ?? "";
+  // "wat projcts has he biult": a slip one edit from a word the router keys on is read as that word, but only when the
+  // message as typed answers nothing and the corrected one does; a message the rules already place (private, abusive,
+  // playful, a greeting) is never touched
+  const raw = input.turns.at(-1) ?? "", corrected = fixTypos(raw);
+  const last = corrected !== raw && ruleKind(raw) === "work" && !answerable(raw) && answerable(corrected) ? corrected : raw;
+  if (last !== raw) emit({ type: "trace", step: "typos", detail: `read as “${last}”`, level: "info" });
   // "how does it handle failures?" after "Show me PACK" is about PACK: resolve the pronoun for the policy checks
   // a follow-up points back ("how does it handle failures?", "tell me more about that"); "projects that use AI" does not:
   // "that"/"this" only count in short messages, and never right after a noun as a relative pronoun
-  const refersBack = /\b(it|its|they|them|their)\b/i.test(last) || (last.split(/\s+/).length <= 7 && /\b(this|that)\b/i.test(last) && !/\b\w+s? that\b/i.test(last.replace(/\b(about|on|of|with|is|was)\s+that\b/gi, "")));
+  // a bare "why?", "and the stack?", "tell me more" after a project is about that project too
+  const refersBack = /\b(it|its|they|them|their)\b/i.test(last) || (last.split(/\s+/).length <= 7 && /\b(this|that)\b/i.test(last) && !/\b\w+s? that\b/i.test(last.replace(/\b(about|on|of|with|is|was)\s+that\b/gi, "")))
+    || /^\s*(why|how|how so|when|where|which one|and|so|more|tell me more|go on|elaborate|details?|more details|really|ok and|and then|what else)\s*[?!.]*$/i.test(last) || /^\s*(and|so|but)\s+(the|its|his|what|how|why)\b/i.test(last);
   const subject = input.turns.length > 1 && !clearPick(last) && refersBack ? `${input.turns.at(-2)} ${last}` : last;
   // the project the visitor is talking about: named now, or named in the turn a pronoun points back to
   const subjectProject = clearPick(subject);

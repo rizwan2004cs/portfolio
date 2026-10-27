@@ -123,11 +123,33 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   if (kind === "small_talk" || kind === "about_visitor" || kind === "visitor_intro") {
     say(BEHAVIOR[kind].reply!(lastUser)); call("suggest", { options: BEHAVIOR[kind].chips }); return true;
   }
+  // "rizwan", "syed mohammad rizwan": his name alone opens his profile
+  if (/^\s*(syed\s+)?(mohammad\s+)?rizwan\s*[?!.]*$/i.test(lastUser) || /^\s*syed mohammad\s*$/i.test(lastUser)) {
+    say("That’s him. Here’s his profile: where he works, what he studied, and what he’s won."); call("show_profile"); call("suggest", { options: ["Everything he’s built", "Why should we hire him?", "Get resume"] }); return true;
+  }
+  // "what projects has he built?", "what has he made?": the index, no model
+  if (re(/^\s*(what|which|list|show( me)?|see)( all)?( of)?( his| the)?( other)? projects?\b[^?]{0,24}$|\bwhat (has|did|does) (he|rizwan) (built?|made?|ship\w*|create\w*|work\w* on)\s*[?!.]*$|\beverything (he|rizwan)('s| has|’s)? (built|made|shipped)\b/) && best.s < 10 && !topicsIn(lastUser).length) {
+    say("Everything he’s shipped."); call("list_projects"); call("suggest", { options: ["Why should we hire him?", "How does this site work?", "Get resume"] }); return true;
+  }
   // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
   if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && !topicsIn(lastUser).length && !profileFocus(lastUser)
     && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything|certif\w*|courses?|badges?|interview|lately|latest|guard\w*|security|hack\w*|tools?|tech\w*|languages?|frameworks?|tests?|testing|databases?|learn\w*)\b/)) {
     say(BEHAVIOR.unclear.reply!(lastUser)); // never repeats the word back
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
+  }
+  // "help", "what can you do?": what this agent answers, said once
+  if (re(/^\s*(help|help me|menu|options|what can (you|u) do|what (do|can) (you|u) (do|answer|know)|what can i ask( you)?|how (do|can) i use (this|you)|what is this( site| page)?)\s*[?!.]*$/)) {
+    say("I answer from Rizwan’s facts, nothing else: his projects and how they’re built, his skills and where each shows, his experience, education and prizes, how he fits a job description you paste, and how this site’s guardrails work. Try one of these."); call("suggest", { options: ["Everything he’s built", "Why should we hire him?", "How does this site work?"] }); return true;
+  }
+  // "and the stack?", "what's PACK built with?" after a project: its stack line, no model
+  const titled = PROJECTS.some((p) => last.includes(p.title.toLowerCase()));
+  if (clear && titled && re(/\b(stack|built (with|on|using|in)|made (with|in)|tech(nolog\w*)?|frameworks?|languages? (used|is|are)|what (does|did) (he|it) use)\b/) && lastUser.trim().split(/\s+/).length <= 10 && !re(/\b(why|compare|vs|versus|difference|this site|the site|projects?|apps?|which|using|list|all)\b/)) {
+    say(`${best.p.title} is built with ${best.p.stack.join(", ")}.`); call("open_project", { id: best.p.id }); call("suggest", { options: ctxNext(best.p) }); return true;
+  }
+  // "tell me more", "go on" after a project: the next facts of its write-up, and its internals when it has them
+  if (clear && re(/^.*\b(tell me more|more details?|go on|elaborate|continue|what else|more about (it|this|that|him)|and more|details please|keep going)\b[?!.]*$/) && !re(/\b(why|how does|compare)\b/)) {
+    const facts = best.p.facts.slice(0, 3).map((f) => f.replace(/\.$/, ""));
+    say(`${best.p.title}, in more detail: ${facts.join(". ")}.`); call("open_project", { id: best.p.id, view: best.p.pipeline.length ? "architecture" : "card" }); call("suggest", { options: ctxNext(best.p) }); return true;
   }
   // "show me his resume", "cv?": the resume, once the visitor approves; a pasted job description is handled above
   if (re(/\b(resume|cv)\b/) && lastUser.trim().split(/\s+/).length <= 8 && !re(/\b(my|our|mine)\b/) && !re(/\b(ats|match|fit|gaps?|against|compare|tailor|improve|review|feedback|say|mention|list|cover|include)\b/)) {
