@@ -146,7 +146,7 @@ export function skillsOverview(text: string): SkillAnswer | undefined {
 }
 
 /** Questions about this agent itself: what it runs on, who built it, whether it is an AI. */
-export const SITE_TECH = /\b(which|what)\s+(api|apis|model|models|llm|llms|backend|stack|framework|provider|language)s?\b[^?]{0,20}\b(you|u|this (site|agent|bot)|it)\b|\bare you (an? )?(ai|bot|llm|chatbot|real|human|model|agent)\b|\bwhat (are|r) you\b|\b(who|what) (built|made|created|wrote|trained) (you|this (site|agent|bot))\b|\byour (api|backend|stack|models?|guard\w*|architecture|tech|llm|code|prompt|framework)\b|\bmodel armou?r\b|^\s*guard ?rails?\s*\??\s*$|\b(this site'?s|the site'?s|the agent'?s) (stack|backend|model|guard\w*)\b|\bhow (do|does) (you|this agent) (work|answer|decide)\b|\bbuilt (on|with) (next|vercel|react)\b/i;
+export const SITE_TECH = /\b(this|the) (site|website|portfolio|agent|bot)\b[^?]{0,30}\b(stack|built|tech|made|runs? on|framework|hosted|powered)\b|\b(stack|tech|framework|backend)\b[^?]{0,24}\b(this|the) (site|website|portfolio|agent)\b|\b(which|what)\s+(api|apis|model|models|llm|llms|backend|stack|framework|provider|language)s?\b[^?]{0,20}\b(you|u|this (site|agent|bot)|it)\b|\bare you (an? )?(ai|bot|llm|chatbot|real|human|model|agent)\b|\bwhat (are|r) you\b|\b(who|what) (built|made|created|wrote|trained) (you|this (site|agent|bot))\b|\byour (api|backend|stack|models?|guard\w*|architecture|tech|llm|code|prompt|framework)\b|\bmodel armou?r\b|^\s*guard ?rails?\s*\??\s*$|\b(this site'?s|the site'?s|the agent'?s) (stack|backend|model|guard\w*)\b|\bhow (do|does) (you|this agent) (work|answer|decide)\b|\bbuilt (on|with) (next|vercel|react)\b/i;
 export function siteTechAnswer(text: string): SkillAnswer {
   const guard = /guard|armou?r|safe|inject|jailbreak/i.test(text);
   return {
@@ -172,6 +172,43 @@ export function interviewAnswer(): SkillAnswer {
 }
 
 /** "what's he working on now / lately / latest?" */
+/** "does he write tests?", "what tests does FinBoom have?": the test facts his write-ups carry, and this site's own. */
+export const TEST_Q = /\b(tests?|testing|test coverage|unit tests?|tdd|test[- ]driven|ci\/?cd|continuous integration)\b/i;
+const TESTY = /\b(vitest|jest|pytest|playwright|cypress|junit|test files?|tests?\b|testing)/i, TEST_TOOL = /\b(vitest|jest|pytest|playwright|cypress|junit)\b/i;
+export function testsAnswer(p?: Project): SkillAnswer {
+  const withTests = PROJECTS.map((x) => ({ x, fact: x.facts.find((f) => TESTY.test(f)), stack: x.stack.filter((t) => TEST_TOOL.test(t)) })).filter((r) => r.fact || r.stack.length);
+  const line = (r: (typeof withTests)[number]) => r.fact ? `${r.x.title}: ${r.fact[0].toLowerCase()}${r.fact.slice(1).replace(/\.$/, "")}` : `${r.x.title} runs ${r.stack.join(" and ")}${r.x.stack.some((t) => /github actions/i.test(t)) ? " in GitHub Actions CI" : ""}`;
+  const asked = p ? withTests.find((r) => r.x.id === p.id) : undefined;
+  const others = withTests.filter((r) => r.x.id !== p?.id).slice(0, 2);
+  const head = p ? (asked ? `${line(asked)}.` : `${p.title}’s write-up doesn’t list its tests.`) : "Yes.";
+  return {
+    text: `${head} ${others.map(line).join("; ")}. This agent is checked by unit, golden and browser tests on every commit, and a nightly judge grades its live answers.`,
+    open: asked?.x.id ?? (p ? undefined : others[0]?.x.id), profile: undefined, chips: ["How does this site work?", "Everything he’s built", "Get resume"],
+  };
+}
+
+/** "what databases has he used?": the data stores in his toolkit, each with where it shows. */
+export const DB_Q = /\b(databases?|dbs?|data ?stores?|nosql|sql databases?|which sql|storage layer|persistence)\b/i;
+const DB_ITEMS = ["PostgreSQL", "Supabase", "MongoDB", "Blob Storage & Azure SQL", "RAG and vector search (Pinecone)"];
+export function dbAnswer(): SkillAnswer {
+  const parts = DB_ITEMS.map((t) => {
+    const where = toolUses(t).map((u) => (u.href === "#work" ? `his work at ${u.label}` : u.label)).slice(0, 2);
+    return `${t === "RAG and vector search (Pinecone)" ? "Pinecone (vector search)" : t}${where.length ? ` in ${where.join(" and ")}` : ""}`;
+  });
+  return { text: `Databases he has used: ${parts.join("; ")}. FinBoom also keeps an on-device SQLite cache for its mobile app.`, open: "finboom", chips: ["Open NGO Donor Matcher", "Everything he’s built", "Get resume"] };
+}
+
+/** "how fast does he learn?", "is he a team player?": soft-skill questions answered with the record, not adjectives. */
+export const LEARN_Q = /\b(learn(s|ing|er)? (fast|quick(ly)?|new things|new tech\w*)|quick learner|fast learner|how fast (can|does) he|pick(s)? (things )?up|adapt\w*|ramp(s)? up|self[- ]taught|soft skills|work ethic|team player|teamwork|collaborat\w*|communicat\w*|attitude|motivated|self[- ]starter|growth mindset|hard[- ]working|dedicat\w*|consistent|disciplin\w*)\b/i;
+export function learnAnswer(): SkillAnswer {
+  const voice = EVENTS.find((e) => /Ten Days/.test(e.title)), pack = EVENTS.find((e) => /Monad/.test(e.title));
+  const intern = EXPERIENCE.find((x) => /Intern/.test(x.role) && /Novulis/.test(x.title)), now = EXPERIENCE.find((x) => x.now);
+  return {
+    text: `Judge it from the record rather than adjectives: ${voice ? "nine voice agents in ten days, one a day, for Murf AI’s challenge" : ""}${pack ? "; PACK, seven agents with a model fallback chain, in a weekend at Monad Blitz" : ""}${intern && now ? `; a ${intern.title} internship (${intern.when}) converted to ${now.role} after three months` : ""}. His side builds reach into Kotlin, EJS and React Native beyond his main stack, and his final-year project was a four-person team build.`,
+    profile: "events", chips: ["Has he won anything?", "Open PACK", "Why should we hire him?"],
+  };
+}
+
 export const LATEST_Q = /\b(lately|latest|recent(ly)?|newest|right now|these days|currently (building|working|doing)|working on|up to|what(’|')?s new|most recent)\b/i;
 export function latestAnswer(): SkillAnswer {
   const now = EXPERIENCE.find((x) => x.now), newest = [...PROJECTS].sort((a, b) => Number(b.year) - Number(a.year)).slice(0, 3);

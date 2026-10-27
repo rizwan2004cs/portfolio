@@ -650,3 +650,32 @@ describe("golden · recruiter logistics: contact, location, freelance, productio
     expect(r.of("panel")[0].panel.kind).toBe("index");
   });
 });
+
+describe("golden · tests, databases, learning speed and this site's stack", () => {
+  const fixed = async (q: string[]) => turn({ turns: q }, [never()]);
+  it("'does he write tests' answers from the write-ups and this site's own checks", async () => {
+    const r = await fixed(["does he write tests"]);
+    expect(r.text).toMatch(/^Yes\. .*FinBoom.*Vitest.*NGO Donor Matcher: 71 Java source files and 15 test files on Spring Boot 3\. This agent is checked by unit, golden and browser tests on every commit/);
+    expect(r.meta.mode).toBe("facts");
+    const fb = await fixed(["what tests does finboom have"]);
+    expect(fb.text).toMatch(/^FinBoom runs Vitest in GitHub Actions CI\./); expect(fb.of("panel")[0].panel.id).toBe("finboom");
+    expect((await fixed(["does PACK have tests?"])).text).toMatch(/^PACK’s write-up doesn’t list its tests\./);
+    expect((await fixed(["Why did he win at the CTF?"])).text).not.toMatch(/tests/);
+  });
+  it("'what databases has he used' lists the data stores with where each shows", async () => {
+    const r = await fixed(["what databases has he used"]);
+    expect(r.text).toMatch(/^Databases he has used: PostgreSQL in .*; Supabase in .*; MongoDB in .*; Blob Storage & Azure SQL in his work at Novulis Consulting; Pinecone \(vector search\) in CCR Compliance Advisor\. FinBoom also keeps an on-device SQLite cache/);
+    expect(r.meta.mode).toBe("facts");
+  });
+  it("'how fast can he learn' answers with the record, opening his events", async () => {
+    const r = await fixed(["how fast can he learn new things"]);
+    expect(r.text).toMatch(/^Judge it from the record rather than adjectives: nine voice agents in ten days, one a day, for Murf AI’s challenge; PACK, seven agents with a model fallback chain, in a weekend at Monad Blitz; a Novulis Consulting internship \(Mar – May 2026\) converted to Associate Software Engineer \(R&D\) after three months\./);
+    expect(r.of("panel")[0].panel.kind).toBe("profile");
+    expect((await fixed(["is he a team player?"])).text).toMatch(/^Judge it from the record/);
+  });
+  it("'tech stack for this site' is about this site, not his toolkit", async () => {
+    const r = await fixed(["what's his tech stack for this site"]);
+    expect(r.text).toMatch(/^I’m one of his projects\. Next\.js on Vercel/);
+    expect((await fixed(["what is this portfolio built with"])).text).toMatch(/^I’m one of his projects/);
+  });
+});
