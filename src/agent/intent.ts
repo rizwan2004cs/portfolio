@@ -81,7 +81,8 @@ export function projectFilter(text: string, named?: Project, loose = false): Fil
 const EVENT_WORDS_OFF = new Set("hackathon bangalore bengaluru events community school technology voice agents google with".split(" "));
 const words = (e: Event) => `${e.title} ${e.where}`.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && !EVENT_WORDS_OFF.has(w) && !/^\d+$/.test(w));
 const EVENT_NAMES = EVENTS.map((e) => {
-  const own = words(e).filter((w) => !EVENTS.some((o) => o !== e && words(o).includes(w)));
+  // "prompt engineering" and "production systems" are not Prompt to Production: plain words name no event
+  const own = words(e).filter((w) => !EVENTS.some((o) => o !== e && words(o).includes(w)) && !/^(prompt|production|lab|community|events?|days?|voice|agents?|ten)$/.test(w));
   const also = e.title.match(/capture the flag/i) ? ["ctf"] : e.where.match(/murf/i) ? ["murf"] : [];
   return { e, re: new RegExp(`\\b(${[...own, ...also, ...(e.kind === "attended" ? [] : [e.result.toLowerCase()])].map(esc).join("|")})\\b`, "i") };
 });

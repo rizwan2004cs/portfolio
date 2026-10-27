@@ -1,6 +1,7 @@
 import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, mentionsTool, PROJECTS, projectById, roleDetail, TOOLKIT, WHY_HIM } from "@/content/data";
 import type { Project } from "@/content/types";
 import type { Experience } from "@/content/data";
+import RESUME from "@/content/resume.json";
 import type { Emit } from "./types";
 import { bestFact } from "./grounding";
 import { fitLine, fitRows, roughRequirements } from "./fit";
@@ -124,6 +125,11 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   if (kind === "small_talk" || kind === "about_visitor" || kind === "visitor_intro") {
     say(BEHAVIOR[kind].reply!(lastUser)); call("suggest", { options: BEHAVIOR[kind].chips }); return true;
   }
+  // "roast him": one roast, every line a fact, so a model never has to decline it
+  if (re(/\broast\b/) && re(/\b(him|rizwan|his)\b/)) {
+    say("A roast, from the record: he builds more fallbacks than most people build features, his models all live on free tiers so his real specialty is surviving rate limits, and he spent a weekend teaching seven AI agents to lie to each other in PACK. Then he put a kill switch on his own portfolio so visitors can watch it keep answering without him.");
+    call("open_project", { id: "pack" }); call("suggest", { options: ["What’s his superpower?", "Take the model offline", "Why should we hire him?"] }); return true;
+  }
   // "rizwan", "syed mohammad rizwan": his name alone opens his profile
   if (/^\s*(syed\s+)?(mohammad\s+)?rizwan\s*[?!.]*$/i.test(lastUser) || /^\s*syed mohammad\s*$/i.test(lastUser)) {
     say("That’s him. Here’s his profile: where he works, what he studied, and what he’s won."); call("show_profile"); call("suggest", { options: ["Everything he’s built", "Why should we hire him?", "Get resume"] }); return true;
@@ -133,7 +139,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
     say("Everything he’s shipped."); call("list_projects"); call("suggest", { options: ["Why should we hire him?", "How does this site work?", "Get resume"] }); return true;
   }
   // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
-  if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && !topicsIn(lastUser).length && !profileFocus(lastUser)
+  if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && kind !== "playful" && !topicsIn(lastUser).length && !profileFocus(lastUser)
     && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything|certif\w*|courses?|badges?|interview|lately|latest|guard\w*|security|hack\w*|tools?|tech\w*|languages?|frameworks?|tests?|testing|databases?|learn\w*)\b/)) {
     say(BEHAVIOR.unclear.reply!(lastUser)); // never repeats the word back
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
@@ -151,6 +157,30 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   if (clear && re(/^.*\b(tell me more|more details?|go on|elaborate|continue|what else|more about (it|this|that|him)|and more|details please|keep going)\b[?!.]*$/) && !re(/\b(why|how does|compare)\b/)) {
     const facts = best.p.facts.slice(0, 3).map((f) => f.replace(/\.$/, ""));
     say(`${best.p.title}, in more detail: ${facts.join(". ")}.`); call("open_project", { id: best.p.id, view: best.p.pipeline.length ? "architecture" : "card" }); call("suggest", { options: ctxNext(best.p) }); return true;
+  }
+  // "rate his python out of 10", "how good is he at React?": no scores here, only the evidence for that skill
+  if (re(/\b(rate|score|grade|rank|out of (10|5|ten|five)|on a scale|how (good|strong|skilled|proficient) is (he|his)|his level (in|at|of)|how well does he know)\b/) && best.s < 10) {
+    const named = toolNamed(lastUser), ans = named ? answerSkill(named) : undefined;
+    say(`No scores here, only evidence. ${ans ? ans.text : WHY_HIM}`); call("open_project", { id: ans?.open ?? "pack" }); call("suggest", { options: ans?.chips ?? ["Everything he’s built", "What are his gaps?", "Get resume"] }); return true;
+  }
+  // "can he lead a team?": what the record shows, team by team, and the leadership line on his resume
+  if (re(/\b(lead|leads|leader|leadership|led|manage|managed|managing|mentor\w*|people management|team lead|head of)\b/) && !re(/\b(team lead at|led by)\b/) && best.s < 10) {
+    const ieee = RESUME.text.match(/IEEE Student Branch[^\n]*?(?=\s{2,}|\n)/)?.[0].replace(/\s+/g, " ").trim();
+    const teams = PROJECTS.filter((p) => /\bwith\b/i.test(p.team)).map((p) => `${p.title} (${p.team.replace(/^[^:]*?(?=with)/i, "").replace(/:.*$/, "").trim()})`).slice(0, 3);
+    say(`His write-up shows team work rather than a management title: ${teams.join(", ")}.${ieee ? ` His resume lists ${ieee}.` : ""} Whether he can lead yours is a question for him.`);
+    call("show_profile", { focus: "events" }); call("suggest", { options: ["Open PACK", "Contact Rizwan", "Get resume"] }); return true;
+  }
+  // "has he worked in a startup?": his employers, and that the write-up doesn't say what kind of companies they are
+  if (re(/\b(start-?ups?|big (company|tech|firm)|mnc|faang|product (company|based)|service (company|based)|enterprise|corporate|agency)\b/) && !re(/\b(novulis|supraja)\b/) && best.s < 10) {
+    const cos = [...new Set(EXPERIENCE.map((x) => x.title))];
+    say(`His employers so far: ${cos.join(" and ")}. His write-up describes his roles there, not what kind of companies they are, so I can’t call either a startup or not.`);
+    call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Why should we hire him?", "Get resume"] }); return true;
+  }
+  // "is he a fit for a data scientist role?" with no requirements pasted: ask for them, and say where his work sits
+  if (re(/\b(fit|fits|suited|suitable|right|good|match|matches|hire\w*|consider\w*)( for| as| in| into)? (a |an |the )?[\w\s-]{2,30}?(role|position|job|team|opening|engineer|developer)\b/) && !re(/,.*,/) && lastUser.length < 140 && !re(/\b(hire him|hiring him|why)\b/)) {
+    const research = re(/data scien\w*|\bml\b|machine learning|research|model training|deep learning/);
+    say(`Paste the role’s requirements and I’ll map each one to his work.${research ? " One thing up front: his work is applied LLM engineering, calling and orchestrating models rather than training them." : ` His strongest evidence: ${WHY_HIM.replace(/^His strongest evidence is /, "")}`}`);
+    call("suggest", { options: ["Why should we hire him?", "What are his gaps?", "Everything he’s built"] }); return true;
   }
   // "show me his resume", "cv?": the resume, once the visitor approves; a pasted job description is handled above
   if (re(/\b(resume|cv)\b/) && lastUser.trim().split(/\s+/).length <= 8 && !re(/\b(my|our|mine)\b/) && !re(/\b(ats|match|fit|gaps?|against|compare|tailor|improve|review|feedback|say|mention|list|cover|include)\b/)) {
@@ -242,8 +272,9 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   const overview = best.s < 10 ? skillsOverview(lastUser) : undefined;
   if (overview) return answered(overview);
   if (LATEST_Q.test(lastUser) && best.s < 10 && !re(LINKS_Q) && !re(/\bproject\b.*\b(ccr|pack|finboom)\b/)) return answered(latestAnswer());
-  if (re(/\b(years?|months?) of experience|how (much|long|many years)[^?]{0,24}experience|how experienced|experience level|\bfresher\b/)) {
-    say(experienceLine()); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
+  if (re(/\b(years?|months?) of experience|how (much|long|many years)[^?]{0,24}experience|how experienced|experience level|\bfresher\b|how senior|seniority|\b(junior|senior|mid[- ]level|entry[- ]level)\b[^?]{0,16}\b(is he|he is|engineer|dev\w*|level)|what level (is|of)/)) {
+    const now = EXPERIENCE.find((x) => x.now)!;
+    say(`${experienceLine()}${re(/senior|seniority|junior|level/) ? ` His title is ${now.role}; the call on seniority is yours, from the work.` : ""}`); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }
   // "has he won anything?", "how much did he win at Monad Blitz?", "which hackathons has he done?": the events
   // themselves (the ones named, else all with the prize first), never a project; "why…" questions go to the model
@@ -315,4 +346,8 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   return false;
 }
 
-export const isJobDescription = (t: string) => t.length > 140 || /\b(job description|jd|requirements?|we need|we're looking for|we are looking for|must have|nice to have|is he a fit|good fit)\b/i.test(t);
+export const isJobDescription = (t: string) => t.length > 140 || /\b(job description|jd|requirements?|we need|we're looking for|we are looking for|must have|nice to have)\b/i.test(t)
+  // "is he a fit?" closes a pasted role; alone ("is he a good fit for a data scientist role?") it is a question, not a paste
+  || (/\b(is he a fit|good fit)\b/i.test(t) && (t.length > 80 || /,/.test(t)))
+  // "Looking for an AI engineer: Python, LangGraph, RAG, vector DBs, evals. 1-3 yrs.": a role word and a list of skills
+  || ((t.match(/,/g)?.length ?? 0) >= 3 && /\b(looking for|hiring|need|yrs|years?|engineer|developer|role|position|stack|skills)\b/i.test(t));
