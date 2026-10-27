@@ -738,3 +738,22 @@ describe("golden · typos, bare follow-ups, his name, help, goodbye", () => {
     expect((await fixed(["who are you"])).text).toMatch(/^I’m one of his projects\./);
   });
 });
+
+describe("golden · the companies, why a role ended, intern versus now", () => {
+  const fixed = async (q: string) => turn({ turns: [q] }, [never()]);
+  it("'what does novulis do' says the write-up covers his role, not the company", async () => {
+    const r = await fixed("what does novulis do");
+    expect(r.text).toMatch(/^His write-up covers his role there, not the company itself\. Associate Software Engineer \(R&D\) at Novulis Consulting, Jun 2026 – now:/);
+    expect((await fixed("is supraja a startup")).text).toMatch(/^His write-up covers his role there, not the company itself\. Cyber Security Intern/);
+    expect(r.meta.mode).toBe("facts");
+  });
+  it("'why did he leave supraja' explains fixed-term internships, nothing ended early", async () => {
+    const r = await fixed("why did he leave supraja");
+    expect(r.text).toMatch(/^Both were fixed-term internships: Cyber Security Intern \(Web Application VAPT\) at Supraja Technologies \(Jun – Sep 2025\) ended with a project, and the Novulis Consulting internship \(Mar – May 2026\) converted to Associate Software Engineer \(R&D\) in June 2026\. His write-up records no role ending early\./);
+    expect((await fixed("why did his internship end?")).text).toMatch(/^Both were fixed-term internships/);
+  });
+  it("'difference between his internship and current role' puts the two Novulis lines side by side", async () => {
+    const r = await fixed("what's the difference between his internship and his current role");
+    expect(r.text).toMatch(/^Software Engineering Intern \(R&D\) at Novulis Consulting, Mar – May 2026: .* Then Associate Software Engineer \(R&D\) at Novulis Consulting, Jun 2026 – now:/);
+  });
+});

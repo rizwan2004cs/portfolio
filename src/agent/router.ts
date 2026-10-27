@@ -1,5 +1,6 @@
 import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, mentionsTool, PROJECTS, projectById, roleDetail, TOOLKIT, WHY_HIM } from "@/content/data";
 import type { Project } from "@/content/types";
+import type { Experience } from "@/content/data";
 import type { Emit } from "./types";
 import { bestFact } from "./grounding";
 import { fitLine, fitRows, roughRequirements } from "./fit";
@@ -179,6 +180,22 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   if (!clear && re(/\bnovulis\b|\bsupraja\b|where (does|did) he work|\b(his|current) (job|role|employer|company)\b|\bintern(ship)?s?\b|what does he do\b/)) {
     // only the roles asked about: Novulis, Supraja, or the internships; everything for "where does he work"
     // "what does he do with azure": only the roles that mention it
+    const now = EXPERIENCE.find((x) => x.now)!, novIntern = EXPERIENCE.find((x) => x.minor && x.title.startsWith("Novulis"))!, supraja = EXPERIENCE.find((x) => x.title.startsWith("Supraja"))!;
+    const roleLine = (x: Experience) => `${x.role} at ${x.title}, ${x.when}: ${roleDetail(x).replace(/\.$/, "")}.`;
+    // "what does Novulis do?", "is Supraja a startup?": the write-up describes his role, not the company
+    if (re(/\b(what (does|is)|about|tell me about|know about)\s+(novulis|supraja)\b|\b(novulis|supraja)( technologies| consulting)?\s+(do|does|is|a startup|startup|company|product|products|clients?|size|based|located)\b|\bis (novulis|supraja)\b/)) {
+      const co = re(/\bsupraja\b/) ? [supraja] : [now];
+      say(`His write-up covers his role there, not the company itself. ${co.map(roleLine).join(" ")}`); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
+    }
+    // "why did he leave Supraja?": both internships were fixed-term; nothing ended early
+    if (re(/\b(why|how come|reason)\b[^?]*\b(leave|left|quit|end|ended|stop|stopped|moved? on|switch(ed)?)\b|\b(leave|left|quit)\b[^?]*\bwhy\b/)) {
+      say(`Both were fixed-term internships: ${supraja.role} at ${supraja.title} (${supraja.when}) ended with a project, and the ${novIntern.title} internship (${novIntern.when}) converted to ${now.role} in June 2026. His write-up records no role ending early.`);
+      call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
+    }
+    // "difference between his internship and his current role": the two Novulis lines side by side
+    if (re(/\b(difference|differ\w*|compare|vs\.?|versus|changed?|grew|growth|promot\w*|convert\w*)\b/) && re(/\bintern\w*|\brole\b|\bjob\b|\bposition\b|\bfull[- ]time\b/)) {
+      say(`${roleLine(novIntern)} Then ${roleLine(now)}`); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
+    }
     const tool = TOOLKIT.flatMap(([, l]) => l).find((t) => mentionsTool(lastUser, t) && !/^(REST APIs|Render)$/.test(t));
     const withTool = tool ? EXPERIENCE.filter((x) => mentionsTool(x.body, tool)) : [];
     const pick = withTool.length ? withTool : EXPERIENCE.filter((x) => (re(/\bnovulis\b/) ? x.title.startsWith("Novulis") && (!re(/what does he do|currently|right now|\bnow\b/) || !!x.now) : re(/\bsupraja\b/) ? x.title.startsWith("Supraja") : re(/\bintern/) ? !!x.minor : re(/where does he work|\b(current|job|employer|company)\b/) ? !!x.now : true));
