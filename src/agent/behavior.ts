@@ -62,6 +62,8 @@ export const BEHAVIOR: Record<Kind, Behavior> = {
     reply: (t) => /\b(bye|goodbye|see (you|ya))\b/i.test(t) ? "Thanks for stopping by. His resume and contact details are a click away if you need them."
       : /\b(thanks|thank|thx|ty|cheers)\b/i.test(t) ? "Anytime. Ask about another project, or grab his resume."
       : /^\s*(hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (morning|afternoon|evening|night)|gm)\b/i.test(t) ? "Hi! I’m Rizwan’s agent. Ask about his projects or experience, or paste a job description to see how he fits."
+      : /^\s*(yes|yeah|yep|yup|sure|maybe)\b/i.test(t) ? "Go on: pick one of these, or ask in your own words."
+      : /^\s*(no|nope|nah|not really)\b/i.test(t) ? "No problem. Anything else about his work, or his resume?"
       : "Sure. Anything else you’d like to see?",
     chips: ["Everything he’s built", "Has he won anything?", "Get resume"],
   },
@@ -80,7 +82,7 @@ export const KINDS = Object.keys(BEHAVIOR) as Kind[];
 /** Kinds where a wrong "work" guess lets the model talk about him: on doubt, these win. */
 export const SENSITIVE: Kind[] = ["personal", "abusive", "accusation"];
 
-const SMALL_TALK_WORDS = "hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (?:morning|afternoon|evening|night)|gm|thanks|thank you|thank u|thx|ty|cheers|ok(?:ay)?|k|cool|nice|great|awesome|perfect|sure|alright|fine|understood|noted|got it|makes sense|bye|goodbye|see you|see ya|a lot|so much|that(?:’|')?s all|that is all|that(?:’|')?ll be all|that(?:’|')?s it|nothing else|all good|no that(?:’|')?s it|i(?:’|')?m good|i(?:’|')?m done";
+const SMALL_TALK_WORDS = "hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (?:morning|afternoon|evening|night)|gm|thanks|thank you|thank u|thx|ty|cheers|ok(?:ay)?|k|cool|nice|great|awesome|perfect|sure|alright|fine|understood|noted|got it|makes sense|bye|goodbye|see you|see ya|a lot|so much|that(?:’|')?s all|that is all|that(?:’|')?ll be all|that(?:’|')?s it|nothing else|all good|no that(?:’|')?s it|i(?:’|')?m good|i(?:’|')?m done|yes|yeah|yep|yup|no|nope|nah|not really|maybe|hmm|hm";
 const SMALL_TALK = new RegExp(`^\\s*(?:${SMALL_TALK_WORDS})(?:[\\s,!.?:)]+(?:${SMALL_TALK_WORDS}))*(?:\\s+(?:there|rizwan|agent|again|man|bro|buddy))?[\\s!.?,:)]*$`, "i");
 const VISITOR_INTRO = /^\s*(?:hi[,!.\s]*|hey[,!.\s]*|hello[,!.\s]*)?(?:i\s*(?:’|')?\s*a?m|i am|this is)\s+(?:his\s+|a\s+|an\s+|the\s+)?(friend|best friend|classmate|batchmate|college ?mate|roommate|colleague|co-?worker|teammate|manager|mentor|teacher|professor|senior|junior|brother|sister|cousin|relative|recruiter|hiring manager|hr|talent \w+|founder|engineer|developer|student)\b/i;
 const ABOUT_VISITOR = /^\s*(who am i|who i am|do you know (me|who i am)|what(’|')?s my name|what is my name|guess who (i am|this is)|remember me)\b/i;

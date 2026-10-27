@@ -4,7 +4,7 @@ import type { Experience } from "@/content/data";
 import RESUME from "@/content/resume.json";
 import { isFilmQ, outsideAnswer, SITE_AGE_Q, siteAgeAnswer } from "./outside";
 import { lifestyle, personal } from "./scope";
-import type { Emit } from "./types";
+import type { AgentEvent, Emit } from "./types";
 import { bestFact } from "./grounding";
 import { fitLine, fitRows, roughRequirements } from "./fit";
 import { EVENT_LINES } from "./tools";
@@ -116,9 +116,37 @@ export function router(lastUser: string, emit: Emit): void {
 
 /** Questions with one factual answer (availability, months of experience, who built a project) are answered
  *  straight from the facts, model or not: a model can only add risk to them. Returns true when it answered. */
+/** "python and java experience, and is he available?": the parts of a message that each ask something, when there
+ *  are two or three of them; a pasted role or a message that names a project is left whole. */
+export function questionParts(text: string): string[] {
+  if (isJobDescription(text) || text.length > 200 || PROJECTS.some((p) => text.toLowerCase().includes(p.title.toLowerCase()))) return [text];
+  const parts = text.split(/\s*(?:[,;]\s*(?:and|also|plus)\s+|\s+(?:and|also|plus)\s+(?=(?:is|does|do|can|has|have|what|which|how|where|when|why|will|would|did|tell|show)\b)|\?\s+(?=\w))/i).map((x) => x.trim()).filter((x) => x.split(/\s+/).length >= 2);
+  return parts.length >= 2 && parts.length <= 3 ? parts : [text];
+}
+
 export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: readonly string[] = []): boolean {
   // a pasted job description mentions "years of experience" too, but it wants a fit report, not one line
   if (isJobDescription(lastUser)) return false;
+  // two questions in one message: answer each, in order, when each has a one-line answer of its own
+  const parts = questionParts(lastUser);
+  if (parts.length > 1) {
+    const buffers = parts.map((part) => { const evs: AgentEvent[] = []; const ok = factAnswer(part, (e) => evs.push(e), loose, shown); return ok ? evs : undefined; });
+    const answered = buffers.filter((b): b is AgentEvent[] => !!b);
+    if (answered.length >= 2) {
+      const texts = answered.flatMap((b) => b.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : ""))).filter((t) => !/^Not sure what you mean/.test(t));
+      emit({ type: "text", text: texts.join(" ") });
+      const seenTools = new Set<string>();
+      for (const b of answered) for (const e of b) {
+        if (e.type === "text") continue;
+        if (e.type === "tool" && e.name === "suggest") continue;
+        const key = e.type === "tool" ? `${e.name}:${JSON.stringify(e.args)}` : e.type === "panel" ? `panel:${e.panel.kind}:${e.panel.id ?? ""}` : e.type === "approval" ? `approval:${e.action}` : JSON.stringify(e);
+        if (seenTools.has(key)) continue; seenTools.add(key); emit(e);
+      }
+      const lastSuggest = [...answered.at(-1)!].reverse().find((e) => e.type === "tool" && e.name === "suggest");
+      if (lastSuggest) emit(lastSuggest);
+      return true;
+    }
+  }
   const last = lastUser.toLowerCase(), re = (r: RegExp) => r.test(last), say = (text: string) => emit({ type: "text", text });
   const call = (name: tools.ToolName, args: Record<string, unknown> = {}) => { emit({ type: "tool", name, args }); tools.runTool(name, args, emit); };
   const ranked = scoreProjects(last), best = ranked[0], clear = best.s >= 4 || (best.s >= 2 && ranked[1].s < best.s);
@@ -274,6 +302,13 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   }
   const asked = skillAsked(lastUser);
   // "does he know Docker?" yes; "is he good at body parsing in FastAPI?" is for the model (more than a name)
+  // "python and java experience", "does he know react, node or django": one answer per thing, in one turn
+  const several = asked ? asked.split(/\s*(?:,|\band\b|\bor\b|&|\/|\+)\s*/i).map((x) => x.trim()).filter(Boolean) : [];
+  if (several.length >= 2 && several.length <= 4 && several.every((x) => x.split(/\s+/).length <= 3) && !PROJECTS.some((p) => last.includes(p.title.toLowerCase()))) {
+    const answers = several.map((x) => answerSkill(x));
+    say(answers.map((a) => a.text).join(" ")); const first = answers.find((a) => a.open); if (first?.open) call("open_project", { id: first.open });
+    call("suggest", { options: answers[0].chips }); return true;
+  }
   if (asked && (isSecurityQ(asked) || (best.s < 10 && asked.split(/\s+/).length <= 3))) return answered(answerSkill(asked));
   if (isSecurityQ(lastUser) && !re(/\b(prize|won|win|wins|winning|ctf v2|capture the flag)\b|^\s*(why|how)\b/) && best.s < 10 && lastUser.trim().split(/\s+/).length <= 10) return answered(securityAnswer());
   const overview = best.s < 10 ? skillsOverview(lastUser) : undefined;
