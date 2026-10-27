@@ -30,8 +30,24 @@ function dist(a: string, b: string): number {
   return d[a.length][b.length];
 }
 
+/** Hinglish, the way visitors here type it: "kya usko python aata hai", "uska experience kitna hai". Read as English
+ *  before the router sees it, under the same gate as a typo: only when the line as typed answers nothing. */
+const HINGLISH: [RegExp, string][] = [
+  [/\b(uska|uski|unka|unki) (\w+) (kitna|kitni|kitne)( hai| hain)?\b/gi, "how much $2 does he have"], [/\bkya (usko|use|usse|unko|unhe|rizwan ko)\b/gi, "does he know"], [/\b(aata|aati|aate|ata) hai\b/gi, ""], [/\bpata hai\b/gi, ""], [/\bjanta hai\b/gi, ""],
+  [/\b(uska|uski|uske|unka|unki|unke|iska|iski|iske)\b/gi, "his"], [/\b(usko|use|usse|unko|unhe)\b/gi, "him"], [/\b(woh|wo|vo|usne|unhone)\b/gi, "he"],
+  [/\bkitna hai\b/gi, "how much"], [/\bkitna\b/gi, "how much"], [/\bkitne\b/gi, "how many"], [/\bkya hai\b/gi, "what is"], [/\bkya\b/gi, "what"],
+  [/\bkaun\b/gi, "who"], [/\bkahan\b/gi, "where"], [/\bkab\b/gi, "when"], [/\bkyun\b|\bkyu\b/gi, "why"], [/\bkaise\b|\bkaisa\b/gi, "how"], [/\bkonsa\b|\bkaunsa\b|\bkonse\b/gi, "which"],
+  [/\b(batao|bata|bataiye|batana)\b/gi, "tell me"], [/\b(dikhao|dikha|dikhaiye)\b/gi, "show me"], [/\bkaam\b/gi, "work"], [/\bnaukri\b|\bjob kya\b/gi, "job"], [/\bpadhai\b/gi, "education"],
+  [/\bkahan (se )?(padha|padhe)\b/gi, "where did he study"], [/\bbanaya\b|\bbanaye\b|\bbanayi\b/gi, "built"], [/\bkiya\b|\bkiye\b|\bkari\b/gi, "did"], [/\bhai\b|\bhain\b|\bh\b/gi, ""], [/\bka\b|\bki\b|\bke\b/gi, ""],
+  [/\bmujhe\b/gi, "I"], [/\bchahiye\b/gi, "want"], [/\baur\b/gi, "and"], [/\bnahi\b|\bnahin\b|\bnai\b/gi, "not"], [/\bhaan\b|\bhan\b|\bji\b/gi, "yes"], [/\bbhai\b|\byaar\b|\bbro\b/gi, ""],
+];
+export function hinglish(text: string): string {
+  if (!/\b(kya|usko|uska|uski|kitna|kitne|kaun|kahan|kyun|kaise|batao|dikhao|kaam|banaya|hai|hain|aata|pata|janta|konsa|kaunsa|padhai)\b/i.test(text)) return text;
+  return HINGLISH.reduce((t, [re, to]) => t.replace(re, to), text).replace(/\s{2,}/g, " ").trim();
+}
+
 export function fixTypos(text: string): string {
-  return text.replace(/\b[a-z]{3,}\b/g, (w) => {
+  return hinglish(text).replace(/\b[a-z]{3,}\b/g, (w) => {
     if (VOCAB.has(w) || KEEP.has(w)) return w;
     if (THREE[w]) return THREE[w];
     if (w.length < 5) return w;

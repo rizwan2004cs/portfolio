@@ -438,7 +438,7 @@ describe("golden · life outside work, and projects nobody asked about", () => {
   it("fitness, sports and hobbies get one honest line and no panel", async () => {
     for (const q of ["does he do weighlfting", "does he do body weightlifting", "does he go to the gym?", "what are his hobbies?", "does he play cricket"]) {
       const r = await turn({ turns: [q] }, [never()]);
-      expect(r.text).toMatch(/stick to his work/); expect(r.of("panel")).toHaveLength(0);
+      expect(r.text).toMatch(/stick to his work|isn’t on the site\. Two things outside work/); expect(r.of("panel")).toHaveLength(0);
     }
     const app = await turn({ turns: ["did he build a fitness app?"] }, [scripted("a", [say("None of his projects is a fitness app.", call("suggest", { options: ["x"] }))])]);
     expect(app.text).not.toMatch(/stick to his work/);
@@ -755,5 +755,78 @@ describe("golden · the companies, why a role ended, intern versus now", () => {
   it("'difference between his internship and current role' puts the two Novulis lines side by side", async () => {
     const r = await fixed("what's the difference between his internship and his current role");
     expect(r.text).toMatch(/^Software Engineering Intern \(R&D\) at Novulis Consulting, Mar – May 2026: .* Then Associate Software Engineer \(R&D\) at Novulis Consulting, Jun 2026 – now:/);
+  });
+});
+
+describe("golden · ratings, seniority, leadership, startups, role fit, skill-list JDs", () => {
+  const fixed = async (q: string) => turn({ turns: [q] }, [never()]);
+  it("a skills list with a role word is a job description, not the Prompt to Production event", async () => {
+    const r = await fixed("Looking for an AI engineer: Python, LangGraph, RAG, vector DBs, prompt engineering, evals. 1-3 yrs.");
+    expect(r.text).not.toMatch(/Paytm|Prompt to Production/); expect(r.of("tool").some((e) => e.name === "match_role")).toBe(true);
+  });
+  it("'rate his python out of 10' gives evidence, not a number", async () => {
+    const r = await fixed("rate his python skills out of 10");
+    expect(r.text).toMatch(/^No scores here, only evidence\. Yes: Python shows in /); expect(r.meta.mode).toBe("facts");
+  });
+  it("'how senior is he' is the experience line plus his title", async () => {
+    const r = await fixed("how senior is he");
+    expect(r.text).toMatch(/^He has been full-time at Novulis Consulting since June 2026 .* His title is Associate Software Engineer \(R&D\); the call on seniority is yours, from the work\./);
+  });
+  it("'can he lead a team' shows the teams and the resume's leadership line", async () => {
+    const r = await fixed("can he lead a team");
+    expect(r.text).toMatch(/^His write-up shows team work rather than a management title: .*PACK.*His resume lists IEEE Student Branch, NBKRIST — Finance Team Lead \(2025 – 2026\), Treasurer \(2024 – 2025\)\. Whether he can lead yours is a question for him\./);
+  });
+  it("'has he worked in a startup' names his employers and what the write-up doesn't say", async () => {
+    const r = await fixed("has he worked in a startup before");
+    expect(r.text).toMatch(/^His employers so far: Novulis Consulting and Supraja Technologies\. His write-up describes his roles there, not what kind of companies they are/);
+  });
+  it("'fit for a data scientist role' with nothing pasted asks for the requirements and says where his work sits", async () => {
+    const r = await fixed("is he a good fit for a data scientist role");
+    expect(r.text).toMatch(/^Paste the role’s requirements and I’ll map each one to his work\. One thing up front: his work is applied LLM engineering/);
+    expect((await fixed("would he fit a devops role")).text).toMatch(/^Paste the role’s requirements and I’ll map each one to his work\. His strongest evidence: PACK/);
+  });
+  it("'roast him' gets a roast built from facts, no model", async () => {
+    const r = await fixed("roast him");
+    expect(r.text).toMatch(/^A roast, from the record: /); expect(r.meta.mode).toBe("facts"); expect(r.of("panel")[0].panel.id).toBe("pack");
+  });
+});
+
+describe("golden · films, outside work, and how old this site is", () => {
+  const fixed = async (q: string[]) => turn({ turns: q }, [never()]);
+  it("'what films does he like' lists them by theme from the films page", async () => {
+    const r = await fixed(["what films does he like"]);
+    expect(r.text).toMatch(/^7 films and a series shaped how he works, grouped by what they gave him: reinventing yourself and taking the leap \(The Intern, Begin Again, We Bought a Zoo\); .*\. His note on each, with posters, is at \/films\.$/);
+    expect(r.meta.mode).toBe("scope");
+    expect((await fixed(["what's his favourite movie"])).text).toMatch(/^He doesn’t rank them\. 7 films/);
+    expect((await fixed(["what films does he like", "why those"])).text).toMatch(/^7 films and a series/);
+  });
+  it("one film, or 'the snow leopard thing', gets his note on it", async () => {
+    const r = await fixed(["what's the snow leopard thing"]);
+    expect(r.text).toMatch(/^The Secret Life of Walter Mitty \(2013\), under “Soul-searching and a life refresh”: It was within us all along\. .*“Beautiful things don’t ask for attention\.” The rest of the list is at \/films\.$/);
+    expect((await fixed(["why whiplash?"])).text).toMatch(/^Whiplash \(2014\), under “Chasing greatness and pushing your limits”: Great is never quite enough\./);
+    expect((await fixed(["has he seen Silo"])).text).toMatch(/^Silo \(2023\)/);
+  });
+  it("'what does he do outside work' and 'does he watch anime' answer from the site, not his job", async () => {
+    expect((await fixed(["what does he do outside work"])).text).toMatch(/^I stick to his work\. Two things outside it are on the site/);
+    expect((await fixed(["does he watch anime"])).text).toMatch(/^Anime isn’t on the site\. Two things outside work are: he writes poetry/);
+    expect((await fixed(["does he play cricket"])).text).toMatch(/^Cricket isn’t on the site\./);
+  });
+  it("'how old is this site' gives the sitemap date and what the site is", async () => {
+    const r = await fixed(["how old is this site"]);
+    expect(r.text).toMatch(/^This site’s content was last updated on \d{1,2} \w{3} \d{4}, the date its sitemap carries\. It’s one of his 2026 projects: Next\.js on Vercel, with this agent on top\./);
+    expect(r.of("panel")[0].panel.kind).toBe("harness");
+    expect((await fixed(["what's new on the site"])).text).toMatch(/^This site’s content was last updated/);
+  });
+});
+
+describe("golden · Hinglish reaches his facts; 'vs' is a comparison, not a team question", () => {
+  const fixed = async (q: string) => turn({ turns: [q] }, [never()]);
+  it("'uska experience kitna hai' gets the experience line", async () => {
+    const r = await fixed("uska experience kitna hai");
+    expect(r.text).toMatch(/^He has been full-time at Novulis Consulting since June 2026/); expect(r.of("trace").some((t) => t.step === "typos")).toBe(true);
+    expect((await fixed("kya usko python aata hai")).text).toMatch(/^Yes: Python shows in /);
+  });
+  it("'PACK vs FinBoom which is more complex' is not answered with PACK's team line", async () => {
+    expect((await fixed("PACK vs FinBoom which is more complex")).text).not.toMatch(/^PACK: Team of two/);
   });
 });
