@@ -229,7 +229,8 @@
         "agents",
         "voice",
         "finance",
-        "tool-use"
+        "tool-use",
+        "mobile"
       ],
       "oneLiner": "Offline-first net-worth tracker for India, with an assistant that asks before it acts.",
       "team": "Solo, 129 commits",

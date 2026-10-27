@@ -9,7 +9,7 @@ export type ProfileFocus = "events" | "work" | "education";
 const FOCUS: [ProfileFocus, RegExp][] = [
   ["events", /\b(won|win|wins|winning|prizes?|awards?|achiev\w*|hackathons?|events?|competitions?|contests?|ctfs?)\b/i],
   ["work", /\b(jobs?|employers?|company|companies|works? at|work experience|experience|intern\w*|novulis|supraja|employ\w*|currently|career|roles?)\b/i],
-  ["education", /\b(educat\w*|stud(y|ied|ies)|college|university|degree|cgpa|gpa|grades?|school|b\.?tech|graduat\w*)\b/i],
+  ["education", /\b(educat\w*|stud(y|ied|ies)|college|university|degree|cgpa|gpa|grades?|school|b\.?tech|graduat\w*|masters?|master(’|')s|phd|ph\.d|m\.?tech|mba|postgrad\w*|higher studies|qualifications?)\b/i],
 ];
 export const profileFocus = (text: string): ProfileFocus | undefined => FOCUS.find(([, r]) => r.test(text))?.[0];
 
