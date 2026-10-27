@@ -1,4 +1,4 @@
-import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, mentionsTool, PROJECTS, projectById, roleDetail, TOOLKIT, toolUses, WHY_HIM } from "@/content/data";
+import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, mentionsTool, PROJECTS, projectById, roleDetail, TOOLKIT, WHY_HIM } from "@/content/data";
 import type { Project } from "@/content/types";
 import type { Emit } from "./types";
 import { bestFact } from "./grounding";
@@ -6,6 +6,7 @@ import { fitLine, fitRows, roughRequirements } from "./fit";
 import { EVENT_LINES } from "./tools";
 import { eventsIn, profileFocus, projectFilter, REASONING, topicsIn } from "./intent";
 import { BEHAVIOR, ruleKind } from "./behavior";
+import { answerSkill, CERT_Q, certAnswer, INTERVIEW_Q, interviewAnswer, isSecurityQ, LATEST_Q, latestAnswer, securityAnswer, SITE_TECH, siteTechAnswer, skillAsked, skillsOverview, type SkillAnswer } from "./skills";
 // runTool is imported lazily to keep router <-> tools free of a load-order cycle
 import * as tools from "./tools";
 
@@ -67,25 +68,6 @@ export function router(lastUser: string, emit: Emit): void {
       return;
     }
   }
-  // "does he know Kubernetes?" is a fair question with a checkable answer, not something outside the lane
-  const skill = lastUser.match(/^\s*(?:does|do|can|has|is|did)\s+(?:he|rizwan)\s+(?:know|use|used|have|has|work(?:ed)?\s+(?:with|on)|any\s+experience\s+(?:with|in)|experience\s+(?:with|in)|familiar\s+with|good\s+(?:at|with)|skilled\s+(?:at|in)|built\s+(?:with|anything\s+(?:with|in)))\s+(.{2,60}?)\s*\??\s*$/i);
-  if (skill && !/\b(him|rizwan|you|this)\b/i.test(skill[1])) {
-    const thing = skill[1].replace(/^(a|an|the)\s+/i, "").replace(/[?.!]+$/, "");
-    // a toolkit item is answered from where it shows (projects, side builds, this site), not by word overlap:
-    // "prompt guard" must not match VerseYou because its facts mention a prompt
-    const tool = TOOLKIT.flatMap(([, l]) => l).find((t) => t.toLowerCase() === thing.toLowerCase());
-    const uses = tool ? toolUses(tool) : null;
-    const [row] = fitRows([thing]);
-    const p = uses ? projectById(uses.find((u) => u.href.startsWith("#") && u.href !== "#other")?.href.slice(1) ?? "") : row.status === "match" ? projectById(row.projects[0].id) : undefined;
-    if (p) {
-      const evidence = row.projects.find((x) => x.id === p.id)?.evidence ?? `Built with ${p.stack.join(", ")}.`;
-      say(`Yes: ${p.title} shows it. ${evidence}`); call("open_project", { id: p.id }); call("suggest", { options: ctxNext(p) }); return;
-    }
-    const name = tool ?? `${thing[0].toUpperCase()}${thing.slice(1)}`, elsewhere = (uses ?? []).map((u) => u.label);
-    say(elsewhere.length ? `${name} is in his toolkit; it shows in ${elsewhere.join(" and ")}, not in his main projects.` : tool || row.status === "toolkit" ? `${name} is in his toolkit, but none of his public projects shows it.` : `Nothing in his public work shows ${thing}.`);
-    call("suggest", { options: ["Everything he’s built", "Get resume", "Contact Rizwan"] });
-    return;
-  }
   // the questions recruiters actually ask get real answers even with every model down
   if (factAnswer(lastUser, emit, true)) return;
   if (re(/\b(resume|cv)\b/)) { say("Here’s his resume, once you approve."); call("offer_resume"); call("suggest", { options: ["Everything he’s built", "Contact Rizwan"] }); return; }
@@ -103,6 +85,14 @@ export function router(lastUser: string, emit: Emit): void {
   if (clear) { say(bestFact([...(/hackathon|event|prize|\bwon\b|built at|build at|impact lab|monad|terralogic|murf|devfest|ctf|superteam/i.test(lastUser) ? EVENT_LINES : []), ...best.p.facts], lastUser, best.p.title) ?? `Here’s ${best.p.title}: ${best.p.oneLiner[0].toLowerCase()}${best.p.oneLiner.slice(1)}`); call("open_project", { id: best.p.id, view: deep && best.p.pipeline.length ? "architecture" : "card" }); call("suggest", { options: ctxNext(best.p) }); return; }
   if (deep) { say("Start with the internals of one agent."); call("open_project", { id: "pack", view: "architecture" }); call("suggest", { options: ["Internals of CCR Compliance Advisor", "How does this site work?"] }); return; }
   if (re(/\b(built|projects?|work|everything|shipped|another)\b/) || best.s >= 2) { say("Everything he’s shipped."); call("list_projects"); call("suggest", { options: ["How does this site work?", "Get resume"] }); return; }
+  // "what's his superpower?" with every model down: a fixed playful line, every word of it from his work
+  if (ruleKind(lastUser) === "playful") {
+    say(re(/kryptonite|weakness|weak spot/) ? "His kryptonite: free-tier rate limits. Which is exactly why everything he builds has a fallback, like PACK’s four-step model chain."
+      : re(/\bwords?\b/) ? "Reliable, grounded, relentless. PACK keeps seven agents playing through model failures, and CCR cites a source for every claim."
+      : re(/pitch|tagline|one[- ]liner|sell/) ? "An AI engineer who builds agents that don’t fall over: PACK, CCR Compliance Advisor and FinBoom each keep working when a model doesn’t."
+      : "His superpower: building AI agents that don’t fall over. PACK keeps a seven-agent game running through a four-step model fallback, and CCR cites a source for every claim.");
+    call("open_project", { id: "pack" }); call("suggest", { options: ["Internals of PACK", "Why should we hire him?", "Everything he’s built"] }); return;
+  }
   say("Outside my lane. Closest thing I can show you is everything he’s built.");
   call("suggest", { options: DEFAULT_NEXT });
 }
@@ -122,7 +112,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   }
   // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
   if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && !topicsIn(lastUser).length && !profileFocus(lastUser)
-    && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything)\b/)) {
+    && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything|certif\w*|courses?|badges?|interview|lately|latest|guard\w*|security|hack\w*|tools?|tech\w*|languages?|frameworks?)\b/)) {
     say(BEHAVIOR.unclear.reply!(lastUser)); // never repeats the word back
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
   }
@@ -145,6 +135,23 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   if (re(/\bopen to (work|roles?|opportunit\w*|new)|\bavailab(le|ility)\b|looking for (a )?(job|role|work|opportunit)|notice period|join(ing)? date|can he join|\b(salary|ctc|compensation|expected pay|pay expectations?|salary package)\b/)) {
     say("This site doesn’t say; ask him directly. His email, phone and LinkedIn are on his profile."); call("offer_contact"); call("suggest", { options: ["Get resume", "Everything he’s built"] }); return true;
   }
+  // what he knows, what this agent runs on, what to ask him, what he's up to: all from the toolkit and his facts
+  const answered = (r: SkillAnswer) => {
+    say(r.text);
+    if (r.open) call("open_project", { id: r.open }); else if (r.profile) call("show_profile", { focus: r.profile });
+    else if (/one of his projects|guardrails here/.test(r.text)) call("show_harness");
+    call("suggest", { options: r.chips }); return true;
+  };
+  if (SITE_TECH.test(lastUser) && best.s < 10) return answered(siteTechAnswer(lastUser));
+  if (INTERVIEW_Q.test(lastUser) && best.s < 10) return answered(interviewAnswer());
+  if (CERT_Q.test(lastUser) && best.s < 10) return answered(certAnswer());
+  const asked = skillAsked(lastUser);
+  // "does he know Docker?" yes; "is he good at body parsing in FastAPI?" is for the model (more than a name)
+  if (asked && (isSecurityQ(asked) || (best.s < 10 && asked.split(/\s+/).length <= 3))) return answered(answerSkill(asked));
+  if (isSecurityQ(lastUser) && !re(/\b(prize|won|win|wins|winning|ctf v2|capture the flag)\b|^\s*(why|how)\b/) && best.s < 10 && lastUser.trim().split(/\s+/).length <= 10) return answered(securityAnswer());
+  const overview = best.s < 10 ? skillsOverview(lastUser) : undefined;
+  if (overview) return answered(overview);
+  if (LATEST_Q.test(lastUser) && best.s < 10 && !re(/\bproject\b.*\b(ccr|pack|finboom)\b/)) return answered(latestAnswer());
   if (re(/\b(years?|months?) of experience|how (much|long|many years)[^?]{0,24}experience|how experienced|experience level|\bfresher\b/)) {
     say(experienceLine()); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }

@@ -25,9 +25,11 @@ const ALIASES: [RegExp, string[]][] = [
   [/postgres|\bsql\b|database/, ["postgres", "supabase", "neon"]],
   [/reliab|fallback|resilien|fault.?toleran/, ["fallback", "checkpoint", "never stalls", "resume"]],
   [/ci.?cd|continuous (integration|delivery|deployment)|devops/, ["github actions", "docker", "azure devops"]],
+  [/security|pentest|vapt|vulnerab|exploit|hack(?!athon)|\bctf\b|owasp/, ["security", "vapt", "penetration", "attacker", "filtered server-side", "verified", "ctf"]],
 ];
 // a term counts at the start of a word only: "eval" must not match inside "retrieval"
-const has = (h: string, t: string) => new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(h);
+// …and "hack" must not match "hackathon", the one word in his write-ups that starts with a skill it isn't
+const has = (h: string, t: string) => new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!athon)`).test(h);
 const TOOLKIT_TERMS = [...MARQUEE_A, ...MARQUEE_B, ...TOOLKIT.flatMap(([, l]) => l)].map((t) => t.toLowerCase());
 
 function haystack(p: Project) {

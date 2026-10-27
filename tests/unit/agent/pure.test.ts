@@ -188,8 +188,8 @@ describe("router (deterministic fallback)", () => {
   });
   it("answers skill questions from the evidence instead of refusing them", () => {
     const text = (q: string) => run(q).filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ");
-    expect(text("does he know kubernetes?")).toBe("Nothing in his public work shows kubernetes.");
-    expect(text("Does he know REST APIs")).toMatch(/^REST APIs is in his toolkit, but none of his public projects shows it\.$/);
+    expect(text("does he know kubernetes?")).toMatch(/^Kubernetes isn’t in his toolkit: he ships with Docker/);
+    expect(text("Does he know REST APIs")).toMatch(/^REST APIs is in his toolkit, but none of his public projects shows it yet\.$/);
     expect(text("does he know node.js?")).toMatch(/shows in Wanderlust/);
     expect(text("does he know Azure Functions?")).toMatch(/Novulis Consulting/);
     expect(text("Why should I hire him over other freshers?")).toMatch(/^His strongest evidence is PACK/);
@@ -206,7 +206,7 @@ describe("router (deterministic fallback)", () => {
     expect(text("what has he built with Supabase?")).toBe("3 of his 10 projects match “Supabase”: FinBoom, Campus Premier League, VerseYou.");
     expect(text("projects using Python")).toMatch(/projects match “Python”: .*CCR Compliance Advisor/);
     expect(tools(run("is he good at Java?"))).toContain("open_project(ngo)");
-    expect(text("has he used Pinecone?")).toMatch(/^Yes: CCR Compliance Advisor shows it\./);
+    expect(text("has he used Pinecone?")).toMatch(/^Yes: Pinecone shows in CCR Compliance Advisor \(RAG and vector search\)\. In CCR Compliance Advisor, sections are embedded/);
   });
   it("is never silent and always suggests", () => {
     for (const q of ["write me a pizza poem", "", "????", "मुझे बताओ", "list all work", "contact"]) {

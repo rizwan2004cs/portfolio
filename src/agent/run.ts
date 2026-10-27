@@ -6,8 +6,8 @@ import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
-import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
-import { BEHAVIOR, ruleKind } from "./behavior";
+import { ATTACK_REPLY, BAD_OUTPUT, CODEY, GUARD_REFUSAL, isAttack, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
+import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind } from "./behavior";
 import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
@@ -102,19 +102,20 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // the project the visitor is talking about: named now, or named in the turn a pronoun points back to
   const subjectProject = clearPick(subject);
   if (offScope(last)) {
-    emit({ type: "trace", step: "scope", detail: "off-scope request refused · 0 tokens", level: "warn" });
-    emit({ type: "text", text: REFUSAL });
-    emit({ type: "suggest", options: DEFAULT_NEXT });
+    const attack = isAttack(last);
+    emit({ type: "trace", step: "scope", detail: attack ? "injection attempt refused · invited to kill the model instead · 0 tokens" : "off-scope request refused · 0 tokens", level: "warn" });
+    emit({ type: "text", text: attack ? ATTACK_REPLY : BEHAVIOR.off_topic.reply!(last) });
+    emit({ type: "suggest", options: attack ? ["Take the model offline", "How does this site work?", "Everything he’s built"] : DEFAULT_NEXT });
     return { mode: "scope" };
   }
   // the outer agent: every message is sorted into one kind first (src/agent/behavior.ts says what each kind gets).
   // The prompt guard runs at the same time, so sorting adds no wait to the turns that do reach a model.
   const guarding = input.killModel ? null : deps.screen(last, deps.signal).catch(() => ({ ok: true, note: "unavailable · let through (tools are closed-world)" }));
   // a visitor who took the model offline gets no AI anywhere, the classifier included
-  const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal));
+  const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal, input.turns.at(-2)));
   const kind = decide(sorted);
   emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
-  if (kind !== "work") {
+  if (BEHAVIOR[kind].reply) {
     emit({ type: "trace", step: "policy", detail: `${kind} · fixed reply from the behaviour policy, no model, no panel · 0 tokens`, level: "info" });
     emit({ type: "text", text: BEHAVIOR[kind].reply!(last) });
     emit({ type: "suggest", options: BEHAVIOR[kind].chips });
@@ -215,7 +216,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   if (!deps.models.length) { emit({ type: "trace", step: "model", detail: "no model configured", level: "err" }); return fallbackToRouter(ROUTER); }
 
   const base: ChatMessage[] = [
-    { role: "system", content: SYSTEM + (input.shown.length ? `\nAlready on screen: ${input.shown.join(", ")}.` : "") },
+    { role: "system", content: SYSTEM + (input.shown.length ? `\nAlready on screen: ${input.shown.join(", ")}.` : "") + (BEHAVIOR[kind].tone ? `\n${BEHAVIOR[kind].tone}` : "") },
     ...turns.map((t) => ({ role: "user" as const, content: t })),
   ];
 
@@ -228,6 +229,8 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // facts of projects the visitor already has on screen are fair sources for follow-ups ("what vector DB does it use?")
   // the model was given every fact, so every fact is a fair source; number, prize and scope checks stay relational
   let source = `${ALL_FACTS_SOURCE} ${KNOWLEDGE} ${onScreen.map((p) => `${p.facts.join(" ")} ${p.stack.join(" ")}`).join(" ")}`;
+  // a playful answer may use the question's own framing ("his superpower is…"): those words are the visitor's, not claims
+  if (kind === "playful") source += ` ${last} superpower super power superhero hero spirit animal secret weapon kryptonite vibe tagline motto pitch words describe character would be like rate limits free tier ${PLAYFUL_IMAGES.join(" ")} ${PLAYFUL_WORDS.join(" ")}`;
   const texts: string[] = [];
   const t0 = Date.now();
   // keys still resting from an earlier rate limit are skipped without a call: one quiet line, not a red row each;

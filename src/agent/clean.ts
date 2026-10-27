@@ -13,6 +13,8 @@ export function clean(text: string): string {
   const sentences = t.replace(/[\u2010-\u2012\u2212]/g, "-").replace(/\s+/g, " ").trim().match(SENTENCES) ?? [];
   return sentences
     .map((x) => x.trim())
+    .map((x) => x.replace(/\s*\b[a-z_]{3,}\(\s*\)\.?/g, "").trim()) // "open_harness()" typed into prose
+    .filter(Boolean)
     .filter((x) => !/\b(suggest(ion)?s?|next steps?|tool calls?|panel)\b/i.test(x))
     // last line of defence: no visitor ever reads tool-argument syntax
     .filter((x) => !/[{}]|"\w+"\s*:/.test(x))
