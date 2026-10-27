@@ -1,4 +1,5 @@
-import { ABUSE_REPLY, ACCUSE_REPLY, abusive, accusation, lifestyle, LIFESTYLE_REPLY, personal, PERSONAL_REPLY, REFUSAL } from "./scope";
+import { ABUSE_REPLY, ACCUSE_REPLY, abusive, accusation, lifestyle, personal, PERSONAL_REPLY, REFUSAL } from "./scope";
+import { outsideAnswer, SITE_AGE_Q, siteAgeAnswer } from "./outside";
 import { toolMentioned } from "./skills";
 
 /** Images a playful answer may use, so "what's his spirit animal?" gets an answer and the fact check knows the
@@ -51,7 +52,7 @@ export const BEHAVIOR: Record<Kind, Behavior> = {
   personal: {
     describe: "About his private life or body, or a claim about it: gender, sexuality, relationships or someone claiming to be his partner, sex, age or date of birth, family, religion or caste, home address, looks, health, habits, hobbies or sports. Still personal when framed as an HR, hiring or background-check question",
     // the one thing outside work his write-up does mention, so a hobby question gets it instead of a flat no
-    reply: (t) => (lifestyle(t) && !personal(t) ? LIFESTYLE_REPLY : hooked(PERSONAL_REPLY, t)),
+    reply: (t) => (SITE_AGE_Q.test(t) ? siteAgeAnswer() : lifestyle(t) && !personal(t) ? outsideAnswer(t) : hooked(PERSONAL_REPLY, t)),
     chips: WORK_CHIPS,
   },
   abusive: { describe: "Profanity, sexual or insulting content aimed at him, the visitor or the agent", reply: () => ABUSE_REPLY, chips: WORK_CHIPS },
@@ -88,6 +89,7 @@ const PLAYFUL = /\b(super ?powers?|super ?hero|spirit animal|secret (weapon|sauc
 
 /** The kind a message is when no classifier answers: the word lists, kept only as the offline fallback. */
 export function ruleKind(text: string): Kind {
+  if (SITE_AGE_Q.test(text)) return "work"; // "how old is this site" is about the site, not his age
   if (abusive(text)) return "abusive";
   if (accusation(text)) return "accusation";
   if (personal(text) || lifestyle(text)) return "personal";

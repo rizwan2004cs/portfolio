@@ -38,8 +38,8 @@ const ACCUSE = /\b(betray\w*|fired|sacked|terminated|laid off|scam\w*|fraud\w*|c
 export const accusation = (text: string) => ACCUSE.test(text) && scoreProjects(text)[0].s < 4;
 export const ACCUSE_REPLY = "Nothing on this site supports that, and I don’t speculate about people. His work history and projects are here to check.";
 // his life outside work (fitness, sports, hobbies, looks) is not on this site either, apart from the poetry he writes
-const LIFESTYLE = /\b(gym|work ?outs?|weigh\w*|lift(ing|s)?|body ?build\w*|bodybuilding|fitness|exercis\w*|sports?|cricket|football|soccer|basketball|badminton|running|marathon|yoga|swim\w*|hobb(y|ies)|movies?|films?|music|songs?|singer|dance|danc\w*|travel\w*|food|diet|vegetarian|height|how tall|his weight|how does he look|good.looking|handsome|physique|games he plays|play(s)? (games|any sport))\b/i;
-export const lifestyle = (text: string) => LIFESTYLE.test(text) && !/\b(app|project|built|build|agent|dashboard|platform)\b/i.test(text);
+const LIFESTYLE = /\b(gym|work ?outs?|weigh\w*|lift(ing|s)?|body ?build\w*|bodybuilding|fitness|exercis\w*|sports?|cricket|football|soccer|basketball|badminton|running|marathon|yoga|swim\w*|hobb(y|ies)|movies?|films?|music|songs?|singer|dance|danc\w*|travel\w*|food|diet|vegetarian|height|how tall|his weight|how does he look|good.looking|handsome|physique|games he plays|play(s)? (games|any sport)|anime|netflix|series he|shows? he|books?|reading|novels?|gaming|video games|chess|guitar|piano|instruments?|pets?|cooking|photography|outside (of )?work|after work|off work|free time|spare time|weekends?|for fun|unwind|relax\w*)\b/i;
+export const lifestyle = (text: string) => LIFESTYLE.test(text) && !/\b(app|project|built|build|agent|dashboard|platform|models?|site|you|running on|runs on)\b/i.test(text);
 export const LIFESTYLE_REPLY = "I stick to his work. Two things outside it are on the site: he writes poetry, which became VerseYou, and he keeps a list of films that shaped how he works (mohammad-rizwan.tech/films).";
 export const PERSONAL_REPLY = "I stick to his work. Ask about a project, his experience, or paste a job description to see how he fits.";
 
