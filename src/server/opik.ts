@@ -10,7 +10,10 @@ let client: Opik | null | undefined;
 export function opikClient(env = process.env): Opik | undefined {
   if (client === undefined) {
     client = env.OPIK_API_KEY
-      ? new Opik({ apiKey: env.OPIK_API_KEY, workspaceName: env.OPIK_WORKSPACE ?? "mohammad-rizwan", projectName: env.OPIK_PROJECT_NAME ?? "Portfolio agent", apiUrl: env.OPIK_URL_OVERRIDE ?? "https://www.comet.com/opik/api" })
+      ? new Opik({ apiKey: env.OPIK_API_KEY, workspaceName: env.OPIK_WORKSPACE ?? "mohammad-rizwan", projectName: env.OPIK_PROJECT_NAME ?? "Portfolio agent", apiUrl: env.OPIK_URL_OVERRIDE ?? "https://www.comet.com/opik/api",
+          // hold every event until the turn's own flush: the closing update then merges into the trace's create,
+          // instead of racing it in a separate batch (a fast turn's update landing first left a trace dated 1970)
+          holdUntilFlush: true })
       : null;
   }
   return client ?? undefined;
@@ -29,7 +32,7 @@ export interface TurnTrace {
 }
 
 export function traceTurn(c: Opik, t: { question: string; turns: string[]; session?: string; killed: boolean; country?: string }): TurnTrace {
-  const trace = c.trace({ name: "agent-turn", input: { question: t.question, turns: t.turns }, threadId: t.session, metadata: { killed: t.killed, country: t.country }, tags: ["portfolio", ENV] });
+  const trace = c.trace({ name: "agent-turn", startTime: new Date(), input: { question: t.question, turns: t.turns }, threadId: t.session, metadata: { killed: t.killed, country: t.country }, tags: ["portfolio", ENV] });
   return {
     // each model in the chain gets its own llm span, so a 429 on key 1 and the fallback that answered both show
     models: (list) => list.map((m) => ({
