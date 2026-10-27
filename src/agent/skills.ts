@@ -72,7 +72,7 @@ export const isSecurityQ = (text: string) => SECURITY.test(text);
 /** "does he know X", "X experience?", "is he good at X", "what about X" → X */
 export function skillAsked(text: string): string | undefined {
   const t = text.trim().replace(/[?.!]+$/, "");
-  const m = t.match(/^(?:and |also |ok |so |but )?(?:does|do|can|has|is|did|was|will|would)\s+(?:he|rizwan)\s+(?:know|knows|use|used|have|has|do|work(?:ed)?\s+(?:with|on|in)|any\s+experience\s+(?:with|in)|experience\s+(?:with|in)|familiar\s+with|good\s+(?:at|with|in)|skilled\s+(?:at|in)|built\s+(?:with|anything\s+(?:with|in))|into|comfortable\s+with|handle|code\s+in|program\s+in|write)\s+(.{1,60}?)(?:\s+(?:also|and|or)\b.*)?$/i)
+  const m = t.match(/^(?:and |also |ok |so |but )?(?:does|do|can|has|is|did|was|will|would)\s+(?:he|rizwan)\s+(?:know|knows|use|used|have|has|do|work(?:ed)?\s+(?:with|on|in)|any\s+experience\s+(?:with|in)|experience\s+(?:with|in)|familiar\s+with|good\s+(?:at|with|in)|skilled\s+(?:at|in)|built\s+(?:with|anything\s+(?:with|in))|into|comfortable\s+with|handle|code\s+in|program\s+in|write)\s+(.{1,60}?)(?:\s+(?:also|and|or)\s+(?:what|how|is|does|do|can|which|tell|show|where|why|when)\b.*)?$/i)
     ?? t.match(/^(?:does|is|did|has|will)\s+(?:his|rizwan'?s)\s+(?:resume|cv|profile|toolkit|stack|write-?up)\s+(?:mention|include|list|have|cover|show|contain|say anything about)s?\s+(.{1,40})$/i)
     ?? t.match(/^(?:what about|how about|and)\s+(.{1,40})$/i)
     ?? t.match(/^(?:his|rizwan'?s)\s+(.{1,40}?)\s+(?:experience|skills?|knowledge|level|expertise)$/i)

@@ -830,3 +830,27 @@ describe("golden · Hinglish reaches his facts; 'vs' is a comparison, not a team
     expect((await fixed("PACK vs FinBoom which is more complex")).text).not.toMatch(/^PACK: Team of two/);
   });
 });
+
+describe("golden · two questions in one message, two skills in one question, bare yes and no", () => {
+  const fixed = async (q: string) => turn({ turns: [q] }, [never()]);
+  it("'python and java experience, and is he available?' answers both parts", async () => {
+    const r = await fixed("python and java experience, and is he available?");
+    expect(r.text).toMatch(/^Yes: Python shows in .*Yes: Java shows in NGO Donor Matcher.*This site doesn’t say; ask him directly\./);
+    expect(r.of("tool").some((e) => e.name === "offer_contact")).toBe(true); expect(r.meta.mode).toBe("facts");
+  });
+  it("'does he know react, node or django' answers each thing", async () => {
+    const r = await fixed("does he know react, node or django");
+    expect(r.text).toMatch(/^Yes: React shows in .*Node\.js is in his toolkit.*Django isn’t in his toolkit: his Python APIs are FastAPI/);
+    expect(r.of("panel")[0].panel.id).toBe("pack");
+  });
+  it("'where did he study and what are his gaps?' answers both; a single question is untouched", async () => {
+    const r = await fixed("where did he study and what are his gaps?");
+    expect(r.text).toMatch(/^B\.Tech, Computer Science & Engineering.*His public work does not show Kubernetes/);
+    expect((await fixed("Show me PACK and the stack?")).text).toMatch(/^PACK is built with /);
+  });
+  it("bare 'yes' and 'no' get a nudge, not 'not sure what you mean'", async () => {
+    expect((await fixed("yes")).text).toBe("Go on: pick one of these, or ask in your own words.");
+    expect((await fixed("no")).text).toBe("No problem. Anything else about his work, or his resume?");
+    expect((await fixed("yes")).meta.mode).toBe("scope");
+  });
+});
