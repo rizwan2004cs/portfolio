@@ -137,6 +137,9 @@ const TITLES = [...PROJECTS].sort((a, b) => b.title.length - a.title.length);
 const TOKEN = new RegExp(`(${TITLES.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|((?:\\$|₹)?\\d[\\d,]*(?:\\.\\d+)?(?:%|k\\b|\\+)?)`, "g");
 /** "mohammad-rizwan.tech/films" or "/films" in an answer becomes a link to it. */
 const SITE_PATH = /(?:https?:\/\/)?(?:www\.)?mohammad-rizwan\.tech(\/[\w/-]*)?|(?<![\w/])(\/(?:films|agent|resume\.pdf|work\/[\w-]+))\b/g;
+// a project's live or source URL named in an answer ("live at finboom-cyan.vercel.app") becomes the same link its panel has
+const LINK_BY_HOST = new Map(PROJECTS.flatMap((p) => Object.values(p.links ?? {})).map((u) => [u.replace(/^https?:\/\//, "").replace(/\/$/, ""), u]));
+const PROJECT_LINK = new RegExp([...LINK_BY_HOST.keys()].sort((a, b) => b.length - a.length).map((h) => h.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")).join("|"), "g");
 export function answerHtml(text: string): string {
   const sentences = text.trim().split(/(?<=[.!?])\s+(?=[A-Z“"(])/);
   const paras: string[] = [];
@@ -144,16 +147,25 @@ export function answerHtml(text: string): string {
   for (let i = 0; i < sentences.length; i += sentences.length > 2 ? 2 : sentences.length) paras.push(sentences.slice(i, i + (sentences.length > 2 ? 2 : sentences.length)).join(" "));
   let n = 0;
   const words = (t: string) => t.split(/(\s+)/).map((w) => (/^\s+$/.test(w) || !w ? w : `<span class="w" style="animation-delay:${Math.min(n++ * 12, 500)}ms">${esc(w)}</span>`)).join("");
-  return paras.map((para) => {
+  const tokens = (seg: string) => {
     let out = "", last = 0;
-    for (const m of para.matchAll(TOKEN)) {
-      out += words(para.slice(last, m.index));
+    for (const m of seg.matchAll(TOKEN)) {
+      out += words(seg.slice(last, m.index));
       const p = m[1] ? TITLES.find((x) => x.title === m[1]) : undefined;
       out += p ? `<button type="button" class="pj" tabindex="-1" data-openp="${esc(p.id)}">${words(m[0])}</button>` : `<b>${words(m[0])}</b>`;
       last = m.index! + m[0].length;
     }
-    const html = `<p>${out}${words(para.slice(last))}</p>`;
-    // links are added after escaping, on text that has no tags of its own
+    return out + words(seg.slice(last));
+  };
+  return paras.map((para) => {
+    // a project's live or source host is one link, kept whole: no number inside it is a figure to highlight
+    let out = "", last = 0;
+    if (LINK_BY_HOST.size) for (const m of para.matchAll(PROJECT_LINK)) {
+      out += tokens(para.slice(last, m.index)) + `<a class="pj" href="${esc(LINK_BY_HOST.get(m[0])!)}" target="_blank" rel="noopener">${words(m[0])}</a>`;
+      last = m.index! + m[0].length;
+    }
+    const html = `<p>${out}${tokens(para.slice(last))}</p>`;
+    // site links are added after escaping, on text that has no tags of its own
     return html.replace(SITE_PATH, (m, p1, p2) => { const path = p1 ?? p2 ?? "/"; return `<a class="pj" href="${esc(path)}">${m}</a>`; });
   }).join("");
 }

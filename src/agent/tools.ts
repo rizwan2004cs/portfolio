@@ -41,7 +41,7 @@ export function runTool(name: ToolName, args: Record<string, unknown>, emit: Emi
       const p = projectById(String(args.id));
       if (!p) return { error: "unknown project id" };
       emit({ type: "panel", panel: { kind: args.view === "architecture" ? "architecture" : "project", id: p.id } });
-      return { id: p.id, title: p.title, team: p.team, facts: p.facts, stack: p.stack, source: p.source };
+      return { id: p.id, title: p.title, team: p.team, facts: p.facts, stack: p.stack, source: p.source, links: p.links };
     }
     case "list_projects": {
       // only the projects asked about; an empty or unknown filter lists everything
@@ -87,7 +87,7 @@ export function runTool(name: ToolName, args: Record<string, unknown>, emit: Emi
 }
 
 /** A chip is only useful if clicking it does something the agent can actually do. */
-const INTENT = /^(everything he.?s built|what has he built\??|how does this site work\??|get (his )?resume|resume|contact( rizwan)?|view (his )?profile|(his )?profile|who is (he|rizwan)\??|internals of .+|open .+|how does .+ handle failures\??|(switch to )?classic( site)?|(list|show)( me)?( all)?( his)? (work|projects)|take the model offline|restore the model|what(’|')?s his superpower\??|what should i ask him( in an interview)?\??|what are his gaps\??|why should we hire him\??|has he won anything\??)$/i;
+const INTENT = /^(everything he.?s built|what has he built\??|how does this site work\??|get (his )?resume|resume|contact( rizwan)?|view (his )?profile|(his )?profile|who is (he|rizwan)\??|internals of .+|open .+|how does .+ handle failures\??|(switch to )?classic( site)?|(list|show)( me)?( all)?( his)? (work|projects)|take the model offline|restore the model|what(’|')?s his superpower\??|what should i ask him( in an interview)?\??|what are his gaps\??|why should we hire him\??|has he won anything\??|can i try it\??)$/i;
 export const knownIntent = (o: string) => INTENT.test(o) || PROJECTS.some((p) => o.toLowerCase().includes(p.title.toLowerCase()));
 
 /** "View PACK details", "See PACK", "Show me PACK" all mean "Open PACK"; "PACK architecture" means "Internals of PACK".
