@@ -1031,5 +1031,220 @@
  {
   "text": "so he does not know hacking",
   "kind": "work"
+ },
+ {
+  "text": "rate his python skills out of 10",
+  "kind": "work",
+  "why": "a rating is a skill question"
+ },
+ {
+  "text": "does he write tests",
+  "kind": "work"
+ },
+ {
+  "text": "what databases has he used",
+  "kind": "work"
+ },
+ {
+  "text": "what's his tech stack for this site",
+  "kind": "work",
+  "why": "about this site"
+ },
+ {
+  "text": "how fast can he learn new things",
+  "kind": "work",
+  "why": "soft skill about his work"
+ },
+ {
+  "text": "is he a team player",
+  "kind": "work",
+  "why": "soft skill about his work"
+ },
+ {
+  "text": "can he lead a team",
+  "kind": "work"
+ },
+ {
+  "text": "has he worked in a startup before",
+  "kind": "work",
+  "why": "his employers"
+ },
+ {
+  "text": "what does novulis do",
+  "kind": "work",
+  "why": "his employer"
+ },
+ {
+  "text": "why did he leave supraja",
+  "kind": "work",
+  "why": "neutral: why a role ended"
+ },
+ {
+  "text": "how senior is he",
+  "kind": "work"
+ },
+ {
+  "text": "is he a good fit for a data scientist role",
+  "kind": "work",
+  "why": "hiring fit"
+ },
+ {
+  "text": "Looking for an AI engineer: Python, LangGraph, RAG, vector DBs, prompt engineering, evals. 1-3 yrs.",
+  "kind": "work",
+  "why": "a job description"
+ },
+ {
+  "text": "can i try finboom",
+  "kind": "work",
+  "why": "demo link"
+ },
+ {
+  "text": "github link for pack",
+  "kind": "work",
+  "why": "source link"
+ },
+ {
+  "text": "where is the source code",
+  "kind": "work"
+ },
+ {
+  "text": "what's his linkedin",
+  "kind": "work",
+  "why": "contact details"
+ },
+ {
+  "text": "can he work remotely",
+  "kind": "work",
+  "why": "location, a hiring question"
+ },
+ {
+  "text": "is he open to freelance work",
+  "kind": "work",
+  "why": "availability"
+ },
+ {
+  "text": "any open source contributions",
+  "kind": "work"
+ },
+ {
+  "text": "does he have a masters",
+  "kind": "work",
+  "why": "education"
+ },
+ {
+  "text": "what mobile apps has he built",
+  "kind": "work"
+ },
+ {
+  "text": "show me his resume",
+  "kind": "work"
+ },
+ {
+  "text": "what languages does he speak",
+  "kind": "work",
+  "why": "answered as not listed, programming languages shown"
+ },
+ {
+  "text": "wat projcts has he biult",
+  "kind": "work",
+  "why": "typos"
+ },
+ {
+  "text": "uska experience kitna hai",
+  "kind": "work",
+  "why": "Hinglish: how much experience does he have"
+ },
+ {
+  "text": "kya usko python aata hai",
+  "kind": "work",
+  "why": "Hinglish: does he know python"
+ },
+ {
+  "text": "roast him",
+  "kind": "playful",
+  "why": "a roast about him as an engineer"
+ },
+ {
+  "text": "what would he do with unlimited time",
+  "kind": "playful"
+ },
+ {
+  "text": "what films does he like",
+  "kind": "personal",
+  "why": "hobbies: the one page outside work answers it"
+ },
+ {
+  "text": "what's his favourite movie",
+  "kind": "personal",
+  "why": "hobbies"
+ },
+ {
+  "text": "does he watch anime",
+  "kind": "personal",
+  "why": "hobbies"
+ },
+ {
+  "text": "what does he do outside work",
+  "kind": "personal",
+  "why": "hobbies"
+ },
+ {
+  "text": "what's the snow leopard thing",
+  "kind": "personal",
+  "why": "a film on his films page; work is also acceptable"
+ },
+ {
+  "text": "how old is this site",
+  "kind": "work",
+  "why": "the site, not his age"
+ },
+ {
+  "text": "what's new on the site",
+  "kind": "work"
+ },
+ {
+  "text": "who are you",
+  "kind": "work",
+  "why": "about this agent"
+ },
+ {
+  "text": "what can you do",
+  "kind": "work",
+  "why": "about this agent"
+ },
+ {
+  "text": "help",
+  "kind": "work",
+  "why": "about this agent; unclear is also acceptable"
+ },
+ {
+  "text": "thanks, that's all",
+  "kind": "small_talk",
+  "why": "a goodbye"
+ },
+ {
+  "text": "yes",
+  "kind": "small_talk",
+  "why": "an acknowledgement with no question"
+ },
+ {
+  "text": "no",
+  "kind": "small_talk",
+  "why": "an acknowledgement with no question"
+ },
+ {
+  "text": "PACK vs FinBoom which is more complex",
+  "kind": "work",
+  "why": "comparison of his projects"
+ },
+ {
+  "text": "tell me more",
+  "kind": "work",
+  "why": "a follow-up about his work"
+ },
+ {
+  "text": "and the stack?",
+  "kind": "work",
+  "why": "a follow-up about his work"
  }
 ]

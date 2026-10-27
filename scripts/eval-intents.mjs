@@ -8,7 +8,9 @@ const key = process.env.OPENROUTER_API_KEY;
 if (!key) { console.log("OPENROUTER_API_KEY not set: skipping the classifier eval"); process.exit(0); }
 const file = new URL("../tests/fixtures/intents.json", import.meta.url);
 if (!existsSync(file)) { console.log("no labelled set at tests/fixtures/intents.json: skipping"); process.exit(0); }
-const cases = JSON.parse(readFileSync(file, "utf8"));
+//   ONLY=regex node scripts/eval-intents.mjs                    only the messages matching it (a local check of new cases)
+const only = process.env.ONLY ? new RegExp(process.env.ONLY, "i") : undefined;
+const cases = JSON.parse(readFileSync(file, "utf8")).filter((c) => !only || only.test(c.text));
 // the kind definitions come from the policy itself, so the eval always tests what production asks
 const src = readFileSync(new URL("../src/agent/behavior.ts", import.meta.url), "utf8");
 const criteria = Object.fromEntries([...src.matchAll(/^\s{2}(\w+): \{\s*(?:\n\s*)?describe: "([^"]+)"/gm)].map((m) => [m[1], m[2]]));
