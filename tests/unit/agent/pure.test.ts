@@ -206,7 +206,7 @@ describe("router (deterministic fallback)", () => {
     expect(text("what has he built with Supabase?")).toBe("3 of his 10 projects match “Supabase”: FinBoom, Campus Premier League, VerseYou.");
     expect(text("projects using Python")).toMatch(/projects match “Python”: .*CCR Compliance Advisor/);
     expect(tools(run("is he good at Java?"))).toContain("open_project(ngo)");
-    expect(text("has he used Pinecone?")).toMatch(/^Yes: RAG and vector search shows in CCR Compliance Advisor\. In CCR Compliance Advisor, sections are embedded/);
+    expect(text("has he used Pinecone?")).toMatch(/^Yes: Pinecone shows in CCR Compliance Advisor \(RAG and vector search\)\. In CCR Compliance Advisor, sections are embedded/);
   });
   it("is never silent and always suggests", () => {
     for (const q of ["write me a pizza poem", "", "????", "मुझे बताओ", "list all work", "contact"]) {

@@ -10,7 +10,7 @@ export const isProjectId = (id: string): boolean => byId.has(id);
 
 export const TOOLKIT: [string, string[]][] = [
   // skills, not vendors: a provider (OpenAI, Gemini) is named inside the skill it serves
-  ["Agents & AI", ["Multi-agent orchestration (LangGraph)", "Tool calling and LLM APIs (Groq, OpenAI, Gemini)", "Model fallback chains", "RAG and vector search (Pinecone)", "Voice agents (LiveKit, Deepgram, Whisper)", "Prompt-injection guards"]],
+  ["Agents & AI", ["Multi-agent orchestration (LangGraph, LangChain)", "Tool calling and LLM APIs (Groq, OpenAI, Gemini)", "Model fallback chains", "RAG and vector search (Pinecone)", "Voice agents (LiveKit, Deepgram, Whisper)", "Prompt-injection guards"]],
   ["Backend & data", ["Python", "FastAPI", "Node.js", "Express", "Java", "Spring Boot", "PostgreSQL", "Supabase", "MongoDB", "REST APIs"]],
   ["Cloud & DevOps", ["Azure App Service", "Azure Functions", "Azure OpenAI & AI services", "Azure DevOps", "Blob Storage & Azure SQL", "Power Platform", "Vercel", "Render", "Docker", "GitHub Actions", "Firebase"]],
   ["Frontend & mobile", ["TypeScript", "Next.js", "React", "Tailwind CSS", "Expo", "React Native", "PWA / offline", "Leaflet"]],
@@ -20,7 +20,7 @@ const TOOL_TERMS: Record<string, RegExp> = {
   "PostgreSQL": /\bpostgres/i, "RAG": /\brag\b|retriev/i, "OpenAI": /(?<!azure )\bopenai\b|gpt-4o/i, "LiveKit Agents": /\blivekit\b/i,
   "Node.js": /\bnode(\.js)?\b/i, "React": /\breact\b(?! native)/i, "Java": /\bjava\b(?!script)/i, "Tailwind CSS": /\btailwind\b/i,
   "PWA / offline": /\bpwa\b|offline-first/i, "REST APIs": /\brest\b/i, "Vercel": /\bvercel\b/i, "Groq": /\bgroq\b|llama/i,
-  "Multi-agent orchestration (LangGraph)": /\blanggraph\b|multi-agent/i, "Tool calling and LLM APIs (Groq, OpenAI, Gemini)": /\b(groq|gemini|gpt-|llama)|(?<!azure )\bopenai\b/i,
+  "Multi-agent orchestration (LangGraph, LangChain)": /\blanggraph\b|\blangchain\b|multi-agent/i, "Tool calling and LLM APIs (Groq, OpenAI, Gemini)": /\b(groq|gemini|gpt-|llama)|(?<!azure )\bopenai\b/i,
   "Model fallback chains": /\bfall(s)? ?back\b|model chain/i, "RAG and vector search (Pinecone)": /\brag\b|retriev|pinecone/i,
   "Voice agents (LiveKit, Deepgram, Whisper)": /\blivekit\b|\bdeepgram\b|\bwhisper\b/i, "Prompt-injection guards": /prompt guard|injection/i,
   // his Novulis work lists the Azure pieces inside one phrase ("Azure (App Service, Functions, …)")

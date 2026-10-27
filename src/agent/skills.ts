@@ -27,7 +27,7 @@ const SAME: [RegExp, string][] = [
   [/^(azure sql|blob storage|blob)$/i, "Blob Storage & Azure SQL"],
   [/^(git ?hub actions|actions|ci\/?cd|ci|cicd)$/i, "GitHub Actions"],
   [/^(llm|llms|llm apis?|openai|gemini|groq|gpt|chatgpt|tool calling|function calling|llama)$/i, "Tool calling and LLM APIs (Groq, OpenAI, Gemini)"],
-  [/^(langgraph|multi.?agent|multi agent systems?|agents?|ai agents?|agent orchestration|orchestration)$/i, "Multi-agent orchestration (LangGraph)"],
+  [/^(langgraph|langchain|lang chain|lang graph|multi.?agent|multi agent systems?|agents?|ai agents?|agent orchestration|orchestration)$/i, "Multi-agent orchestration (LangGraph, LangChain)"],
   [/^(rag|retrieval|vector (search|db|database)|pinecone|embeddings?)$/i, "RAG and vector search (Pinecone)"],
   [/^(voice|voice agents?|voice ai|speech|livekit|deepgram|whisper|stt|tts|text to speech|speech to text)$/i, "Voice agents (LiveKit, Deepgram, Whisper)"],
   [/^(fallbacks?|model fallbacks?|fallback chains?)$/i, "Model fallback chains"],
@@ -36,7 +36,7 @@ const SAME: [RegExp, string][] = [
 
 /** Things not in his toolkit → the closest thing that is, and how to say it. */
 const NEAREST: [RegExp, string, string][] = [
-  [/langchain|llama ?index|crewai|autogen|semantic kernel|haystack|dspy/i, "Multi-agent orchestration (LangGraph)", "he orchestrates agents with LangGraph instead"],
+  [/llama ?index|crewai|autogen|semantic kernel|haystack|dspy/i, "Multi-agent orchestration (LangGraph, LangChain)", "he orchestrates agents with LangGraph and LangChain instead"],
   [/\baws\b|amazon web services|\blambda\b|\bs3\b|\bec2\b|\bgcp\b|google cloud platform/i, "Azure App Service", "his cloud work is on Azure, at Novulis"],
   [/kubernetes|\bk8s\b|helm|terraform|ansible/i, "Docker", "he ships with Docker and GitHub Actions"],
   [/django|flask|express\.?js/i, "FastAPI", "his Python APIs are FastAPI"],
@@ -89,14 +89,16 @@ export interface SkillAnswer { text: string; open?: string; profile?: "events" |
 export function answerSkill(thing: string): SkillAnswer {
   if (isSecurityQ(thing)) return securityAnswer();
   const tool = findTool(thing);
-  const name = tool ? short(tool) : pretty(thing);
+  // "does he know pinecone": the name they asked, when it sits inside the item's brackets, not the item's long title
+  const inside = tool?.match(/\((.*)\)$/)?.[1].split(/,\s*/).find((x) => squash(x) === squash(thing));
+  const name = tool ? (inside ?? short(tool)) : pretty(thing);
   if (tool) {
     const uses = toolUses(tool);
     const projects = uses.filter((u) => u.href.startsWith("#") && u.href !== "#other" && u.href !== "#work").map((u) => projectById(u.href.slice(1))).filter((p): p is Project => !!p);
     const elsewhere = uses.filter((u) => u.href === "#other" || u.href === "#work" || u.href === "/agent").map((u) => (u.href === "#work" ? `his work at ${u.label}` : u.href === "/agent" ? "this agent" : `${u.label} (a side build)`));
     if (projects.length) {
       const [p] = projects, fact = p.facts.find((f) => mentionsTool(f, tool));
-      return { text: `Yes: ${name} shows in ${projects.map((x) => x.title).join(", ")}.${fact ? ` In ${p.title}, ${fact[0].toLowerCase()}${fact.slice(1)}` : ""}${elsewhere.length ? ` Also in ${elsewhere.join(" and ")}.` : ""}`, open: p.id, chips: [...projects.slice(1, 3).map((x) => `Open ${x.title}`), "Everything he’s built", "Get resume"].slice(0, 3) };
+      return { text: `Yes: ${name} shows in ${projects.map((x) => x.title).join(", ")}${inside ? ` (${short(tool)})` : ""}.${fact ? ` In ${p.title}, ${fact[0].toLowerCase()}${fact.slice(1)}` : ""}${elsewhere.length ? ` Also in ${elsewhere.join(" and ")}.` : ""}`, open: p.id, chips: [...projects.slice(1, 3).map((x) => `Open ${x.title}`), "Everything he’s built", "Get resume"].slice(0, 3) };
     }
     if (elsewhere.length) return { text: `${name} is in his toolkit; it shows in ${elsewhere.join(" and ")}, not in his public projects.`, profile: elsewhere.some((e) => e.startsWith("his work")) ? "work" : undefined, chips: ["Everything he’s built", "Get resume", "Why should we hire him?"] };
     return { text: `${name} is in his toolkit, but none of his public projects shows it yet.`, chips: ["Everything he’s built", "Get resume", "What are his gaps?"] };

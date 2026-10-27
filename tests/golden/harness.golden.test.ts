@@ -563,7 +563,8 @@ describe("golden · skills, tools, this agent, and what to ask him", () => {
     const py = await fixed("does he know python");
     expect(py.text).toMatch(/^Yes: Python shows in PACK/);
     const lc = await fixed("Does he know langchain");
-    expect(lc.text).toMatch(/^LangChain isn’t in his toolkit: he orchestrates agents with LangGraph instead, as in PACK\./);
+    expect(lc.text).toMatch(/^Yes: LangChain shows in PACK \(Multi-agent orchestration\)\. In PACK, a LangGraph state machine/); expect(lc.of("panel")[0].panel.id).toBe("pack");
+    expect((await fixed("does he know crewai")).text).toMatch(/^CrewAI isn’t in his toolkit: he orchestrates agents with LangGraph and LangChain instead, as in PACK\./);
     const k8s = await fixed("any kubernetes experience?");
     expect(k8s.text).toMatch(/Kubernetes isn’t in his toolkit/); expect(k8s.text).toMatch(/Kubernetes, AWS/);
     const hw = await fixed("Has he built anything with hardware?");
