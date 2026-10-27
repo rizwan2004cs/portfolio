@@ -6,7 +6,7 @@ import { fitLine, fitRows, roughRequirements } from "./fit";
 import { EVENT_LINES } from "./tools";
 import { eventsIn, profileFocus, projectFilter, REASONING, topicsIn } from "./intent";
 import { BEHAVIOR, ruleKind } from "./behavior";
-import { answerSkill, CERT_Q, certAnswer, INTERVIEW_Q, interviewAnswer, isSecurityQ, LATEST_Q, latestAnswer, securityAnswer, SITE_TECH, siteTechAnswer, skillAsked, skillsOverview, type SkillAnswer } from "./skills";
+import { answerSkill, toolNamed, CERT_Q, certAnswer, INTERVIEW_Q, interviewAnswer, isSecurityQ, LATEST_Q, latestAnswer, securityAnswer, SITE_TECH, siteTechAnswer, skillAsked, skillsOverview, type SkillAnswer } from "./skills";
 // runTool is imported lazily to keep router <-> tools free of a load-order cycle
 import * as tools from "./tools";
 
@@ -145,6 +145,12 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   if (SITE_TECH.test(lastUser) && best.s < 10) return answered(siteTechAnswer(lastUser));
   if (INTERVIEW_Q.test(lastUser) && best.s < 10) return answered(interviewAnswer());
   if (CERT_Q.test(lastUser) && best.s < 10) return answered(certAnswer());
+  // "but it is in Rizwan's work" after "what concepts are there in fastapi": the rebuttal carries the previous turn, so
+  // answer for the tool it named instead of letting a model pick a project
+  if (re(/\b(it|that|this)('?s| is| was|'?s in| in)?\b[^.]*\b(in|on|part of|from) (his|rizwan'?s) (work|resume|cv|projects?|stack|toolkit|skills?|experience)\b/) && best.s < 10) {
+    const named = toolNamed(lastUser);
+    if (named) return answered(answerSkill(named));
+  }
   const asked = skillAsked(lastUser);
   // "does he know Docker?" yes; "is he good at body parsing in FastAPI?" is for the model (more than a name)
   if (asked && (isSecurityQ(asked) || (best.s < 10 && asked.split(/\s+/).length <= 3))) return answered(answerSkill(asked));

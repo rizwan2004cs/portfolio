@@ -98,7 +98,7 @@ export function answerSkill(thing: string): SkillAnswer {
     const elsewhere = uses.filter((u) => u.href === "#other" || u.href === "#work" || u.href === "/agent").map((u) => (u.href === "#work" ? `his work at ${u.label}` : u.href === "/agent" ? "this agent" : `${u.label} (a side build)`));
     if (projects.length) {
       const [p] = projects, fact = p.facts.find((f) => mentionsTool(f, tool));
-      return { text: `Yes: ${name} shows in ${projects.map((x) => x.title).join(", ")}${inside ? ` (${short(tool)})` : ""}.${fact ? ` In ${p.title}, ${fact[0].toLowerCase()}${fact.slice(1)}` : ""}${elsewhere.length ? ` Also in ${elsewhere.join(" and ")}.` : ""}`, open: p.id, chips: [...projects.slice(1, 3).map((x) => `Open ${x.title}`), "Everything he’s built", "Get resume"].slice(0, 3) };
+      return { text: `Yes: ${name} shows in ${projects.map((x) => x.title).join(", ")}${inside ? ` (${short(tool)})` : ""}.${fact ? ` In ${p.title}, ${fact[0].toLowerCase()}${fact.slice(1)}` : ` ${p.title}: ${p.oneLiner}`}${elsewhere.length ? ` Also in ${elsewhere.join(" and ")}.` : ""}`, open: p.id, chips: [...projects.slice(1, 3).map((x) => `Open ${x.title}`), "Everything he’s built", "Get resume"].slice(0, 3) };
     }
     if (elsewhere.length) return { text: `${name} is in his toolkit; it shows in ${elsewhere.join(" and ")}, not in his public projects.`, profile: elsewhere.some((e) => e.startsWith("his work")) ? "work" : undefined, chips: ["Everything he’s built", "Get resume", "Why should we hire him?"] };
     return { text: `${name} is in his toolkit, but none of his public projects shows it yet.`, chips: ["Everything he’s built", "Get resume", "What are his gaps?"] };
@@ -184,14 +184,33 @@ export const CERT_Q = /\b(certif\w*|courses?|badges?|credentials?|hackerrank|lin
 export const certAnswer = (): SkillAnswer => ({ text: `Certifications: ${CERTS.map(([c, y]) => `${c}${y ? ` (${y})` : ""}`).join("; ")}.`, profile: "work", chips: ["Everything he’s built", "Get resume", "Why should we hire him?"] });
 
 /** A refusal that names a tool he does use turns into a pointer: "what is Docker?" → where Docker shows in his work. */
+/** The one toolkit item a sentence names outright ("what concepts are there in fastapi" → FastAPI), or none. Only whole
+ *  names count, never a word that happens to sit inside one, so "work" never becomes a framework. */
+export function toolNamed(text: string): string | undefined {
+  const words = text.toLowerCase().replace(/[^a-z0-9+#.\s-]/g, " ").split(/\s+/).filter((w) => w.length >= 2 && !STOP.has(w));
+  const grams = [...words.map((w, i) => `${w} ${words[i + 1] ?? ""}`.trim()), ...words];
+  for (const g of grams) {
+    const same = SAME.find(([re]) => re.test(g))?.[1];
+    if (same && !/^(rest|apis?|rest apis?|offline|actions|ci|safety|injection|speech|voice|agents?|orchestration|retrieval|embeddings?|fallbacks?|guards?)$/i.test(g)) return same;
+    const sq = squash(g), exact = ALL_TOOLS.find((x) => squash(x) === sq || squash(short(x)) === sq);
+    if (exact) return exact;
+  }
+  return undefined;
+}
+const STOP = new Set(["the", "and", "for", "with", "what", "whats", "how", "does", "did", "is", "are", "was", "were", "in", "on", "of", "to", "me", "it", "its", "his", "he", "do", "you", "can", "about", "there", "this", "that", "work", "rizwan", "rizwans", "but", "not", "know", "use", "used", "using", "tell", "explain", "concepts", "concept", "basics", "learn", "teach", "tutorial", "example", "examples", "all", "any", "some", "also"]);
+
+/** A visitor asking what a tool *is* ("what is docker", "what concepts are there in fastapi", "how does node.js work")
+ *  gets no lesson, but is pointed at where he uses it. Undefined when the message names no tool of his. */
 export function toolMentioned(text: string): string | undefined {
-  const t = text.replace(/^(what|whats|what'?s|explain|define|tell me about|describe)\s+(is|are|does|do)?\s*(a|an|the)?\s*/i, "").replace(/[?.!]+$/, "").trim();
-  if (t.split(/\s+/).length > 4) return undefined;
-  const tool = findTool(t);
+  if (text.trim().split(/\s+/).length > 12) return undefined;
+  const tool = toolNamed(text);
   if (!tool) return undefined;
-  const uses = toolUses(tool).filter((u) => u.href.startsWith("#") && u.href !== "#other" && u.href !== "#work").map((u) => u.label);
+  const all = toolUses(tool), uses = all.filter((u) => u.href.startsWith("#") && u.href !== "#other" && u.href !== "#work").map((u) => u.label);
+  const elsewhere = all.filter((u) => u.href === "#other" || u.href === "#work").map((u) => (u.href === "#work" ? `his work at ${u.label}` : `${u.label}, a side build`));
   const name = short(tool);
-  return uses.length ? `I don’t explain ${name} itself, but he uses it in ${uses.slice(0, 2).join(" and ")}. Ask what he did with it there.` : `I don’t explain ${name} itself; it’s in his toolkit, from his work at Novulis.`;
+  return uses.length ? `I don’t explain ${name} itself, but he uses it in ${uses.slice(0, 2).join(" and ")}. Ask what he did with it there.`
+    : elsewhere.length ? `I don’t explain ${name} itself, but it shows in ${elsewhere.slice(0, 2).join(" and ")}. Ask what he did with it there.`
+    : `I don’t explain ${name} itself; it’s in his toolkit, though none of his public work shows it yet.`;
 }
 
 export const toolShort = short;

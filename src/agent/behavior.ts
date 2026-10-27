@@ -34,7 +34,11 @@ export interface Behavior {
 /** A refusal shouldn't dead-end: each one ends with a different way in, chosen by the message so the same question
  *  always gets the same line (tests stay exact) while a run of refusals doesn't read as one stuck reply. */
 const HOOKS = ["Ask what his superpower is.", "Paste a job description and I’ll map it to his work.", "Try to break me: take the model offline and ask again.", "Ask which project shows what he’s best at."];
-export const hooked = (base: string, text: string) => `${base} ${HOOKS[[...text].reduce((n, ch) => n + ch.charCodeAt(0), 0) % HOOKS.length]}`;
+export const hooked = (base: string, text: string) => {
+  // a hook the base line already makes ("paste a job description") would read twice, so it is left out
+  const pool = HOOKS.filter((h) => !(/job description/i.test(h) && /job description/i.test(base)));
+  return `${base} ${pool[[...text].reduce((n, ch) => n + ch.charCodeAt(0), 0) % pool.length]}`;
+};
 
 export const BEHAVIOR: Record<Kind, Behavior> = {
   work: { describe: "About his work: projects, code and architecture, skills, experience, education, prizes, hiring fit or a pasted job description, availability, notice period, salary, location, his resume or contact details, or how this site and its agent work. Words like relationship, body, age, family, partner, fitness or look are work when they refer to his projects, code or career", chips: WORK_CHIPS },

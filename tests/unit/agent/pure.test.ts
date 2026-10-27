@@ -311,3 +311,28 @@ describe("answer formatting", () => {
     expect(answerHtml("<img src=x onerror=alert(1)>")).not.toContain("<img");
   });
 });
+
+describe("what a tool is, and 'but it is in his work'", () => {
+  it("points a 'what is X' or 'concepts in X' question at where he uses X, and names no tool from a stray word", async () => {
+    const { toolMentioned, toolNamed } = await import("@/agent/skills");
+    expect(toolMentioned("What concepts are there in fastapi")).toMatch(/^I don’t explain FastAPI itself, but he uses it in /);
+    expect(toolMentioned("how does node.js work")).toMatch(/^I don’t explain Node\.js itself, but it shows in Wanderlust, a side build/);
+    expect(toolMentioned("What is docker")).toMatch(/^I don’t explain Docker itself, but he uses it in NGO Donor Matcher/);
+    expect(toolMentioned("How to add two numbers.")).toBeUndefined();
+    expect(toolMentioned("But it is in Rizwan's work")).toBeUndefined();
+    expect(toolNamed("does his work hold up")).toBeUndefined();
+  });
+  it("a rebuttal that points back at the previous turn's tool answers for that tool", () => {
+    const evs: AgentEvent[] = []; router("What concepts are there in fastapi But it is in Rizwan's work", (e) => evs.push(e));
+    expect(evs.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ")).toMatch(/^Yes: FastAPI shows in PACK, PULSEVO\. PACK: /);
+    expect(evs.some((e) => e.type === "tool" && e.name === "open_project")).toBe(true);
+  });
+  it("a refusal never repeats the way in its base line already gives", async () => {
+    const { hooked } = await import("@/agent/behavior");
+    const { PERSONAL_REPLY } = await import("@/agent/scope");
+    for (const q of ["His dob", "is he married?", "Tell me your friends names", "what is his age", "where does he live"]) {
+      const out = hooked(PERSONAL_REPLY, q);
+      expect(out.match(/job description/g)?.length ?? 0).toBeLessThanOrEqual(1);
+    }
+  });
+});
