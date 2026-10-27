@@ -6,7 +6,7 @@ import { fitLine, fitRows, roughRequirements } from "./fit";
 import { EVENT_LINES } from "./tools";
 import { eventsIn, profileFocus, projectFilter, REASONING, topicsIn } from "./intent";
 import { BEHAVIOR, ruleKind } from "./behavior";
-import { answerSkill, toolNamed, CERT_Q, certAnswer, INTERVIEW_Q, interviewAnswer, isSecurityQ, LATEST_Q, latestAnswer, securityAnswer, SITE_TECH, siteTechAnswer, skillAsked, skillsOverview, type SkillAnswer } from "./skills";
+import { answerSkill, toolNamed, CERT_Q, DB_Q, dbAnswer, LEARN_Q, learnAnswer, TEST_Q, testsAnswer, certAnswer, INTERVIEW_Q, interviewAnswer, isSecurityQ, LATEST_Q, latestAnswer, securityAnswer, SITE_TECH, siteTechAnswer, skillAsked, skillsOverview, type SkillAnswer } from "./skills";
 // runTool is imported lazily to keep router <-> tools free of a load-order cycle
 import * as tools from "./tools";
 
@@ -125,7 +125,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   }
   // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
   if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && !topicsIn(lastUser).length && !profileFocus(lastUser)
-    && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything|certif\w*|courses?|badges?|interview|lately|latest|guard\w*|security|hack\w*|tools?|tech\w*|languages?|frameworks?)\b/)) {
+    && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything|certif\w*|courses?|badges?|interview|lately|latest|guard\w*|security|hack\w*|tools?|tech\w*|languages?|frameworks?|tests?|testing|databases?|learn\w*)\b/)) {
     say(BEHAVIOR.unclear.reply!(lastUser)); // never repeats the word back
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
   }
@@ -168,6 +168,9 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   if (SITE_TECH.test(lastUser) && best.s < 10) return answered(siteTechAnswer(lastUser));
   if (INTERVIEW_Q.test(lastUser) && best.s < 10) return answered(interviewAnswer());
   if (CERT_Q.test(lastUser) && best.s < 10) return answered(certAnswer());
+  if (TEST_Q.test(lastUser) && !re(/\b(ctf|a test|test (him|me)|interview|hackathon)\b/) && (best.s < 10 || clear)) return answered(testsAnswer(clear ? best.p : undefined));
+  if (DB_Q.test(lastUser) && best.s < 10 && re(/\b(what|which|has|does|know|used?|his|list|experience)\b/)) return answered(dbAnswer());
+  if (LEARN_Q.test(lastUser) && best.s < 10 && !re(/\b(project|agent|model)s?\b.*\b(learn|adapt)/)) return answered(learnAnswer());
   // "but it is in Rizwan's work" after "what concepts are there in fastapi": the rebuttal carries the previous turn, so
   // answer for the tool it named instead of letting a model pick a project
   if (re(/\b(it|that|this)('?s| is| was|'?s in| in)?\b[^.]*\b(in|on|part of|from) (his|rizwan'?s) (work|resume|cv|projects?|stack|toolkit|skills?|experience)\b/) && best.s < 10) {
