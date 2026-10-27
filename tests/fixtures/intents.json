@@ -888,5 +888,45 @@
   "text": "nice site",
   "kind": "small_talk",
   "why": "compliment"
+ },
+ {
+  "text": "If Rizwan were a super hero what's his super power?",
+  "kind": "playful",
+  "accept": [
+   "work"
+  ],
+  "why": "playful but about his work: answered lightly from his facts"
+ },
+ {
+  "text": "what's his spirit animal?",
+  "kind": "playful",
+  "accept": [
+   "work"
+  ],
+  "why": "playful but about his work: answered lightly from his facts"
+ },
+ {
+  "text": "describe him in three words",
+  "kind": "playful",
+  "accept": [
+   "work"
+  ],
+  "why": "playful but about his work: answered lightly from his facts"
+ },
+ {
+  "text": "what would he build with unlimited time?",
+  "kind": "playful",
+  "accept": [
+   "work"
+  ],
+  "why": "playful but about his work: answered lightly from his facts"
+ },
+ {
+  "text": "what's his secret weapon as an engineer?",
+  "kind": "playful",
+  "accept": [
+   "work"
+  ],
+  "why": "playful but about his work: answered lightly from his facts"
  }
 ]

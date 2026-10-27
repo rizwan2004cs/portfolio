@@ -532,3 +532,25 @@ describe("golden · empty replies and the hiring question", () => {
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/strongest evidence is PACK/);
   });
 });
+
+describe("golden · playful questions get a playful answer, from his work", () => {
+  const kindIs = (kind: string) => async () => ({ kind: kind as never, confidence: 0.95, source: "model" as const, note: `${kind} · 0.95` });
+  it("'what's his superpower?' reaches the model with the playful tone, and a grounded answer survives", async () => {
+    const m = scripted("a", [say("His superpower is building AI agents that keep running when a model fails, like PACK with its four-step model fallback.", call("open_project", { id: "pack" }), call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["If Rizwan were a super hero what's his super power?"] }, [m], undefined, undefined, kindIs("playful"));
+    expect(r.meta.mode).toBe("model");
+    expect(String(m.calls[0][0].content)).toMatch(/playful question/);
+    expect(r.text).toMatch(/superpower/i); expect(r.of("panel").map((p) => p.panel.id)).toEqual(["pack"]);
+    assertHealthy(r);
+  });
+  it("with every model down, the router still answers in the same spirit", async () => {
+    const r = await turn({ turns: ["what's his superpower?"] }, [scripted("a", [new Error("down")])]);
+    expect(r.text).toMatch(/^His superpower/); expect(r.of("panel")[0].panel.id).toBe("pack");
+    expect((await turn({ turns: ["describe him in three words"] }, [scripted("a", [new Error("down")])])).text).toMatch(/^Reliable, grounded, relentless/);
+    expect((await turn({ turns: ["what's his kryptonite?"] }, [scripted("a", [new Error("down")])])).text).toMatch(/^His kryptonite: free-tier rate limits/);
+  });
+  it("private questions dressed up as playful stay private", async () => {
+    const r = await turn({ turns: ["what's his superpower in bed"] }, [never()], undefined, undefined, kindIs("personal"));
+    expect(r.of("panel")).toHaveLength(0); expect(r.meta.mode).toBe("scope");
+  });
+});

@@ -77,6 +77,7 @@ export function mountAgent(shell: HTMLElement): () => void {
       ...(focus ? [focus.sims?.length ? `How does ${focus.title} handle failures?` : "", focus.pipeline.length && !shown.has("arch:" + focus.id) ? `Internals of ${focus.title}` : "", related ? `Open ${related.title}` : ""] : []),
       fresh ? `Open ${fresh.title}` : "",
       !shown.has("profile") && !shown.has("events") ? "Has he won anything?" : "",
+      said.length >= 2 && !asked.has(norm("What’s his superpower?")) ? "What’s his superpower?" : "",
       said.length >= 3 && !down && !q("#kill").classList.contains("used") ? "Take the model offline" : "", // only to visitors who haven't tried it
 
       "Everything he’s built", "How does this site work?", "Get resume", "Contact Rizwan",

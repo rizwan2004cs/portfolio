@@ -103,6 +103,14 @@ export function router(lastUser: string, emit: Emit): void {
   if (clear) { say(bestFact([...(/hackathon|event|prize|\bwon\b|built at|build at|impact lab|monad|terralogic|murf|devfest|ctf|superteam/i.test(lastUser) ? EVENT_LINES : []), ...best.p.facts], lastUser, best.p.title) ?? `Here’s ${best.p.title}: ${best.p.oneLiner[0].toLowerCase()}${best.p.oneLiner.slice(1)}`); call("open_project", { id: best.p.id, view: deep && best.p.pipeline.length ? "architecture" : "card" }); call("suggest", { options: ctxNext(best.p) }); return; }
   if (deep) { say("Start with the internals of one agent."); call("open_project", { id: "pack", view: "architecture" }); call("suggest", { options: ["Internals of CCR Compliance Advisor", "How does this site work?"] }); return; }
   if (re(/\b(built|projects?|work|everything|shipped|another)\b/) || best.s >= 2) { say("Everything he’s shipped."); call("list_projects"); call("suggest", { options: ["How does this site work?", "Get resume"] }); return; }
+  // "what's his superpower?" with every model down: a fixed playful line, every word of it from his work
+  if (ruleKind(lastUser) === "playful") {
+    say(re(/kryptonite|weakness|weak spot/) ? "His kryptonite: free-tier rate limits. Which is exactly why everything he builds has a fallback, like PACK’s four-step model chain."
+      : re(/\bwords?\b/) ? "Reliable, grounded, relentless. PACK keeps seven agents playing through model failures, and CCR cites a source for every claim."
+      : re(/pitch|tagline|one[- ]liner|sell/) ? "An AI engineer who builds agents that don’t fall over: PACK, CCR Compliance Advisor and FinBoom each keep working when a model doesn’t."
+      : "His superpower: building AI agents that don’t fall over. PACK keeps a seven-agent game running through a four-step model fallback, and CCR cites a source for every claim.");
+    call("open_project", { id: "pack" }); call("suggest", { options: ["Internals of PACK", "Why should we hire him?", "Everything he’s built"] }); return;
+  }
   say("Outside my lane. Closest thing I can show you is everything he’s built.");
   call("suggest", { options: DEFAULT_NEXT });
 }

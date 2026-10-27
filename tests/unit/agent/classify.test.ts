@@ -26,7 +26,12 @@ describe("the outer agent", () => {
     expect(decide({ kind: "unclear", confidence: 0.9, source: "model", note: "" })).toBe("unclear");
   });
   it("every non-work kind has a reply and chips; the rules cover the offline basics", () => {
-    for (const k of KINDS.filter((k) => k !== "work")) { expect(BEHAVIOR[k].reply?.("x")).toBeTruthy(); expect(BEHAVIOR[k].chips.length).toBeGreaterThan(0); }
+    // a kind either answers with a fixed line or goes to the model; only playful carries its own tone there
+    for (const k of KINDS) { expect(!!BEHAVIOR[k].reply || k === "work" || !!BEHAVIOR[k].tone).toBe(true); expect(BEHAVIOR[k].chips.length).toBeGreaterThan(0); }
+    expect(BEHAVIOR.playful.reply).toBeUndefined();
+    expect(ruleKind("If Rizwan were a super hero what's his super power?")).toBe("playful");
+    expect(ruleKind("describe him in three words")).toBe("playful");
+    expect(ruleKind("is he gay")).toBe("personal");
     expect(ruleKind("I'm his friend")).toBe("visitor_intro");
     expect(ruleKind("who am i ?")).toBe("about_visitor");
     expect(ruleKind("what is the relationship between PACK and CCR?")).toBe("work");

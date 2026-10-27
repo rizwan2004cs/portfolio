@@ -7,7 +7,7 @@ import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
 import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
-import { BEHAVIOR, ruleKind } from "./behavior";
+import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind } from "./behavior";
 import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
@@ -114,7 +114,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal, input.turns.at(-2)));
   const kind = decide(sorted);
   emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
-  if (kind !== "work") {
+  if (BEHAVIOR[kind].reply) {
     emit({ type: "trace", step: "policy", detail: `${kind} · fixed reply from the behaviour policy, no model, no panel · 0 tokens`, level: "info" });
     emit({ type: "text", text: BEHAVIOR[kind].reply!(last) });
     emit({ type: "suggest", options: BEHAVIOR[kind].chips });
@@ -215,7 +215,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   if (!deps.models.length) { emit({ type: "trace", step: "model", detail: "no model configured", level: "err" }); return fallbackToRouter(ROUTER); }
 
   const base: ChatMessage[] = [
-    { role: "system", content: SYSTEM + (input.shown.length ? `\nAlready on screen: ${input.shown.join(", ")}.` : "") },
+    { role: "system", content: SYSTEM + (input.shown.length ? `\nAlready on screen: ${input.shown.join(", ")}.` : "") + (BEHAVIOR[kind].tone ? `\n${BEHAVIOR[kind].tone}` : "") },
     ...turns.map((t) => ({ role: "user" as const, content: t })),
   ];
 
@@ -228,6 +228,8 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // facts of projects the visitor already has on screen are fair sources for follow-ups ("what vector DB does it use?")
   // the model was given every fact, so every fact is a fair source; number, prize and scope checks stay relational
   let source = `${ALL_FACTS_SOURCE} ${KNOWLEDGE} ${onScreen.map((p) => `${p.facts.join(" ")} ${p.stack.join(" ")}`).join(" ")}`;
+  // a playful answer may use the question's own framing ("his superpower is…"): those words are the visitor's, not claims
+  if (kind === "playful") source += ` ${last} superpower super power superhero hero spirit animal secret weapon kryptonite vibe tagline motto pitch words describe character would be like rate limits free tier ${PLAYFUL_IMAGES.join(" ")} ${PLAYFUL_WORDS.join(" ")}`;
   const texts: string[] = [];
   const t0 = Date.now();
   // keys still resting from an earlier rate limit are skipped without a call: one quiet line, not a red row each;

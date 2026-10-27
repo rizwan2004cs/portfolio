@@ -15,7 +15,7 @@ const ASKS: Partial<Record<ToolName, [RegExp, string]>> = {
 const SITE_Q = /\b(this (site|agent|portfolio|chat)|the site|how (do|does) you work|your (model|harness|guard))\b/i;
 export const ABOUT_HIM = /\b(won|win|wins|prizes?|awards?|achiev\w*|hackathons?|events?|competitions?|contests?|educat\w*|stud(y|ied|ies)|college|university|degree|cgpa|gpa|grades?|based|located|location|who is (?:he|rizwan|syed)|background|intern\w*|job|employer|company|works? at|currently|where (?:does|did) he work|novulis|supraja|employ\w*)\b/i;
 
-const WORK_Q = /\b(built|build|made|projects?|work|portfolio|shipped|apps?|experience|skills?|stack|hire|role|job|tech\w*|engineer\w*|cod(e|ing)|develop\w*|program\w*|strong\w*|best|good at|ai|agents?|rag|llm\w*|backend|frontend|full.?stack|systems?|fail\w*|architecture|internals?|example|show)\b/i;
+const WORK_Q = /\b(super ?power|super ?hero|spirit animal|secret weapon|three words|describe him|kryptonite|avenger|pitch|tagline|vibe|motto|in \w+ words|built|build|made|projects?|work|portfolio|shipped|apps?|experience|skills?|stack|hire|role|job|tech\w*|engineer\w*|cod(e|ing)|develop\w*|program\w*|strong\w*|best|good at|ai|agents?|rag|llm\w*|backend|frontend|full.?stack|systems?|fail\w*|architecture|internals?|example|show)\b/i;
 
 /** Every model tool call passes through here before anything reaches the visitor. */
 export function checkToolCall(call: { name: string; args: Record<string, unknown> }, ctx: { last: string; subject?: string; shown: string[]; openedThisRun: Set<string> }): Decision {
