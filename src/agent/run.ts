@@ -112,7 +112,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // a follow-up points back ("how does it handle failures?", "tell me more about that"); "projects that use AI" does not:
   // "that"/"this" only count in short messages, and never right after a noun as a relative pronoun
   // a bare "why?", "and the stack?", "tell me more" after a project is about that project too
-  const refersBack = /\b(it|its|they|them|their)\b/i.test(last) || (last.split(/\s+/).length <= 7 && /\b(this|that)\b/i.test(last) && !/\b\w+s? that\b/i.test(last.replace(/\b(about|on|of|with|is|was)\s+that\b/gi, "")))
+  const refersBack = /\b(it|its|they|them|their)\b/i.test(last) || (last.split(/\s+/).length <= 7 && /\b(this|that|those|these)\b/i.test(last) && !/\b\w+s? that\b/i.test(last.replace(/\b(about|on|of|with|is|was)\s+that\b/gi, "")))
     || /^\s*(why|how|how so|when|where|which one|and|so|more|tell me more|go on|elaborate|details?|more details|really|ok and|and then|what else)\s*[?!.]*$/i.test(last) || /^\s*(and|so|but)\s+(the|its|his|what|how|why)\b/i.test(last);
   const subject = input.turns.length > 1 && !clearPick(last) && refersBack ? `${input.turns.at(-2)} ${last}` : last;
   // the project the visitor is talking about: named now, or named in the turn a pronoun points back to

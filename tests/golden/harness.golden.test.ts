@@ -438,7 +438,7 @@ describe("golden · life outside work, and projects nobody asked about", () => {
   it("fitness, sports and hobbies get one honest line and no panel", async () => {
     for (const q of ["does he do weighlfting", "does he do body weightlifting", "does he go to the gym?", "what are his hobbies?", "does he play cricket"]) {
       const r = await turn({ turns: [q] }, [never()]);
-      expect(r.text).toMatch(/stick to his work/); expect(r.of("panel")).toHaveLength(0);
+      expect(r.text).toMatch(/stick to his work|isn’t on the site\. Two things outside work/); expect(r.of("panel")).toHaveLength(0);
     }
     const app = await turn({ turns: ["did he build a fitness app?"] }, [scripted("a", [say("None of his projects is a fitness app.", call("suggest", { options: ["x"] }))])]);
     expect(app.text).not.toMatch(/stick to his work/);
@@ -788,5 +788,33 @@ describe("golden · ratings, seniority, leadership, startups, role fit, skill-li
   it("'roast him' gets a roast built from facts, no model", async () => {
     const r = await fixed("roast him");
     expect(r.text).toMatch(/^A roast, from the record: /); expect(r.meta.mode).toBe("facts"); expect(r.of("panel")[0].panel.id).toBe("pack");
+  });
+});
+
+describe("golden · films, outside work, and how old this site is", () => {
+  const fixed = async (q: string[]) => turn({ turns: q }, [never()]);
+  it("'what films does he like' lists them by theme from the films page", async () => {
+    const r = await fixed(["what films does he like"]);
+    expect(r.text).toMatch(/^7 films and a series shaped how he works, grouped by what they gave him: reinventing yourself and taking the leap \(The Intern, Begin Again, We Bought a Zoo\); .*\. His note on each, with posters, is at \/films\.$/);
+    expect(r.meta.mode).toBe("scope");
+    expect((await fixed(["what's his favourite movie"])).text).toMatch(/^He doesn’t rank them\. 7 films/);
+    expect((await fixed(["what films does he like", "why those"])).text).toMatch(/^7 films and a series/);
+  });
+  it("one film, or 'the snow leopard thing', gets his note on it", async () => {
+    const r = await fixed(["what's the snow leopard thing"]);
+    expect(r.text).toMatch(/^The Secret Life of Walter Mitty \(2013\), under “Soul-searching and a life refresh”: It was within us all along\. .*“Beautiful things don’t ask for attention\.” The rest of the list is at \/films\.$/);
+    expect((await fixed(["why whiplash?"])).text).toMatch(/^Whiplash \(2014\), under “Chasing greatness and pushing your limits”: Great is never quite enough\./);
+    expect((await fixed(["has he seen Silo"])).text).toMatch(/^Silo \(2023\)/);
+  });
+  it("'what does he do outside work' and 'does he watch anime' answer from the site, not his job", async () => {
+    expect((await fixed(["what does he do outside work"])).text).toMatch(/^I stick to his work\. Two things outside it are on the site/);
+    expect((await fixed(["does he watch anime"])).text).toMatch(/^Anime isn’t on the site\. Two things outside work are: he writes poetry/);
+    expect((await fixed(["does he play cricket"])).text).toMatch(/^Cricket isn’t on the site\./);
+  });
+  it("'how old is this site' gives the sitemap date and what the site is", async () => {
+    const r = await fixed(["how old is this site"]);
+    expect(r.text).toMatch(/^This site’s content was last updated on \d{1,2} \w{3} \d{4}, the date its sitemap carries\. It’s one of his 2026 projects: Next\.js on Vercel, with this agent on top\./);
+    expect(r.of("panel")[0].panel.kind).toBe("harness");
+    expect((await fixed(["what's new on the site"])).text).toMatch(/^This site’s content was last updated/);
   });
 });

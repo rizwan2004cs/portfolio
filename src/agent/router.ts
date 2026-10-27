@@ -2,6 +2,8 @@ import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, mentionsTool, PROJ
 import type { Project } from "@/content/types";
 import type { Experience } from "@/content/data";
 import RESUME from "@/content/resume.json";
+import { isFilmQ, outsideAnswer, SITE_AGE_Q, siteAgeAnswer } from "./outside";
+import { lifestyle, personal } from "./scope";
 import type { Emit } from "./types";
 import { bestFact } from "./grounding";
 import { fitLine, fitRows, roughRequirements } from "./fit";
@@ -125,6 +127,11 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   if (kind === "small_talk" || kind === "about_visitor" || kind === "visitor_intro") {
     say(BEHAVIOR[kind].reply!(lastUser)); call("suggest", { options: BEHAVIOR[kind].chips }); return true;
   }
+  // "what films does he like?", "what does he do outside work?": the one page outside his work, answered from it
+  if ((lifestyle(lastUser) && !personal(lastUser)) || isFilmQ(lastUser)) {
+    say(outsideAnswer(lastUser)); call("suggest", { options: ["Open VerseYou", "Everything he’s built", "What’s his superpower?"] }); return true;
+  }
+  if (SITE_AGE_Q.test(lastUser)) { say(siteAgeAnswer()); call("show_harness"); call("suggest", { options: ["How does this site work?", "Everything he’s built", "Get resume"] }); return true; }
   // "roast him": one roast, every line a fact, so a model never has to decline it
   if (re(/\broast\b/) && re(/\b(him|rizwan|his)\b/)) {
     say("A roast, from the record: he builds more fallbacks than most people build features, his models all live on free tiers so his real specialty is surviving rate limits, and he spent a weekend teaching seven AI agents to lie to each other in PACK. Then he put a kill switch on his own portfolio so visitors can watch it keep answering without him.");
