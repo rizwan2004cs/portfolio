@@ -757,3 +757,36 @@ describe("golden · the companies, why a role ended, intern versus now", () => {
     expect(r.text).toMatch(/^Software Engineering Intern \(R&D\) at Novulis Consulting, Mar – May 2026: .* Then Associate Software Engineer \(R&D\) at Novulis Consulting, Jun 2026 – now:/);
   });
 });
+
+describe("golden · ratings, seniority, leadership, startups, role fit, skill-list JDs", () => {
+  const fixed = async (q: string) => turn({ turns: [q] }, [never()]);
+  it("a skills list with a role word is a job description, not the Prompt to Production event", async () => {
+    const r = await fixed("Looking for an AI engineer: Python, LangGraph, RAG, vector DBs, prompt engineering, evals. 1-3 yrs.");
+    expect(r.text).not.toMatch(/Paytm|Prompt to Production/); expect(r.of("tool").some((e) => e.name === "match_role")).toBe(true);
+  });
+  it("'rate his python out of 10' gives evidence, not a number", async () => {
+    const r = await fixed("rate his python skills out of 10");
+    expect(r.text).toMatch(/^No scores here, only evidence\. Yes: Python shows in /); expect(r.meta.mode).toBe("facts");
+  });
+  it("'how senior is he' is the experience line plus his title", async () => {
+    const r = await fixed("how senior is he");
+    expect(r.text).toMatch(/^He has been full-time at Novulis Consulting since June 2026 .* His title is Associate Software Engineer \(R&D\); the call on seniority is yours, from the work\./);
+  });
+  it("'can he lead a team' shows the teams and the resume's leadership line", async () => {
+    const r = await fixed("can he lead a team");
+    expect(r.text).toMatch(/^His write-up shows team work rather than a management title: .*PACK.*His resume lists IEEE Student Branch, NBKRIST — Finance Team Lead \(2025 – 2026\), Treasurer \(2024 – 2025\)\. Whether he can lead yours is a question for him\./);
+  });
+  it("'has he worked in a startup' names his employers and what the write-up doesn't say", async () => {
+    const r = await fixed("has he worked in a startup before");
+    expect(r.text).toMatch(/^His employers so far: Novulis Consulting and Supraja Technologies\. His write-up describes his roles there, not what kind of companies they are/);
+  });
+  it("'fit for a data scientist role' with nothing pasted asks for the requirements and says where his work sits", async () => {
+    const r = await fixed("is he a good fit for a data scientist role");
+    expect(r.text).toMatch(/^Paste the role’s requirements and I’ll map each one to his work\. One thing up front: his work is applied LLM engineering/);
+    expect((await fixed("would he fit a devops role")).text).toMatch(/^Paste the role’s requirements and I’ll map each one to his work\. His strongest evidence: PACK/);
+  });
+  it("'roast him' gets a roast built from facts, no model", async () => {
+    const r = await fixed("roast him");
+    expect(r.text).toMatch(/^A roast, from the record: /); expect(r.meta.mode).toBe("facts"); expect(r.of("panel")[0].panel.id).toBe("pack");
+  });
+});
