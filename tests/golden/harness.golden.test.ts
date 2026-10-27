@@ -623,3 +623,30 @@ describe("golden · demo, live and source links come from the write-ups", () => 
     expect((await fixed(["which ones can i try right now"])).text).toMatch(/^Try them live:/);
   });
 });
+
+describe("golden · recruiter logistics: contact, location, freelance, production", () => {
+  const fixed = async (q: string) => turn({ turns: [q] }, [never()]);
+  it("socials and contact details go through the approval, never 'doesn't cover that'", async () => {
+    for (const q of ["what's his linkedin", "his email?", "how can I reach him"]) {
+      const r = await fixed(q);
+      expect(r.text).toMatch(/^His LinkedIn, GitHub, email and phone are on his profile, shown once you approve\./);
+      expect(r.of("tool").some((e) => e.name === "offer_contact")).toBe(true); expect(r.meta.mode).toBe("facts");
+    }
+  });
+  it("remote and relocation say where he is and leave the rest to him", async () => {
+    const r = await fixed("can he work remotely");
+    expect(r.text).toMatch(/^He’s in Bengaluru, Associate Software Engineer \(R&D\) at Novulis Consulting \(Jun 2026 – now\); his Novulis Consulting internship before that was remote\. Remote, hybrid or relocation is his call/);
+    expect(r.of("tool").some((e) => e.name === "offer_contact")).toBe(true);
+    expect((await fixed("will he relocate to Hyderabad?")).text).toMatch(/^He’s in Bengaluru/);
+  });
+  it("freelance and contract questions get the availability line, not a model guess", async () => {
+    expect((await fixed("is he open to freelance work")).text).toMatch(/^This site doesn’t say; ask him directly\./);
+    expect((await fixed("part-time contract work?")).text).toMatch(/^This site doesn’t say/);
+  });
+  it("'experience with production systems' is about deployments, not the Prompt to Production event", async () => {
+    const r = await fixed("does he have any experience with production systems");
+    expect(r.text).toMatch(/^6 of his projects are deployed and live: CCR Compliance Advisor, FinBoom, Campus Premier League, VerseYou, PULSEVO, NGO Donor Matcher\. At Novulis Consulting he builds full-stack applications on Azure/);
+    expect(r.text).not.toMatch(/Paytm/);
+    expect(r.of("panel")[0].panel.kind).toBe("index");
+  });
+});

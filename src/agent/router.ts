@@ -145,7 +145,17 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
     const pick = withTool.length ? withTool : EXPERIENCE.filter((x) => (re(/\bnovulis\b/) ? x.title.startsWith("Novulis") && (!re(/what does he do|currently|right now|\bnow\b/) || !!x.now) : re(/\bsupraja\b/) ? x.title.startsWith("Supraja") : re(/\bintern/) ? !!x.minor : re(/where does he work|\b(current|job|employer|company)\b/) ? !!x.now : true));
     say(pick.map((x) => `${x.role} at ${x.title}, ${x.when}: ${roleDetail(x).replace(/\.$/, "")}.`).join(" ")); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }
-  if (re(/\bopen to (work|roles?|opportunit\w*|new)|\bavailab(le|ility)\b|looking for (a )?(job|role|work|opportunit)|notice period|join(ing)? date|can he join|\b(salary|ctc|compensation|expected pay|pay expectations?|salary package)\b/)) {
+  // "what's his linkedin?", "his email?": the profile holds them, shown once the visitor approves
+  if (re(/\b(linkedin|his github|github profile|socials?|twitter|x handle|instagram|his (email|phone|number|mail|whatsapp)|email (id|address)|phone number|how (do|can) i (reach|contact|message|talk to|get in touch with) (him|rizwan))\b/) && best.s < 10) {
+    say("His LinkedIn, GitHub, email and phone are on his profile, shown once you approve."); call("offer_contact"); call("suggest", { options: ["Get resume", "Everything he’s built"] }); return true;
+  }
+  // "can he work remotely?", "will he relocate?": where he is, and that the rest is his call
+  if (re(/\b(remote(ly)?|work from home|wfh|relocat\w*|on-?site|hybrid|which city|where (is|does) he (based|live|work|stay)|his location|based in|time ?zone)\b/) && best.s < 10 && !re(/\bintern\w*\b/)) {
+    const now = EXPERIENCE[0];
+    say(`He’s in Bengaluru, ${now.role} at ${now.title} (${now.when}); his ${EXPERIENCE[1].title} internship before that was remote. Remote, hybrid or relocation is his call to make: ask him directly, his contact details are on his profile.`);
+    call("offer_contact"); call("suggest", { options: ["Get resume", "Everything he’s built"] }); return true;
+  }
+  if (re(/\bopen to (work|roles?|opportunit\w*|new)|\bavailab(le|ility)\b|looking for (a )?(job|role|work|opportunit)|notice period|join(ing)? date|can he join|\b(salary|ctc|compensation|expected pay|pay expectations?|salary package|freelanc\w*|contract (work|role|basis)|consulting work|part[- ]time|side gigs?|gig work|moonlight\w*)\b/)) {
     say("This site doesn’t say; ask him directly. His email, phone and LinkedIn are on his profile."); call("offer_contact"); call("suggest", { options: ["Get resume", "Everything he’s built"] }); return true;
   }
   // what he knows, what this agent runs on, what to ask him, what he's up to: all from the toolkit and his facts
@@ -177,7 +187,9 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   // "has he won anything?", "how much did he win at Monad Blitz?", "which hackathons has he done?": the events
   // themselves (the ones named, else all with the prize first), never a project; "why…" questions go to the model
   const named = eventsIn(lastUser), prizeQ = re(/\b(prizes?|won|wins?|winnings?|awards?)\b/);
-  if (best.s < 10 && (loose || !REASONING.test(lastUser)) && !re(/\b(projects?|apps?|built|build|made|make)\b/) && (named.length || re(/\b(prizes?|won|wins?|awards?|hackathons?|ctfs?|events?|devfest|achievements?|competitions?|contests?)\b/))) {
+  // "experience with production systems" names no event, even though one event is called Prompt to Production
+  const productionQ = re(/\bin production\b|\bproduction[- ](systems?|experience|grade|ready|code|apps?|environments?|level|software|use)\b/);
+  if (best.s < 10 && !productionQ && (loose || !REASONING.test(lastUser)) && !re(/\b(projects?|apps?|built|build|made|make)\b/) && (named.length || re(/\b(prizes?|won|wins?|awards?|hackathons?|ctfs?|events?|devfest|achievements?|competitions?|contests?)\b/))) {
     const won = EVENTS.filter((e) => e.kind === "won");
     const builds = EVENTS.flatMap((e) => (e.links ?? []).filter((l) => l.href.startsWith("/work/")).map((l) => `${projectById(l.href.slice(6))?.title} at ${e.title}`)).slice(0, 2);
     // a hackathon is an event where he built a project tagged as one
@@ -236,7 +248,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   }
   if (!clear && re(/\b(deploy(ed|ment)?s?|in production|production (use|app|system)s?|hosted|live (apps?|projects?|demos?|sites?)|real users)\b|\b(projects?|apps?|which)\b[^?]{0,30}\blive\b/)) {
     const live = PROJECTS.filter((p) => p.links?.live).map((p) => p.title);
-    say(`Live deployments: ${live.join(", ")}. None of the write-ups give user or traffic numbers.`); call("list_projects"); call("suggest", { options: ["Open CCR Compliance Advisor", "Get resume"] }); return true;
+    say(`${live.length} of his projects are deployed and live: ${live.join(", ")}. At ${EXPERIENCE[0].title} he builds full-stack applications on Azure as ${EXPERIENCE[0].role}. None of the write-ups give user or traffic numbers.`); call("list_projects"); call("suggest", { options: ["Open CCR Compliance Advisor", "Can I try it?", "Get resume"] }); return true;
   }
   return false;
 }
