@@ -713,3 +713,28 @@ describe("golden · resume, open source, spoken languages, higher degrees, mobil
     expect(r.text).toMatch(/FinBoom/); expect(r.text).toMatch(/Kerala Immersion/);
   });
 });
+
+describe("golden · typos, bare follow-ups, his name, help, goodbye", () => {
+  const fixed = async (q: string[]) => turn({ turns: q }, [never()]);
+  it("typos still reach his facts", async () => {
+    const r = await fixed(["wat projcts has he biult"]);
+    expect(r.of("panel")[0].panel.kind).toBe("index"); expect(r.text).not.toMatch(/Outside my lane/);
+    expect((await fixed(["does he knw reakt"])).text).toMatch(/^Yes: React shows in /);
+  });
+  it("'and the stack?', 'tell me more' and 'why' after a project stay on that project", async () => {
+    const stack = await fixed(["Show me PACK", "and the stack?"]);
+    expect(stack.text).toMatch(/^PACK is built with /); expect(stack.of("panel")[0].panel.id).toBe("pack");
+    const more = await fixed(["Show me PACK", "tell me more"]);
+    expect(more.text).toMatch(/^PACK, in more detail: /); expect(more.of("panel")[0].panel.kind).toBe("architecture");
+    const why = await fixed(["Show me FinBoom", "why"]);
+    expect(why.text).not.toMatch(/^Not sure what you mean/);
+  });
+  it("his name alone opens his profile; 'help' says what the agent answers; 'that's all' is a goodbye", async () => {
+    const name = await fixed(["rizwan"]);
+    expect(name.text).toMatch(/^That’s him\./); expect(name.of("panel")[0].panel.kind).toBe("profile");
+    expect((await fixed(["what can you do"])).text).toMatch(/^I answer from Rizwan’s facts, nothing else/);
+    expect((await fixed(["help"])).text).toMatch(/^I answer from Rizwan’s facts/);
+    expect((await fixed(["thanks, that's all"])).text).toMatch(/^Anytime\./);
+    expect((await fixed(["who are you"])).text).toMatch(/^I’m one of his projects\./);
+  });
+});

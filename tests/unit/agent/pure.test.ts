@@ -346,3 +346,14 @@ describe("project links in answers", () => {
     expect(h).not.toContain("<b>");
   });
 });
+
+describe("typos", () => {
+  it("reads a one-slip word as the word the router keys on, and leaves names and real words alone", async () => {
+    const { fixTypos } = await import("@/agent/typos");
+    expect(fixTypos("wat projcts has he biult")).toBe("what projects has he built");
+    expect(fixTypos("does he knw reakt")).toBe("does he know react");
+    expect(fixTypos("Show me PACK and Mahesh")).toBe("Show me PACK and Mahesh");
+    expect(fixTypos("is he good at body parsing in FastAPI?")).toBe("is he good at body parsing in FastAPI?");
+    expect(fixTypos("Kerala Immersion")).toBe("Kerala Immersion");
+  });
+});
