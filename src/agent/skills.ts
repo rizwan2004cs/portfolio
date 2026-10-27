@@ -73,13 +73,14 @@ export const isSecurityQ = (text: string) => SECURITY.test(text);
 export function skillAsked(text: string): string | undefined {
   const t = text.trim().replace(/[?.!]+$/, "");
   const m = t.match(/^(?:and |also |ok |so |but )?(?:does|do|can|has|is|did|was|will|would)\s+(?:he|rizwan)\s+(?:know|knows|use|used|have|has|do|work(?:ed)?\s+(?:with|on|in)|any\s+experience\s+(?:with|in)|experience\s+(?:with|in)|familiar\s+with|good\s+(?:at|with|in)|skilled\s+(?:at|in)|built\s+(?:with|anything\s+(?:with|in))|into|comfortable\s+with|handle|code\s+in|program\s+in|write)\s+(.{1,60}?)(?:\s+(?:also|and|or)\b.*)?$/i)
+    ?? t.match(/^(?:does|is|did|has|will)\s+(?:his|rizwan'?s)\s+(?:resume|cv|profile|toolkit|stack|write-?up)\s+(?:mention|include|list|have|cover|show|contain|say anything about)s?\s+(.{1,40})$/i)
     ?? t.match(/^(?:what about|how about|and)\s+(.{1,40})$/i)
     ?? t.match(/^(?:his|rizwan'?s)\s+(.{1,40}?)\s+(?:experience|skills?|knowledge|level|expertise)$/i)
     ?? t.match(/^(.{1,40}?)\s+(?:experience|skills?|knowledge|expertise)(?:\s+of\s+(?:him|rizwan))?$/i)
     ?? t.match(/^(?:any|got)\s+(.{1,40}?)\s+(?:experience|skills?)$/i);
   if (!m) return undefined;
   const thing = m[1].replace(/^(a|an|the|any|some)\s+/i, "").replace(/\s+(or not|too|as well|well)$/i, "").trim();
-  if (!thing || /\b(him|rizwan|you|this|that|it|project|job|work|hire|anything|everything|something|more|else)\b/i.test(thing)) return undefined;
+  if (!thing || /\b(him|rizwan|you|this|that|it|project|job|work|hire|anything|everything|something|more|else|masters?|master(’|')s|phd|degree|mba|m\.?tech|diploma|certif\w*|resume|cv|linkedin|github)\b/i.test(thing)) return undefined;
   return thing;
 }
 

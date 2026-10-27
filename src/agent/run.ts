@@ -129,7 +129,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // one-answer questions (greetings, availability, prizes, who built it) never need a model, so they never risk one:
   // worked out first, so they also skip the guard's round trip (nothing is left for an injection to steer)
   const factual: AgentEvent[] = [];
-  const isFact = factAnswer(subject, (e) => factual.push(e));
+  const isFact = factAnswer(subject, (e) => factual.push(e), false, input.shown);
   const g = input.killModel ? { ok: true, note: "skipped · model offline, router can't be injected" }
     : isFact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await guarding!;
   emit({ type: "trace", step: "guard", detail: g.note, level: g.ok ? "ok" : "warn" });

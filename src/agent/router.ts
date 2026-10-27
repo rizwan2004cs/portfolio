@@ -112,7 +112,7 @@ export function router(lastUser: string, emit: Emit): void {
 
 /** Questions with one factual answer (availability, months of experience, who built a project) are answered
  *  straight from the facts, model or not: a model can only add risk to them. Returns true when it answered. */
-export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean {
+export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: readonly string[] = []): boolean {
   // a pasted job description mentions "years of experience" too, but it wants a fit report, not one line
   if (isJobDescription(lastUser)) return false;
   const last = lastUser.toLowerCase(), re = (r: RegExp) => r.test(last), say = (text: string) => emit({ type: "text", text });
@@ -128,6 +128,23 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
     && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything|certif\w*|courses?|badges?|interview|lately|latest|guard\w*|security|hack\w*|tools?|tech\w*|languages?|frameworks?|tests?|testing|databases?|learn\w*)\b/)) {
     say(BEHAVIOR.unclear.reply!(lastUser)); // never repeats the word back
     call("suggest", { options: ["Everything he’s built", "Has he won anything?", "Get resume"] }); return true;
+  }
+  // "show me his resume", "cv?": the resume, once the visitor approves; a pasted job description is handled above
+  if (re(/\b(resume|cv)\b/) && lastUser.trim().split(/\s+/).length <= 8 && !re(/\b(my|our|mine)\b/) && !re(/\b(ats|match|fit|gaps?|against|compare|tailor|improve|review|feedback|say|mention|list|cover|include)\b/)) {
+    if (shown.includes("done:resume")) say("You already have his resume from earlier in this chat. Anything else you’d like to see?");
+    else { say("Here’s his resume, once you approve."); call("offer_resume"); }
+    call("suggest", { options: ["Everything he’s built", "Contact Rizwan"] }); return true;
+  }
+  // "any open source contributions?": his public repos, and the one upstream pull request his events record
+  if (re(/\bopen[- ]?source\b|\bcontribut(ion|ions|ed|ing|e|or)\b|\bupstream\b|\bpull requests?\b|\bmerged prs?\b|\bprs\b/) && best.s < 10) {
+    const pub = PROJECTS.filter((p) => p.links?.source).length, pr = EVENTS.find((e) => e.links?.some((l) => /pull\/\d+/.test(l.href)));
+    say(`${pub} of his ${PROJECTS.length} projects are public on GitHub, source included.${pr ? ` Upstream, his events list one merged pull request, for ${pr.title} (${pr.where}): ${pr.body[0].toLowerCase()}${pr.body.slice(1)}` : ""} No other open-source contributions are listed.`);
+    call("show_profile", { focus: "events" }); call("suggest", { options: ["Everything he’s built", "Can I try it?", "Get resume"] }); return true;
+  }
+  // "what languages does he speak?": spoken languages aren't in his write-up; programming languages are
+  if (re(/\blanguages? (does|can|do) (he|rizwan) (speak|talk)|\bspoken languages?|\bmother tongue|\bnative language|\b(speaks?|fluent in|knows?) (tamil|telugu|hindi|english|kannada|malayalam|urdu|arabic)\b|\bhow many languages/)) {
+    say(`Spoken languages aren’t in his write-up. Programming languages: ${TOOLKIT[1][1].filter((t) => /^(Python|Java|TypeScript)$/.test(t)).concat(TOOLKIT[3][1].filter((t) => /^TypeScript$/.test(t))).join(", ")}, with JavaScript and SQL on his resume. Kerala Immersion, his language-learning app, teaches Malayalam and Kannada through Tamil.`);
+    call("open_project", { id: "kerala" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }
   // "why should we hire him?" has one written answer: his strongest evidence, said the same way every time
   if (re(/\bwhy (should|would|do|to) (i|we|you|anyone) (hire|pick|choose)|\bwhy (hire )?him\b|what makes him|stand(s)? out|over other (freshers|candidates|engineers)/)) {
@@ -147,7 +164,9 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   }
   // "what's his linkedin?", "his email?": the profile holds them, shown once the visitor approves
   if (re(/\b(linkedin|his github|github profile|socials?|twitter|x handle|instagram|his (email|phone|number|mail|whatsapp)|email (id|address)|phone number|how (do|can) i (reach|contact|message|talk to|get in touch with) (him|rizwan))\b/) && best.s < 10) {
-    say("His LinkedIn, GitHub, email and phone are on his profile, shown once you approve."); call("offer_contact"); call("suggest", { options: ["Get resume", "Everything he’s built"] }); return true;
+    if (shown.includes("done:contact")) say("His contact details are already on screen from earlier in this chat: LinkedIn, GitHub, email and phone.");
+    else { say("His LinkedIn, GitHub, email and phone are on his profile, shown once you approve."); call("offer_contact"); }
+    call("suggest", { options: ["Get resume", "Everything he’s built"] }); return true;
   }
   // "can he work remotely?", "will he relocate?": where he is, and that the rest is his call
   if (re(/\b(remote(ly)?|work from home|wfh|relocat\w*|on-?site|hybrid|which city|where (is|does) he (based|live|work|stay)|his location|based in|time ?zone)\b/) && best.s < 10 && !re(/\bintern\w*\b/)) {
@@ -229,7 +248,8 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   }
   // "what is his CGPA?", "where did he study?": his education, from his profile
   if (best.s < 10 && (loose || !REASONING.test(lastUser)) && profileFocus(lastUser) === "education") {
-    say(`${EDUCATION.degree}, ${EDUCATION.school}, ${EDUCATION.years}: CGPA ${EDUCATION.cgpa}, ${EDUCATION.classAwarded}.`);
+    const higher = re(/\b(masters?|master(’|')s|phd|ph\.d|m\.?tech|mba|postgrad\w*|higher studies)\b/) ? "No master’s or PhD is listed; his degree is " : "";
+    say(`${higher}${EDUCATION.degree}, ${EDUCATION.school}, ${EDUCATION.years}: CGPA ${EDUCATION.cgpa}, ${EDUCATION.classAwarded}.`);
     call("show_profile", { focus: "education" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }
   // how this site works: the same answer the browser gives, never a project panel

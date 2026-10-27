@@ -350,8 +350,10 @@ describe("golden · failures degrade, never double-answer", () => {
     expect(r.meta.mode).toBe("router"); expect(m.calls.length).toBe(0); assertHealthy(r);
   });
   it("no model configured → router", async () => {
-    const r = await turn({ turns: ["resume"] }, []);
-    expect(r.meta.mode).toBe("router"); expect(r.of("approval")[0].action).toBe("resume"); assertHealthy(r);
+    const r = await turn({ turns: ["compare PACK and CCR"] }, []);
+    expect(r.meta.mode).toBe("router"); assertHealthy(r);
+    const resume = await turn({ turns: ["resume"] }, []);
+    expect(resume.meta.mode).toBe("facts"); expect(resume.of("approval")[0].action).toBe("resume"); assertHealthy(resume);
   });
   it("aborted request ends quietly as 'aborted'", async () => {
     const ctl = new AbortController();
@@ -376,7 +378,9 @@ describe("golden · harness repairs", () => {
   });
   it("the same approval is never offered twice", async () => {
     const r = await turn({ turns: ["resume again please"], shown: ["done:resume"] }, [scripted("a", [say("Sure.", call("offer_resume"), call("suggest", { options: ["x"] }))])]);
-    expect(r.of("approval").length).toBe(0); assertHealthy(r);
+    expect(r.of("approval").length).toBe(0); expect(r.text).toMatch(/^You already have his resume/); assertHealthy(r);
+    const c = await turn({ turns: ["what's his linkedin"], shown: ["done:contact"] }, [never()]);
+    expect(c.of("approval").length).toBe(0); expect(c.text).toMatch(/^His contact details are already on screen/);
   });
   it("asking for architecture upgrades a card view; duplicates in one turn are dropped", async () => {
     const r = await turn({ turns: ["show the finboom architecture"] }, [scripted("a", [tools(call("open_project", { id: "finboom", view: "card" }), call("open_project", { id: "finboom" }), call("suggest", { options: ["x"] }))])]);
@@ -677,5 +681,35 @@ describe("golden · tests, databases, learning speed and this site's stack", () 
     const r = await fixed(["what's his tech stack for this site"]);
     expect(r.text).toMatch(/^I’m one of his projects\. Next\.js on Vercel/);
     expect((await fixed(["what is this portfolio built with"])).text).toMatch(/^I’m one of his projects/);
+  });
+});
+
+describe("golden · resume, open source, spoken languages, higher degrees, mobile apps", () => {
+  const fixed = async (q: string) => turn({ turns: [q] }, [never()]);
+  it("'show me his resume' offers it without a model", async () => {
+    const r = await fixed("show me his resume");
+    expect(r.text).toBe("Here’s his resume, once you approve."); expect(r.of("tool").some((e) => e.name === "offer_resume")).toBe(true); expect(r.meta.mode).toBe("facts");
+    const k8s = await fixed("does his resume mention kubernetes?");
+    expect(k8s.text).toMatch(/^Kubernetes isn’t in his toolkit: he ships with Docker and GitHub Actions/); expect(k8s.meta.mode).toBe("facts");
+  });
+  it("'any open source contributions' counts his public repos and the merged upstream PR", async () => {
+    const r = await fixed("any open source contributions");
+    expect(r.text).toMatch(/^9 of his 10 projects are public on GitHub, source included\. Upstream, his events list one merged pull request, for Prompt to Production \(ISTE NBKRIST\): built the event platform for the Paytm AI Workshop/);
+    expect(r.of("panel")[0].panel.kind).toBe("profile");
+  });
+  it("'what languages does he speak' says spoken ones aren't listed and names the programming ones", async () => {
+    const r = await fixed("what languages does he speak");
+    expect(r.text).toMatch(/^Spoken languages aren’t in his write-up\. Programming languages: Python, Java, TypeScript, with JavaScript and SQL on his resume\. Kerala Immersion/);
+    expect(r.of("panel")[0].panel.id).toBe("kerala");
+  });
+  it("'does he have a masters' answers from his education, not his toolkit", async () => {
+    const r = await fixed("does he have a masters");
+    expect(r.text).toMatch(/^No master’s or PhD is listed; his degree is B\.Tech, Computer Science & Engineering/);
+    expect(r.of("panel")[0].panel.kind).toBe("profile");
+    expect((await fixed("which college")).text).toMatch(/^B\.Tech/);
+  });
+  it("'what mobile apps has he built' lists both mobile projects", async () => {
+    const r = await fixed("what mobile apps has he built");
+    expect(r.text).toMatch(/FinBoom/); expect(r.text).toMatch(/Kerala Immersion/);
   });
 });
