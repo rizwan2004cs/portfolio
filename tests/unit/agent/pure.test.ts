@@ -336,3 +336,13 @@ describe("what a tool is, and 'but it is in his work'", () => {
     }
   });
 });
+
+describe("project links in answers", () => {
+  it("a live or source host named in an answer becomes that link", async () => {
+    const { answerHtml } = await import("@/render/html");
+    const h = answerHtml("FinBoom is live at finboom-cyan.vercel.app, and the source is on GitHub at github.com/rizwan2004cs/finboom.");
+    expect(h).toMatch(/<a class="pj" href="https:\/\/finboom-cyan\.vercel\.app" target="_blank" rel="noopener"><span class="w"[^>]*>finboom-cyan\.vercel\.app<\/span><\/a>/);
+    expect(h).toMatch(/<a class="pj" href="https:\/\/github\.com\/rizwan2004cs\/finboom" target="_blank" rel="noopener"><span class="w"[^>]*>github\.com\/rizwan2004cs\/finboom<\/span><\/a>/);
+    expect(h).not.toContain("<b>");
+  });
+});

@@ -605,3 +605,21 @@ describe("golden · skills, tools, this agent, and what to ask him", () => {
     expect(leak.text).not.toMatch(/open_harness/);
   });
 });
+
+describe("golden · demo, live and source links come from the write-ups", () => {
+  const fixed = async (q: string[]) => turn({ turns: q }, [never()]);
+  it("a project with both links names them and opens the panel", async () => {
+    const r = await fixed(["can i try finboom"]);
+    expect(r.text).toMatch(/^FinBoom is live at finboom-cyan\.vercel\.app, and the source is on GitHub at github\.com\/rizwan2004cs\/finboom\. Both buttons are on its panel\./);
+    expect(r.of("panel")[0].panel.id).toBe("finboom"); expect(r.meta.mode).toBe("facts");
+    expect((await fixed(["github link for pack"])).text).toMatch(/^PACK has no hosted demo: run it from the source on GitHub at github\.com\/rizwan2004cs\/Agent-Werewolf/);
+    expect((await fixed(["is there a demo of duo"])).text).toMatch(/^DUO has no public demo or repo/);
+    expect((await fixed(["Show me CCR", "can i see it live"])).text).toMatch(/^CCR Compliance Advisor is live at ccr-compliance-agent\.onrender\.com \(a free-tier host/);
+  });
+  it("with no project named, lists what can be tried and where the buttons are", async () => {
+    const r = await fixed(["where is the source code"]);
+    expect(r.text).toMatch(/^Try them live: CCR Compliance Advisor, FinBoom, Campus Premier League, VerseYou, PULSEVO, NGO Donor Matcher\. The source of every project but DUO is on GitHub/);
+    expect(r.of("panel")[0].panel.kind).toBe("index");
+    expect((await fixed(["which ones can i try right now"])).text).toMatch(/^Try them live:/);
+  });
+});

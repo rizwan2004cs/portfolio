@@ -38,9 +38,22 @@ export function clearPick(text: string): Project | undefined {
 
 export const ctxNext = (p: Project): string[] => [
   p.sims?.length ? `How does ${p.title} handle failures?` : p.pipeline.length ? `Internals of ${p.title}` : "Everything he’s built",
+  ...(p.links?.live ? ["Can I try it?"] : []),
   "Everything he’s built",
   "Get resume",
-].filter((x, i, a) => a.indexOf(x) === i);
+].filter((x, i, a) => a.indexOf(x) === i).slice(0, 3);
+
+const LINKS_Q = /\b(demos?|links?|urls?|github|repos?|repositor(?:y|ies)|source code|the code|open.?source|clone|try (?:it|this|that|them|out|him)|can i (?:try|use|test|play|run)|(?:it|this|that|site|app)(?:'s|’s| is)? live|live (?:link|site|version|url|app|demo)|see it live|hosted (?:at|on|where))\b/i;
+const host = (u: string) => u.replace(/^https?:\/\//, "").replace(/\/$/, "");
+/** Where a project can be tried and read, from its write-up's links; the same URLs sit on its panel as buttons. */
+export function linksLine(p: Project): string {
+  const { live, source } = p.links ?? {};
+  const wake = live && /onrender\.com/.test(live) ? " (a free-tier host: the first load can take about 30 seconds)" : "";
+  if (live && source) return `${p.title} is live at ${host(live)}${wake}, and the source is on GitHub at ${host(source)}. Both buttons are on its panel.`;
+  if (live) return `${p.title} is live at ${host(live)}${wake}; its code isn’t public.`;
+  if (source) return `${p.title} has no hosted demo: run it from the source on GitHub at ${host(source)}, linked on its panel.`;
+  return `${p.title} has no public demo or repo: it’s hardware, built in person, so its panel’s write-up and photos are what there is.`;
+}
 export const DEFAULT_NEXT = ["Everything he’s built", "How does this site work?", "Get resume"];
 
 /** Deterministic answer for any message. Used when models are down, killed, or answer nothing. Never silent. */
@@ -157,7 +170,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   if (isSecurityQ(lastUser) && !re(/\b(prize|won|win|wins|winning|ctf v2|capture the flag)\b|^\s*(why|how)\b/) && best.s < 10 && lastUser.trim().split(/\s+/).length <= 10) return answered(securityAnswer());
   const overview = best.s < 10 ? skillsOverview(lastUser) : undefined;
   if (overview) return answered(overview);
-  if (LATEST_Q.test(lastUser) && best.s < 10 && !re(/\bproject\b.*\b(ccr|pack|finboom)\b/)) return answered(latestAnswer());
+  if (LATEST_Q.test(lastUser) && best.s < 10 && !re(LINKS_Q) && !re(/\bproject\b.*\b(ccr|pack|finboom)\b/)) return answered(latestAnswer());
   if (re(/\b(years?|months?) of experience|how (much|long|many years)[^?]{0,24}experience|how experienced|experience level|\bfresher\b/)) {
     say(experienceLine()); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Get resume"] }); return true;
   }
@@ -212,6 +225,14 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false): boolean
   if (clear && re(/\b(alone|solo|by himself|on his own|team(mates?)?|who else|with whom|his (part|role|contribution)|versus|vs\.?|who did what|split|what did he (do|build) (in|on|for))\b/)) {
     const solo = /^solo\b/i.test(best.p.team), split = /:\s*he\s/.test(best.p.team);
     say(`${best.p.title}: ${best.p.team}.${!solo && !split ? " The write-up doesn’t split who built which part." : ""}`); call("open_project", { id: best.p.id }); call("suggest", { options: ctxNext(best.p) }); return true;
+  }
+  // "can I try FinBoom?", "github link for PACK", "is there a demo of DUO?": the links his write-ups carry, never a model
+  // saying there is no repo when the panel shows one
+  if (re(LINKS_Q) || (clear && re(/\btry\b/))) {
+    if (clear) { say(linksLine(best.p)); call("open_project", { id: best.p.id }); call("suggest", { options: ctxNext(best.p) }); return true; }
+    const live = PROJECTS.filter((p) => p.links?.live).map((p) => p.title), noRepo = PROJECTS.filter((p) => !p.links?.source).map((p) => p.title);
+    say(`Try them live: ${live.join(", ")}. The source of every project${noRepo.length ? ` but ${noRepo.join(" and ")}` : ""} is on GitHub; the Live and Source buttons are on each panel.`);
+    call("list_projects"); call("suggest", { options: ["Open FinBoom", "Open CCR Compliance Advisor", "Everything he’s built"] }); return true;
   }
   if (!clear && re(/\b(deploy(ed|ment)?s?|in production|production (use|app|system)s?|hosted|live (apps?|projects?|demos?|sites?)|real users)\b|\b(projects?|apps?|which)\b[^?]{0,30}\blive\b/)) {
     const live = PROJECTS.filter((p) => p.links?.live).map((p) => p.title);
