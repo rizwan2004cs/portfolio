@@ -78,6 +78,7 @@ export function mountAgent(shell: HTMLElement): () => void {
       fresh ? `Open ${fresh.title}` : "",
       !shown.has("profile") && !shown.has("events") ? "Has he won anything?" : "",
       said.length >= 2 && !asked.has(norm("What’s his superpower?")) ? "What’s his superpower?" : "",
+      roles.includes("ai") || roles.includes("backend") || roles.includes("fullstack") || (S.visitor as string) === "hire" ? "What should I ask him in an interview?" : "",
       said.length >= 3 && !down && !q("#kill").classList.contains("used") ? "Take the model offline" : "", // only to visitors who haven't tried it
 
       "Everything he’s built", "How does this site work?", "Get resume", "Contact Rizwan",

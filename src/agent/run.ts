@@ -6,7 +6,7 @@ import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
-import { BAD_OUTPUT, CODEY, GUARD_REFUSAL, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
+import { ATTACK_REPLY, BAD_OUTPUT, CODEY, GUARD_REFUSAL, isAttack, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
 import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind } from "./behavior";
 import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
@@ -102,9 +102,10 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // the project the visitor is talking about: named now, or named in the turn a pronoun points back to
   const subjectProject = clearPick(subject);
   if (offScope(last)) {
-    emit({ type: "trace", step: "scope", detail: "off-scope request refused · 0 tokens", level: "warn" });
-    emit({ type: "text", text: REFUSAL });
-    emit({ type: "suggest", options: DEFAULT_NEXT });
+    const attack = isAttack(last);
+    emit({ type: "trace", step: "scope", detail: attack ? "injection attempt refused · invited to kill the model instead · 0 tokens" : "off-scope request refused · 0 tokens", level: "warn" });
+    emit({ type: "text", text: attack ? ATTACK_REPLY : BEHAVIOR.off_topic.reply!(last) });
+    emit({ type: "suggest", options: attack ? ["Take the model offline", "How does this site work?", "Everything he’s built"] : DEFAULT_NEXT });
     return { mode: "scope" };
   }
   // the outer agent: every message is sorted into one kind first (src/agent/behavior.ts says what each kind gets).

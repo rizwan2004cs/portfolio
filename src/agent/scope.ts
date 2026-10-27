@@ -7,6 +7,9 @@ const ATTACK =
   /\b(api[_ -]?keys?|secret keys?|access tokens?|auth tokens?|bearer tokens?|passwords?|env(ironment)? var\w*|\.env\b|system prompt|hidden (rules|prompt|instructions)|your( (exact|full|complete|internal|original|real|initial|hidden))? (instructions|prompt|rules|config(uration)?)|json schemas?|tool schemas?|(every|all|each) (tool|function)s? (you|it) (can|could|are able to) (call|use|run)|(list|show|print|dump|reveal) (every|all|each|your) (tools?|functions))\b|\b(jailbreak|dan mode|developer mode|god mode prompt|pretend (to be|you are|you're)|act as (an? )?(unrestricted|unfiltered|uncensored|different|new|evil)|role-?play as|ignore (all|any|previous|prior|the above|your)( \w+)? (instructions|rules|prompts?)|repeat (everything|all|the (text|words|lines))( \w+)? (above|before))\b/i;
 const NON_LATIN_ATTACK = /(सिस्टम प्रॉम्प्ट|पासवर्ड|एपीआई|कुंजी|api key)/i;
 
+/** An attempt to rewrite the agent (not just an off-topic task): it gets an invitation to break it properly. */
+export const isAttack = (text: string) => ATTACK.test(text) || NON_LATIN_ATTACK.test(text);
+export const ATTACK_REPLY = "That reads like an attempt to rewrite my instructions, so I’ll skip it. If you want to see me fail for real, take the model offline: every answer still comes from his facts.";
 export function offScope(text: string): boolean {
   if (ATTACK.test(text) || NON_LATIN_ATTACK.test(text)) return true;
   return OFF_TASK.test(text) && scoreProjects(text)[0].s < 4;

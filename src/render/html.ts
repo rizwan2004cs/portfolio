@@ -135,6 +135,8 @@ export function profilePart(pr: Profile, focus?: string) {
  *  project), figures in bold. Every word is its own span so the answer can fade in word by word. Escapes everything. */
 const TITLES = [...PROJECTS].sort((a, b) => b.title.length - a.title.length);
 const TOKEN = new RegExp(`(${TITLES.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|((?:\\$|₹)?\\d[\\d,]*(?:\\.\\d+)?(?:%|k\\b|\\+)?)`, "g");
+/** "mohammad-rizwan.tech/films" or "/films" in an answer becomes a link to it. */
+const SITE_PATH = /(?:https?:\/\/)?(?:www\.)?mohammad-rizwan\.tech(\/[\w/-]*)?|(?<![\w/])(\/(?:films|agent|resume\.pdf|work\/[\w-]+))\b/g;
 export function answerHtml(text: string): string {
   const sentences = text.trim().split(/(?<=[.!?])\s+(?=[A-Z“"(])/);
   const paras: string[] = [];
@@ -150,7 +152,9 @@ export function answerHtml(text: string): string {
       out += p ? `<button type="button" class="pj" tabindex="-1" data-openp="${esc(p.id)}">${words(m[0])}</button>` : `<b>${words(m[0])}</b>`;
       last = m.index! + m[0].length;
     }
-    return `<p>${out}${words(para.slice(last))}</p>`;
+    const html = `<p>${out}${words(para.slice(last))}</p>`;
+    // links are added after escaping, on text that has no tags of its own
+    return html.replace(SITE_PATH, (m, p1, p2) => { const path = p1 ?? p2 ?? "/"; return `<a class="pj" href="${esc(path)}">${m}</a>`; });
   }).join("");
 }
 
