@@ -380,7 +380,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
         : status ? `rejected (HTTP ${status})` : e instanceof Error && e.name === "TimeoutError" ? "timed out" : e instanceof Error && e.message === "returned nothing" ? "returned nothing" : "failed";
       // say where the run goes next: another key for the same model, the next model, another provider, or the router
       const next = deps.models[mi + 1], base0 = (n: string) => n.split(" · ")[0];
-      const provider = (n: string) => (/gemini/i.test(n) ? "gemini" : /openrouter/i.test(n) ? "openrouter" : "groq");
+      const provider = (n: string) => (/gemini/i.test(n) ? "gemini" : /openrouter/i.test(n) ? "openrouter" : /nemotron/i.test(n) ? "nvidia" : "groq");
       const then = !next ? "→ deterministic router" : base0(next.name) === base0(model.name) ? `→ trying ${next.name.split(" · ")[1] ?? "the next key"}` : provider(next.name) !== provider(model.name) ? `→ switching provider: ${next.name}` : `→ falling back to ${base0(next.name)}`;
       if (rest) resting.push(model.name);
       else { flushSkips(model.name); emit({ type: "trace", step: "model", detail: `${model.name} ${why} ${then}`, level: "err" }); }

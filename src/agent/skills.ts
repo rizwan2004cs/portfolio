@@ -47,7 +47,7 @@ const NEAREST: [RegExp, string, string][] = [
   [/weaviate|chroma|qdrant|faiss|milvus|pgvector/i, "RAG and vector search (Pinecone)", "his vector search runs on Pinecone"],
   [/twilio|\bvapi\b|elevenlabs|retell|murf/i, "Voice agents (LiveKit, Deepgram, Whisper)", "his voice agents run on LiveKit, Deepgram and Murf"],
   [/\bn8n\b|zapier|make\.com|power automate/i, "Power Platform", "his workflow automation is on Power Platform"],
-  [/anthropic|claude|mistral|cohere|deepseek|qwen/i, "Tool calling and LLM APIs (Groq, OpenAI, Gemini)", "the models in his projects are Groq-hosted, OpenAI and Gemini"],
+  [/anthropic|claude|mistral|cohere|deepseek|qwen/i, "Tool calling and LLM APIs (Groq, OpenAI, Gemini)", "the models in his projects are Groq-hosted, NVIDIA-hosted, OpenAI and Gemini"],
   [/\brust\b|\bgo(lang)?\b|c\+\+|\bc#\b|\.net|\bphp\b|ruby|swift|scala|\bc\b/i, "Python", "his languages are Python, TypeScript and Java"],
   [/\bmcp\b|model context protocol/i, "Tool calling and LLM APIs (Groq, OpenAI, Gemini)", "his agents use plain tool calling"],
   [/\bsupabase edge|edge functions?/i, "Supabase", "VerseYou runs on Supabase Edge Functions"],
@@ -153,7 +153,7 @@ export function siteTechAnswer(text: string): SkillAnswer {
   return {
     text: guard
       ? "The guardrails here are mine, not a vendor product: Llama Prompt Guard 2 on Groq screens each message for injection, a scope filter refuses off-topic requests, every tool is closed-world (it picks content by id, it can’t write text), and a grounding check drops any sentence a model writes that his facts don’t support. Azure and AWS aren’t involved."
-      : "I’m one of his projects. Next.js on Vercel, streaming over the AG-UI protocol. Answers come from gpt-oss-120b and gpt-oss-20b on Groq, then Gemini 2.5 Flash, then free models on OpenRouter, with a deterministic router behind them when every model is down. A prompt guard screens each message and a grounding check verifies every sentence against his facts.",
+      : "I’m one of his projects. Next.js on Vercel, streaming over the AG-UI protocol. Answers come from gpt-oss-120b and gpt-oss-20b on Groq, then Nemotron 3.5 Lightning, 3.5 Super and 3 Ultra on NVIDIA, then Gemini 2.5 Flash, then free models on OpenRouter, with a deterministic router behind them when every model is down. A prompt guard screens each message and a grounding check verifies every sentence against his facts.",
     chips: ["Take the model offline", "Internals of PACK", "Everything he’s built"],
   };
 }

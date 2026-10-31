@@ -21,7 +21,7 @@ export function opikClient(env = process.env): Opik | undefined {
 
 // production, preview or local: real visitors are the "production" ones
 const ENV = process.env.VERCEL_ENV ?? "local";
-const PROVIDER = (name: string) => (/gemini/i.test(name) ? "google_ai" : /openrouter/i.test(name) ? "openrouter" : "groq");
+const PROVIDER = (name: string) => (/gemini/i.test(name) ? "google_ai" : /openrouter/i.test(name) ? "openrouter" : /nemotron/i.test(name) ? "nvidia" : "groq");
 const error = (e: unknown) => ({ exceptionType: e instanceof Error ? e.name : "Error", message: e instanceof Error ? e.message.slice(0, 500) : String(e), traceback: e instanceof Error ? (e.stack ?? "").slice(0, 2000) : "" });
 
 export interface TurnTrace {

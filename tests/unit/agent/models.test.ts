@@ -87,6 +87,20 @@ describe("prompt guard key rotation", () => {
   });
 });
 
+describe("nvidia fallback", () => {
+  it("sits between Groq and Gemini, one request per Nemotron model with thinking off, and is absent without a key", async () => {
+    let body: Record<string, unknown> = {}, auth = "", url = "";
+    const fake = (async (u: string, init: RequestInit) => { url = u; auth = String((init.headers as Record<string, string>).Authorization); body = JSON.parse(String(init.body)); return reply("ok"); }) as unknown as typeof fetch;
+    const chain = modelChain(["k1"], "g", fake, "or", "nv");
+    expect(chain.map((m) => m.name)).toEqual(["gpt-oss-120b", "gpt-oss-20b", "nemotron-3.5-lightning-30b-a3b", "nemotron-3.5-super-vl-120b-a12b", "nemotron-3-ultra-550b-a55b", "gemini-2.5-flash", "openrouter · free models"]);
+    await chain[2].complete([], new AbortController().signal);
+    expect(url).toBe("https://integrate.api.nvidia.com/v1/chat/completions"); expect(auth).toBe("Bearer nv");
+    expect(body.model).toBe("nvidia/nemotron-3.5-lightning-30b-a3b"); expect(body.chat_template_kwargs).toEqual({ enable_thinking: false }); expect(body.tools).toBeTruthy();
+    expect(modelChain(["k1"], "g", fake, "or").map((m) => m.name)).not.toContain("nemotron-3.5-lightning-30b-a3b");
+    expect(defaultDeps({ GROQ_API_KEY: "a", NVIDIA_API_KEY: " nv " } as unknown as NodeJS.ProcessEnv).models().map((m) => m.name)).toEqual(["gpt-oss-120b", "gpt-oss-20b", "nemotron-3.5-lightning-30b-a3b", "nemotron-3.5-super-vl-120b-a12b", "nemotron-3-ultra-550b-a55b"]);
+  });
+});
+
 describe("openrouter fallback", () => {
   it("comes after Gemini, sends its free models as one routed request, and is absent without a key", async () => {
     let body: Record<string, unknown> = {};
