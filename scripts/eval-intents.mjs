@@ -1,11 +1,11 @@
 // Runs the labelled message set (tests/fixtures/intents.json) through the live classifier and checks every message
 // lands in a kind the behaviour policy accepts for it. This replaces testing the agent by hand, one phrasing at a time.
-//   OPENROUTER_API_KEY=… node scripts/eval-intents.mjs          all messages
+//   NVIDIA_API_KEY=… node scripts/eval-intents.mjs              all messages
 //   MIN_ACCURACY=0.9 node scripts/eval-intents.mjs              fail below this share
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
-const key = process.env.OPENROUTER_API_KEY;
-if (!key) { console.log("OPENROUTER_API_KEY not set: skipping the classifier eval"); process.exit(0); }
+const key = process.env.NVIDIA_API_KEY;
+if (!key) { console.log("NVIDIA_API_KEY not set: skipping the classifier eval"); process.exit(0); }
 const file = new URL("../tests/fixtures/intents.json", import.meta.url);
 if (!existsSync(file)) { console.log("no labelled set at tests/fixtures/intents.json: skipping"); process.exit(0); }
 //   ONLY=regex node scripts/eval-intents.mjs                    only the messages matching it (a local check of new cases)
@@ -15,6 +15,10 @@ const cases = JSON.parse(readFileSync(file, "utf8")).filter((c) => !only || only
 const src = readFileSync(new URL("../src/agent/behavior.ts", import.meta.url), "utf8");
 const criteria = Object.fromEntries([...src.matchAll(/^\s{2}(\w+): \{\s*(?:\n\s*)?describe: "([^"]+)"/gm)].map((m) => [m[1], m[2]]));
 const SENSITIVE = ["personal", "abusive", "accusation"];
+// the same prompt as classifierMessages() in src/agent/classify.ts: change both together
+const SITE = "A portfolio site for Syed Mohammad Rizwan, an AI engineer, with an AI agent visitors chat with.";
+const system = `${SITE}\nSort the visitor's newest message into exactly one kind. A short follow-up takes the kind of the exchange before it.\nKinds:\n${Object.entries(criteria).map(([k, d]) => `- ${k}: ${d}`).join("\n")}\n`
+  + `Reply with JSON only: {"kind": <kind>, "confidence": <0 to 1>, "visitor": {"name", "company", "role", "hiringFor"}} where "visitor" appears only when the kind is visitor_intro, with only the fields the message states.`;
 // the same rule as decide() in src/agent/classify.ts
 const decide = (kind, conf, p = {}) => {
   if (kind === "work" || conf >= 0.5 || SENSITIVE.includes(kind)) return kind;
@@ -27,19 +31,19 @@ for (const c of cases) {
   let kind = "error", conf = 0, probs = {};
   for (let attempt = 0; attempt < 3 && kind === "error"; attempt++) {
     try {
-      const r = await fetch("https://openrouter.ai/api/alpha/decisions", {
+      const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: "POST", signal: AbortSignal.timeout(20_000),
-        headers: { Authorization: `Bearer ${key}`, "content-type": "application/json", "X-OpenRouter-Title": "portfolio intent eval" },
-        body: JSON.stringify({ model: "baseten/mammoth-1:free", state: { site: "A portfolio site for Syed Mohammad Rizwan, an AI engineer, with an AI agent visitors chat with.", visitor_message: c.text }, questions: { kind: { type: "choice", instructions: "What kind of message is visitor_message? A short follow-up takes the kind of the message before it.", criteria } } }),
+        headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
+        body: JSON.stringify({ model: "nvidia/nemotron-3.5-lightning-30b-a3b", temperature: 0, max_tokens: 120, chat_template_kwargs: { enable_thinking: false }, messages: [{ role: "system", content: system }, { role: "user", content: `Visitor message: ${c.text.slice(0, 1500)}` }] }),
       });
-      if (r.ok) { const a = (await r.json()).answers?.kind; kind = a?.choice ?? "error"; conf = Number(a?.confidence ?? 0); probs = a?.probabilities ?? {}; }
+      if (r.ok) { const m = /\{[\s\S]*\}/.exec((await r.json()).choices?.[0]?.message?.content ?? ""); try { const a = m ? JSON.parse(m[0]) : {}; kind = a.kind ?? "error"; conf = Number(a.confidence ?? 0); } catch { kind = "error"; } }
       else await new Promise((res) => setTimeout(res, 2000));
     } catch { /* retried */ }
   }
-  if (kind === "error" && rows.length === 0) { console.log("classifier unreachable (free-tier daily limit?): skipping, not failing"); process.exit(0); }
+  if (kind === "error" && rows.length === 0) { console.log("classifier unreachable: skipping, not failing"); process.exit(0); }
   const acted = decide(kind, conf, probs), ok = [c.kind, ...(c.accept ?? [])].includes(acted);
   rows.push({ ...c, got: kind, acted, conf, ok });
-  await new Promise((res) => setTimeout(res, 900)); // free tier: about one request a second
+  await new Promise((res) => setTimeout(res, 1600)); // the trial endpoint allows 40 requests a minute
 }
 
 const right = rows.filter((r) => r.ok).length, share = right / rows.length;

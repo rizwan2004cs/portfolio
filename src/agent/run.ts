@@ -129,7 +129,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // The prompt guard runs at the same time, so sorting adds no wait to the turns that do reach a model.
   const guarding = input.killModel ? null : deps.screen(last, deps.signal).catch(() => ({ ok: true, note: "unavailable · let through (tools are closed-world)" }));
   // a visitor who took the model offline gets no AI anywhere, the classifier included
-  const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal, input.turns.at(-2)));
+  const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal, input.turns.length > 1 ? { user: input.turns.at(-2)! } : undefined));
   const kind = decide(sorted);
   emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
   if (BEHAVIOR[kind].reply) {

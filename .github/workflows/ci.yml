@@ -74,7 +74,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      # each run spends ~1 free-tier request per message, from the same daily budget the live site uses:
+      # each run spends one NVIDIA request per message (a per-minute limit, no daily cap):
       # only when the policy, the classifier or the labelled set changed, or when started by hand
       - name: Did the behaviour change?
         id: changed
@@ -84,7 +84,7 @@ jobs:
       - name: Classifier eval
         if: steps.changed.outputs.run == '1'
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: node scripts/eval-intents.mjs
 
   live-evals:

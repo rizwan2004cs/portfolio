@@ -4,7 +4,7 @@ import { isProjectId } from "@/content/data";
 import { newIds, runError, runFinished, runStarted, toAgui } from "./agui";
 import { cacheKey, makeCache, type AnswerCache } from "./cache";
 import { groqScreen, modelChain } from "./models";
-import { decisionClassifier, type Classifier } from "./classify";
+import { classifierEndpoints, nemotronClassifier, type Classifier } from "./classify";
 import { router } from "./router";
 import { waitUntil } from "@vercel/functions";
 import * as Sentry from "@sentry/nextjs";
@@ -47,7 +47,7 @@ export function defaultDeps(env = process.env): HandlerDeps {
   return {
     models: () => modelChain(groqKeys, env.GEMINI_API_KEY?.trim() || undefined, fetch, env.OPENROUTER_API_KEY?.trim() || undefined, env.NVIDIA_API_KEY?.trim() || undefined),
     screen: groqScreen(groqKeys),
-    classify: decisionClassifier(env.OPENROUTER_API_KEY?.trim() || undefined),
+    classify: nemotronClassifier(classifierEndpoints(env.NVIDIA_API_KEY?.trim() || undefined, env.OPENROUTER_API_KEY?.trim() || undefined)),
     cache: makeCache(),
     now: () => Date.now(),
     log: neonTurnLog(env.DATABASE_URL),
