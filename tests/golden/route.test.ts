@@ -34,6 +34,18 @@ describe("route · input validation", () => {
     ["wrong types", { turns: [42] }],
   ])("400 for %s", async (_, body) => expect((await handleAgent(post(body), deps())).status).toBe(400));
 
+  it("a conversation arrives as history: the model gets the agent's own replies, old clients may still send turns", async () => {
+    let messages: { role: string; content?: string | null }[] = [];
+    const m = { name: "m", complete: async (ms: { role: string; content?: string | null }[]) => { messages = ms; return { role: "assistant" as const, content: "PACK it is." }; } };
+    const d = { ...deps(), models: () => [m] };
+    const res = await handleAgent(post({ history: [{ user: "what's his superpower?", agent: "An owl.", showed: ["CCR Compliance Advisor"] }, { user: "Not animal, something techy about PACK" }] }), d);
+    expect(res.status).toBe(200); await events(res);
+    expect(messages.slice(0, 4).map((x) => x.role)).toEqual(["system", "user", "assistant", "user"]);
+    expect(messages[2].content).toBe("[showed: CCR Compliance Advisor] An owl.");
+    expect((await handleAgent(post({ history: [{ user: "   " }] }), d)).status).toBe(400);
+    expect((await handleAgent(post({ history: [{ user: "x", showed: ["a", "b", "c", "d", "e", "f"] }] }), d)).status).toBe(400);
+  });
+
   it("413 for an oversized body", async () => {
     expect((await handleAgent(post({ turns: ["x".repeat(LIMITS.bodyBytes + 100)] }), deps())).status).toBe(413);
   });

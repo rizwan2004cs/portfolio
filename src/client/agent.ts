@@ -3,6 +3,8 @@
 import { EXPERIENCE, PROFILE, PROJECTS } from "@/content/data";
 import type { Project } from "@/content/types";
 import { fitRows } from "@/agent/fit";
+import type { Exchange } from "@/agent/types";
+import { trimHistory } from "./history";
 import { wireContactForms } from "./contact";
 import { answerHtml, CHEV, connectPanel, esc, fitPanel, harnessPanel, homeIntro, ICON, indexPanel, profilePart, projectPanel, resumePanel, shortlistPanel } from "@/render/html";
 import { fine, fmt, installImageHandling, paintClocks, readShortlist, reduce, runSim, startClock, wait, wireArch, writeShortlist } from "./shared";
@@ -30,9 +32,9 @@ export function mountAgent(shell: HTMLElement): () => void {
 
   const col = q("#col"), feed = q("#feed"), sugg = q("#sugg"), traceEl = q("#trace"), form = q<HTMLFormElement>("#form"), inp = q<HTMLInputElement>("#inp");
   const RETURNING = store("rz_seen");
-  let turns: string[] = [], said: string[] = [], focusId = "", shown = new Set<string>(), busy = false, down = false, turnNo = 0, tStart = 0, lastAgentRun = false;
+  let turns: string[] = [], said: string[] = [], convo: Exchange[] = [], turnSaid: string[] = [], turnShowed: string[] = [], focusId = "", shown = new Set<string>(), busy = false, down = false, turnNo = 0, tStart = 0, lastAgentRun = false;
   let target: HTMLElement | null = null, queued: string | null = null, focusTurn = -1, lastChips: string[] = [];
-  let PREV: { html: string; turns: string[]; said?: string[]; focusId?: string; shown: string[]; down?: boolean; shortlist?: string[]; trace?: string; events?: string; state?: Record<string, unknown>; turnNo?: number } | null = null;
+  let PREV: { html: string; turns: string[]; said?: string[]; convo?: Exchange[]; focusId?: string; shown: string[]; down?: boolean; shortlist?: string[]; trace?: string; events?: string; state?: Record<string, unknown>; turnNo?: number } | null = null;
 
   /* ---------- small helpers ---------- */
   // set when the visitor answers a choice card: whatever the agent adds next is brought into view, so the answer
@@ -52,6 +54,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     const shown = opts.big ? words.map((w, i) => (/\s+/.test(w) ? w : `<span class="w" style="animation-delay:${Math.min(i * 12, 500)}ms">${esc(w)}</span>`)).join("") : answerHtml(text);
     const el = add(`<div class="msg${lastAgentRun ? " cont" : ""}"><span class="mark${down ? " degraded" : ""}" aria-hidden="true"><i></i></span><div class="text${opts.big ? " big" : ""}"><span class="sr">${esc(text)}</span><span class="tv" aria-hidden="true">${shown}</span></div></div>`, slot);
     wireAnswer(el);
+    turnSaid.push(text);
     lastAgentRun = true;
     await wait(Math.min(words.length * 12, 500) + 80);
     return el;
@@ -226,6 +229,7 @@ export function mountAgent(shell: HTMLElement): () => void {
       html = projectPanel(p, { ...opts, arch: kind === "architecture", shortlisted: (S.shortlist as string[]).includes(p.id), permalink: true }); shown.add(p.id); store("rz_last", p.id);
     }
     const el = add(html); el.dataset.key = key; wirePanel(el); paintClocks();
+    turnShowed.push(id && P.has(id) ? P.get(id)!.title : kind === "profile" ? "his profile" : kind === "index" ? "the project list" : kind === "harness" ? "how this agent is built" : kind);
     setState({ onScreen: [...shown].filter((x) => !x.includes(":")) });
     if (id && P.has(id)) { focusId = id; focusTurn = turnNo; if (kind === "architecture") shown.add("arch:" + id); }
     if (kind === "architecture") requestAnimationFrame(() => { const a = el.querySelector<HTMLElement>(".arch[data-pid]"); if (a) void runSim(a, null); });
@@ -439,6 +443,7 @@ export function mountAgent(shell: HTMLElement): () => void {
       th = traceTurn(text);
       target = add('<div class="turn"><div class="ttext"></div></div>');
       let next: string[] | null = null, meta: Meta | null = null;
+      turnSaid = []; turnShowed = [];
       const tour = TOURS[text.toLowerCase().replace(/'/g, "’")];
       // "Open PACK architecture" (a model-written chip) is the internals view, still answered locally
       const fast = text.match(/^(internals of|open) (.+?)(?:'s|’s)?( architecture| internals)?\??$/i), fp = fast ? byTitle(fast[2]) : undefined;
@@ -538,7 +543,12 @@ export function mountAgent(shell: HTMLElement): () => void {
         await say("Lost the connection for a moment. These still work offline:"); next = ["Everything he’s built", "Get resume"]; meta = { mode: "local" };
       }
       // refused messages and tour buttons are UI, not conversation: keep them out of the history sent to the model
-      if (!tour && meta?.mode !== "scope" && meta?.mode !== "guard") turns.push(text);
+      if (!tour && meta?.mode !== "scope" && meta?.mode !== "guard") {
+        turns.push(text);
+        // what the agent said and showed this turn travels with the next message, so the model sees its own replies
+        const showed = [...new Set(turnShowed)].slice(0, 5), agent = turnSaid.join(" ").slice(0, 2000);
+        convo.push({ user: text, ...(agent ? { agent } : {}), ...(showed.length ? { showed } : {}) });
+      }
       said.push(text);
       if (meta?.mode === "local" || meta?.mode === "tour") logEv("RUN_FINISHED", meta.mode, "run");
       if (meta) metaLine(meta);
@@ -557,7 +567,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     try { return await stream(text, setNext, think); } finally { think.remove(); } // never leave "working" behind, even on a dropped connection
   }
   async function stream(text: string, setNext: (o: string[]) => void, think: HTMLElement): Promise<Meta> {
-    const res = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ turns: [...turns, text].slice(-6), shown: [...shown], killModel: down }) });
+    const res = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ history: trimHistory([...convo, { user: text }].slice(-6)), shown: [...shown], killModel: down }) });
     if (res.status === 429) { think.remove(); await say("You’re going fast. Give it a minute; the buttons below still work."); return { mode: "local" }; }
     if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
     let meta: Meta | null = null, plan: ReturnType<typeof planCard> | null = null, pending: number | null = null, compactNext = false;
@@ -674,7 +684,7 @@ export function mountAgent(shell: HTMLElement): () => void {
   /* ---------- sessions survive a trip to Classic ---------- */
   function saveSession() {
     if (ending) return;
-    try { if (col.classList.contains("started")) sessionStorage.setItem(SESSION_KEY, JSON.stringify({ html: col.innerHTML, turns, said, focusId, shown: [...shown], down, shortlist: S.shortlist, trace: traceEl.innerHTML, events: q("#events").innerHTML, state: S, turnNo })); } catch { /* storage off */ }
+    try { if (col.classList.contains("started")) sessionStorage.setItem(SESSION_KEY, JSON.stringify({ html: col.innerHTML, turns, said, convo, focusId, shown: [...shown], down, shortlist: S.shortlist, trace: traceEl.innerHTML, events: q("#events").innerHTML, state: S, turnNo })); } catch { /* storage off */ }
   }
   /** A question card from a saved session: still answerable, and the answer is sent as an ordinary message. */
   function reviveCard(el: HTMLElement) {
@@ -707,7 +717,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     if (PREV.turnNo) turnNo = PREV.turnNo;
     if (PREV.focusId) focusTurn = turnNo;
     if (PREV.shortlist?.length) { setState({ shortlist: PREV.shortlist.filter((id) => P.has(id)) }); syncTray(); }
-    col.classList.remove("home"); col.innerHTML = PREV.html; turns = PREV.turns; said = PREV.said ?? [...PREV.turns]; focusId = PREV.focusId ?? ""; shown = new Set(PREV.shown); PREV = null;
+    col.classList.remove("home"); col.innerHTML = PREV.html; turns = PREV.turns; said = PREV.said ?? [...PREV.turns]; convo = PREV.convo ?? PREV.turns.map((user) => ({ user })); focusId = PREV.focusId ?? ""; shown = new Set(PREV.shown); PREV = null;
     if (wasDown && !down) setDown(true);
     col.classList.add("started");
     col.querySelectorAll<HTMLElement>(".approval:not(.resolved)").forEach((a) => wireApproval(a, (a.dataset.action === "contact" ? "contact" : "resume")));

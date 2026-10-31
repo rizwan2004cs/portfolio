@@ -23,8 +23,12 @@ export interface RunMeta {
   fallback?: boolean;
 }
 
+/** One exchange: what the visitor said and, once answered, what the agent replied and showed. */
+export interface Exchange { user: string; agent?: string; showed?: string[] }
 export interface RunInput {
   turns: string[];
+  /** the conversation so far, newest last (its `user` fields are `turns`); absent from old clients */
+  history?: Exchange[];
   shown: string[];
   killModel: boolean;
 }
