@@ -20,7 +20,8 @@ describe("the outer agent", () => {
     const f = reply({ choices: [{ message: { content: 'Sure: {"kind":"visitor_intro","confidence":0.95,"visitor":{"name":" Priya ","company":"Razorpay","hiringFor":"backend engineer","extra":"x","role":""}}' } }] });
     const c = await nemotronClassifier("k", f)("hi I'm Priya from Razorpay, hiring backend engineers", sig());
     expect(c.visitor).toEqual({ name: "Priya", company: "Razorpay", hiringFor: "backend engineer" });
-    expect(parseAnswer('{"kind":"work","confidence":2,"visitor":{"name":"' + "x".repeat(200) + '"}}')).toEqual({ kind: "work", confidence: 1, visitor: { name: "x".repeat(80) } });
+    expect(parseAnswer('{"kind":"visitor_intro","confidence":2,"visitor":{"name":"' + "x".repeat(200) + '"}}')).toEqual({ kind: "visitor_intro", confidence: 1, visitor: { name: "x".repeat(80) } });
+    expect(parseAnswer('{"kind":"work","confidence":0.9,"visitor":{"name":"Hiring Manager","company":"TechCorp"}}')).toEqual({ kind: "work", confidence: 0.9 }); // a guess on a work question is dropped
   });
   it("falls back to the word rules when the classifier errors, times out, or answers nonsense, and says why", async () => {
     expect(await nemotronClassifier("k", reply({}, 503))("fucking", sig())).toMatchObject({ kind: "abusive", source: "rules", note: "rules · classifier HTTP 503" });

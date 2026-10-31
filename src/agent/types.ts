@@ -1,3 +1,5 @@
+import type { Visitor } from "./classify";
+import type { SessionState } from "./state";
 export type PanelKind = "project" | "architecture" | "index" | "profile" | "harness" | "fit";
 export type Level = "ok" | "info" | "warn" | "err";
 
@@ -8,7 +10,8 @@ export type AgentEvent =
   | { type: "approval"; action: "resume" | "contact" }
   | { type: "suggest"; options: string[] }
   | { type: "frontend"; name: "switch_mode"; args: { mode: "classic" | "agent" } }
-  | { type: "trace"; step: string; detail: string; level: Level };
+  | { type: "trace"; step: string; detail: string; level: Level }
+  | { type: "state"; state: SessionState };
 
 export type Emit = (ev: AgentEvent) => void;
 
@@ -21,6 +24,8 @@ export interface RunMeta {
   ms?: number;
   tools?: number;
   fallback?: boolean;
+  /** who the visitor said they are this turn, for the next state; stripped before the client sees the meta */
+  visitor?: Visitor;
 }
 
 /** One exchange: what the visitor said and, once answered, what the agent replied and showed. */
@@ -30,6 +35,8 @@ export interface RunInput {
   /** the conversation so far, newest last (its `user` fields are `turns`); absent from old clients */
   history?: Exchange[];
   shown: string[];
+  /** what earlier turns established, echoed back by the client and sanitised on arrival */
+  state?: SessionState;
   killModel: boolean;
 }
 
