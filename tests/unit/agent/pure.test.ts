@@ -393,7 +393,7 @@ describe("the transcript the model sees", () => {
 describe("grounding a playful answer", () => {
   it("keeps the metaphor, still drops a wrong number or a tech he never used", () => {
     const pack = projectById("pack")!, src = pack.facts.join(" ");
-    const g = groundAnswer("He’d be a compiler: a knack for coordinating seven noisy agents into one game. It handles 9,000 players a night.", src, "Not animal", pack.title, src, pack.facts, { playful: true });
+    const g = groundAnswer("He’d be a compiler: a knack for coordinating seven noisy agents into one game. It handles 9,000 players a night.", src, "Not animal", pack.title, src, pack.facts, { loose: true });
     expect(g.text).toBe("He’d be a compiler: a knack for coordinating seven noisy agents into one game."); expect(g.dropped).toHaveLength(1);
     expect(groundAnswer("He’d be a compiler: a knack for coordinating seven noisy agents into one game.", src, "Not animal", pack.title, src, pack.facts).dropped).toHaveLength(1); // the same sentence fails the ordinary check
   });

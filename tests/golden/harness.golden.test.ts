@@ -414,11 +414,25 @@ describe("golden · private life and refusals", () => {
 });
 
 describe("golden · panels only for questions about him or his work", () => {
-  it("a greeting is answered at once: no model, no guard round trip, no panel", async () => {
+  it("a greeting is a conversation: the model answers it in its own words, no panel; without a model, the policy's line", async () => {
     for (const q of ["hello", "Hi!", "hey there", "thanks", "good morning", "ok"]) {
-      const r = await turn({ turns: [q] }, [never()], async () => { throw new Error("guard must not run"); });
-      expect(r.meta.mode).toBe("scope"); expect(r.of("panel")).toHaveLength(0); expect(r.text.length).toBeGreaterThan(10);
+      const m = scripted("a", [say("Hey, welcome. Want to start with what he's built, or paste a role to match?", call("list_projects"), call("suggest", { options: ["x"] }))]);
+      const r = await turn({ turns: [q] }, [m]);
+      expect(r.meta.mode).toBe("model"); expect(r.of("panel")).toHaveLength(0); expect(r.text).toMatch(/^Hey, welcome/);
+      const f = await turn({ turns: [q] }, [never()]);
+      expect(f.meta.mode).toBe("scope"); expect(f.of("panel")).toHaveLength(0); expect(f.text.length).toBeGreaterThan(10);
     }
+  });
+  it("an intro reaches the model with its tone and the visitor in state; the fallback line uses their name", async () => {
+    let system = "";
+    const m = { name: "m", complete: async (ms: { role: string; content?: string | null }[]) => { system = String(ms[0].content); return { role: "assistant" as const, content: "Hi Priya. For a backend role I can map the requirements to his work, or show the services he has shipped." }; } };
+    const intro = async () => ({ kind: "visitor_intro" as const, confidence: 0.95, source: "model" as const, note: "visitor_intro", visitor: { name: "Priya", company: "Razorpay", hiringFor: "backend engineer" } });
+    const r = await turn({ turns: ["hi I'm Priya from Razorpay, hiring backend engineers"] }, [m], passScreen, undefined, intro);
+    expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/^Hi Priya/); expect(system).toContain("The visitor just introduced themselves.");
+    const f = await turn({ turns: ["hi I'm Priya from Razorpay, hiring backend engineers"] }, [never()], passScreen, undefined, intro);
+    expect(f.text).toBe("Welcome, Priya. Paste the role’s requirements and I’ll map them to his work, or start with his strongest projects.");
+    const who = await turn({ turns: ["I'm Priya", "who am i?"], history: [{ user: "I'm Priya", agent: "Hi Priya." }, { user: "who am i?" }], state: { focus: null, shown: [], offered: [], visitor: { name: "Priya", company: "Razorpay" }, topics: [] } }, [never()]);
+    expect(who.text).toBe("You told me you’re Priya from Razorpay. I can show you what Rizwan has built.");
   });
   it("the model's project list and profile are dropped when the message isn't about his work or him", async () => {
     const m = scripted("a", [say("I can hear you fine.", call("list_projects"), call("show_profile"), call("suggest", { options: ["x"] }))]);
