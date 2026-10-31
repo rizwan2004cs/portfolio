@@ -112,6 +112,9 @@ export function transcript(history: Exchange[]): ChatMessage[] {
   });
 }
 
+/** Did the deterministic layer give up on the message rather than answer it? */
+export const isUnclearReply = (events: AgentEvent[]) => events.some((e) => e.type === "text" && /^Not sure what you mean/.test(e.text));
+
 export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Promise<RunMeta> {
   // "wat projcts has he biult": a slip one edit from a word the router keys on is read as that word, but only when the
   // message as typed answers nothing and the corrected one does; a message the rules already place (private, abusive,
@@ -129,6 +132,10 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   const subject = input.turns.length > 1 && !clearPick(last) && refersBack ? `${input.turns.at(-2)} ${last}` : last;
   // the project the visitor is talking about: named now, or named in the turn a pronoun points back to
   const subjectProject = clearPick(subject);
+  // a short message after a reply ("Not animal", "and the stack?") is judged with the exchange it answers, so a tool
+  // call about the project the agent just named is about his work
+  const followUp = input.history && input.history.length > 1 && last.trim().split(/\s+/).length <= 6 && !clearPick(last);
+  const policySubject = followUp ? `${input.history!.at(-2)!.user} ${input.history!.at(-2)!.agent ?? ""} ${last}` : subject;
   if (offScope(last)) {
     const attack = isAttack(last);
     emit({ type: "trace", step: "scope", detail: attack ? "injection attempt refused · invited to kill the model instead · 0 tokens" : "off-scope request refused · 0 tokens", level: "warn" });
@@ -143,8 +150,9 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   const history: Exchange[] = input.history?.length ? input.history : input.turns.map((user) => ({ user }));
   const before = history.length > 1 ? history.at(-2) : undefined;
   const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal, before ? { user: before.user, agent: before.agent } : undefined));
-  const kind = decide(sorted);
-  emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
+  // "unclear" is a first-turn verdict: two words after a reply ("Not animal") are a follow-up, and the model has the transcript
+  const decided = decide(sorted), kind = decided === "unclear" && history.length > 1 ? "work" : decided;
+  emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : decided === "unclear" ? `${sorted.note} · a follow-up, not a first turn: goes to the model` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
   if (BEHAVIOR[kind].reply) {
     emit({ type: "trace", step: "policy", detail: `${kind} · fixed reply from the behaviour policy, no model, no panel · 0 tokens`, level: "info" });
     emit({ type: "text", text: BEHAVIOR[kind].reply!(last) });
@@ -157,7 +165,9 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   // one-answer questions (greetings, availability, prizes, who built it) never need a model, so they never risk one:
   // worked out first, so they also skip the guard's round trip (nothing is left for an injection to steer)
   const factual: AgentEvent[] = [];
-  const isFact = factAnswer(subject, (e) => factual.push(e), false, input.shown);
+  // the deterministic "not sure what you mean" is only ever a first-turn answer: after a reply, a short message the facts
+  // can't place is a follow-up, and the model reads it with the conversation
+  const isFact = factAnswer(subject, (e) => factual.push(e), false, input.shown) && !(history.length > 1 && isUnclearReply(factual));
   const g = input.killModel ? { ok: true, note: "skipped · model offline, router can't be injected" }
     : isFact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await guarding!;
   emit({ type: "trace", step: "guard", detail: g.note, level: g.ok ? "ok" : "warn" });
@@ -321,7 +331,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
             messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ error: "not allowed: you refused this question; show nothing" }) });
             continue;
           }
-          const d = checkToolCall({ name: tc.function.name, args }, { last, subject, shown: input.shown, openedThisRun: opened });
+          const d = checkToolCall({ name: tc.function.name, args }, { last, subject: policySubject, shown: input.shown, openedThisRun: opened });
           if (d.action === "drop") {
             drops++;
             emit({ type: "trace", step: "policy", detail: d.detail, level: "info" });
@@ -348,7 +358,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
       // verify before the visitor sees it: every claim must come from this turn's sources
       const answer = texts.join(" ").trim();
       if (answer) {
-        const gr = groundAnswer(answer, source, last, lastTitle, `${source} ${ALL_FACTS_SOURCE}`, lastFacts);
+        const gr = groundAnswer(answer, source, last, lastTitle, `${source} ${ALL_FACTS_SOURCE}`, lastFacts, { playful: kind === "playful" });
         if (gr.dropped.length) emit({ type: "trace", step: "grounding", detail: `removed ${gr.dropped.length} of ${gr.total} sentence${gr.total > 1 ? "s" : ""}: not in his facts (${gr.dropped.flat().slice(0, 4).map((w) => `“${w}”`).join(", ")})`, level: "warn" });
         else emit({ type: "trace", step: "grounding", detail: gr.total > 1 ? `all ${gr.total} sentences checked against his facts · verified` : "the sentence was checked against his facts · verified", level: "ok" });
         // an answer that was entirely invented, with nothing on screen, is better replaced by the router

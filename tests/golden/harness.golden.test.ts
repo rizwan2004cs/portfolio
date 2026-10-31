@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ABUSE_REPLY, ACCUSE_REPLY, ATTACK_REPLY, GUARD_REFUSAL, PERSONAL_REPLY, REFUSAL } from "@/agent/scope";
 import { ModelError } from "@/agent/types";
-import { assertHealthy, blockScreen, call, http, say, scripted, tools, turn } from "./helpers";
+import { assertHealthy, blockScreen, call, http, passScreen, say, scripted, tools, turn } from "./helpers";
 
 const never = () => scripted("never", [new Error("must not be called")]);
 
@@ -852,5 +852,34 @@ describe("golden · two questions in one message, two skills in one question, ba
     expect((await fixed("yes")).text).toBe("Go on: pick one of these, or ask in your own words.");
     expect((await fixed("no")).text).toBe("No problem. Anything else about his work, or his resume?");
     expect((await fixed("yes")).meta.mode).toBe("scope");
+  });
+});
+
+describe("follow-ups with the conversation in hand", () => {
+  const superhero = { user: "What is he if he has some superpower", agent: "If he were a superhero, he’d be an owl, like his CCR Compliance Advisor citing sources.", showed: ["CCR Compliance Advisor"] };
+  it("'Not animal' after the superhero answer reaches the model, never the 'not sure' reply", async () => {
+    const m = scripted("gpt-oss-120b", [say("Then a compiler: CCR Compliance Advisor turns 74,975 regulation sections into one cited answer.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: [superhero.user, "Not animal"], history: [superhero, { user: "Not animal" }], shown: ["ccr"] }, [m]);
+    expect(r.meta.mode).toBe("model"); expect(r.text).not.toMatch(/Not sure what you mean/); expect(r.text).toMatch(/compiler/);
+  });
+  it("a playful follow-up may open the project the agent just named, and its metaphor survives grounding", async () => {
+    const m = scripted("gpt-oss-120b", [say("Then a compiler: a knack for coordinating seven noisy agents into one game.", call("open_project", { id: "pack" }), call("suggest", { options: ["x"] }))]);
+    const prev = { user: "What is he if he has some superpower", agent: "An owl, like PACK keeping seven agents in one game.", showed: ["PACK"] };
+    const r = await turn({ turns: [prev.user, "Not animal"], history: [prev, { user: "Not animal" }], shown: ["pack"] }, [m], passScreen, undefined, async () => ({ kind: "playful" as const, confidence: 0.9, source: "model" as const, note: "playful" }));
+    expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/compiler/); expect(r.of("trace").map((e) => e.detail).join("\n")).not.toMatch(/blocked opening pack/);
+  });
+  it("a one-word first turn still gets the 'not sure' reply without a model call", async () => {
+    const r = await turn({ turns: ["count"], history: [{ user: "count" }] }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/Not sure what you mean/);
+  });
+  it("a short follow-up that is a complete fact question still answers from the facts", async () => {
+    const r = await turn({ turns: [superhero.user, "has he won anything?"], history: [superhero, { user: "has he won anything?" }] }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/\$115/);
+  });
+  it("the classifier's 'unclear' verdict is overruled after a reply: the model reads the follow-up", async () => {
+    const m = scripted("gpt-oss-120b", [say("Then a compiler.", call("suggest", { options: ["x"] }))]);
+    const unclear = async () => ({ kind: "unclear" as const, confidence: 0.9, source: "model" as const, note: "unclear · 0.90 confidence" });
+    const r = await turn({ turns: [superhero.user, "Not animal"], history: [superhero, { user: "Not animal" }] }, [m], passScreen, undefined, unclear);
+    expect(r.meta.mode).toBe("model"); expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/a follow-up, not a first turn/);
   });
 });

@@ -130,7 +130,7 @@ export function bestFact(facts: string[], question: string, title = ""): string 
   return score >= Math.min(2, words.length) && (score >= 2 || words.length === 1) ? best : null;
 }
 
-export function groundAnswer(answer: string, source: string, question: string, title?: string | null, wideSource = source, facts: string[] = []) {
+export function groundAnswer(answer: string, source: string, question: string, title?: string | null, wideSource = source, facts: string[] = [], opts: { playful?: boolean } = {}) {
   const src = source.toLowerCase(), wide = wideSource.toLowerCase();
   const kept: string[] = [];
   const dropped: string[][] = [];
@@ -143,7 +143,9 @@ export function groundAnswer(answer: string, source: string, question: string, t
       kept.push(s); afterRefusal = true; continue;
     }
     // "Closest thing: …" after a refusal may point at any real project, but still only with real facts
-    const base = afterRefusal ? wide : src, miss = unsupported(s, base);
+    // a playful answer ("he'd be a compiler: …") is a metaphor over the facts: its wording is free, its numbers, names,
+    // tech and roles are not
+    const base = afterRefusal ? wide : src, miss = opts.playful ? [] : unsupported(s, base);
     if (!miss.length) miss.push(...misanchored(s, base), ...misattributed(s, base), ...misattributedTech(s), ...roleBleed(s));
     // puffery ("routinely", "extensive experience") is never in the write-ups
     const puff = s.match(/\b(routinely|extensive(ly)?|expert(ise)?|years of|seasoned|mastery|deep experience|similar stacks|proven track record|battle.tested|production.(ready|grade)|in production|at scale|enterprise.grade|several production|deep (prompt|knowledge|expertise|understanding)|most (freshers|candidates|engineers|graduates|people)|unlike (most|other)|few (freshers|candidates|engineers))\b/i);
