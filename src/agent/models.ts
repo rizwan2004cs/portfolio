@@ -61,6 +61,14 @@ export function geminiModel(key: string, fetchImpl: typeof fetch = fetch): Model
   return chatModel(GEMINI_MODEL, GEMINI, key, { model: GEMINI_MODEL, temperature: 0.3, max_tokens: 500, reasoning_effort: "low" }, fetchImpl);
 }
 
+const NVIDIA = "https://integrate.api.nvidia.com/v1/chat/completions";
+/** NVIDIA's hosted Nemotron models on its free trial endpoints (a per-minute limit, no daily cap): fastest first, frontier last. */
+export const NVIDIA_MODELS = ["nvidia/nemotron-3.5-lightning-30b-a3b", "nvidia/nemotron-3.5-super-vl-120b-a12b", "nvidia/nemotron-3-ultra-550b-a55b"] as const;
+/** One Nemotron model on NVIDIA's OpenAI-compatible endpoint. Thinking is off: a visitor is waiting, and the answer is a tool pick, not a proof. */
+export function nvidiaModel(id: string, key: string, fetchImpl: typeof fetch = fetch): ModelClient {
+  return chatModel(id.replace(/^nvidia\//, ""), NVIDIA, key, { model: id, temperature: 0.3, max_tokens: 500, chat_template_kwargs: { enable_thinking: false } }, fetchImpl);
+}
+
 const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
 /** Free OpenRouter models that call tools; OpenRouter tries them in order inside one request (it allows three). */
 export const OPENROUTER_MODELS = ["nvidia/nemotron-3.5-lightning:free", "thinkingmachines/inkling-small:free", "google/gemma-4-31b-it:free"] as const;
@@ -69,11 +77,12 @@ export function openRouterModel(key: string, fetchImpl: typeof fetch = fetch): M
   return chatModel("openrouter · free models", OPENROUTER, key, { model: OPENROUTER_MODELS[0], models: [...OPENROUTER_MODELS], temperature: 0.3, max_tokens: 500 }, fetchImpl);
 }
 
-/** The model chain: each Groq model on every key (a throttled key hands the same model to the next),
- *  then Gemini on its own quota, then free OpenRouter models, then the caller falls back to the deterministic router. */
-export function modelChain(groqKeys: string[], geminiKey: string | undefined, fetchImpl: typeof fetch = fetch, openRouterKey?: string): ModelClient[] {
+/** The model chain: each Groq model on every key (a throttled key hands the same model to the next), then NVIDIA's Nemotron
+ *  models on their own quota, then Gemini on its, then free OpenRouter models, then the caller falls back to the deterministic router. */
+export function modelChain(groqKeys: string[], geminiKey: string | undefined, fetchImpl: typeof fetch = fetch, openRouterKey?: string, nvidiaKey?: string): ModelClient[] {
   return [
     ...MODEL_IDS.flatMap((id) => groqKeys.map((k, i) => groqModel(id, k, fetchImpl, i + 1, groqKeys.length))),
+    ...(nvidiaKey ? NVIDIA_MODELS.map((id) => nvidiaModel(id, nvidiaKey, fetchImpl)) : []),
     ...(geminiKey ? [geminiModel(geminiKey, fetchImpl)] : []),
     ...(openRouterKey ? [openRouterModel(openRouterKey, fetchImpl)] : []),
   ];

@@ -473,7 +473,7 @@ export function mountAgent(shell: HTMLElement): () => void {
           next = n ? ["Get resume", "Contact Rizwan"] : ["Everything he’s built"]; meta = { mode: "local" };
         } else if (siteQ) {
           local(); tr("ok", "fast path", "how this site works, answered in your browser · no model call");
-          await say("Every message passes a prompt guard and a scope filter. Known questions are answered right here; the rest go to a model chain (gpt-oss-120b, gpt-oss-20b, Gemini) with a deterministic router behind it, and every sentence is checked against his facts.");
+          await say("Every message passes a prompt guard and a scope filter. Known questions are answered right here; the rest go to a model chain (gpt-oss-120b, gpt-oss-20b, Nemotron on NVIDIA, Gemini, free OpenRouter models) with a deterministic router behind it, and every sentence is checked against his facts.");
           await toolLine("Show how this agent is built", "show_harness"); showPanel("harness");
           next = ["Everything he’s built", "Try to break it", "Get resume"]; meta = { mode: "local" };
         } else if (hireQ) {

@@ -45,7 +45,7 @@ export interface HandlerDeps {
 export function defaultDeps(env = process.env): HandlerDeps {
   const groqKeys = [env.GROQ_API_KEY, ...(env.GROQ_API_KEYS_FALLBACK ?? "").split(",")].map((k) => k?.trim() ?? "").filter(Boolean);
   return {
-    models: () => modelChain(groqKeys, env.GEMINI_API_KEY?.trim() || undefined, fetch, env.OPENROUTER_API_KEY?.trim() || undefined),
+    models: () => modelChain(groqKeys, env.GEMINI_API_KEY?.trim() || undefined, fetch, env.OPENROUTER_API_KEY?.trim() || undefined, env.NVIDIA_API_KEY?.trim() || undefined),
     screen: groqScreen(groqKeys),
     classify: decisionClassifier(env.OPENROUTER_API_KEY?.trim() || undefined),
     cache: makeCache(),

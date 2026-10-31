@@ -20,7 +20,7 @@ const TOOL_TERMS: Record<string, RegExp> = {
   "PostgreSQL": /\bpostgres/i, "RAG": /\brag\b|retriev/i, "OpenAI": /(?<!azure )\bopenai\b|gpt-4o/i, "LiveKit Agents": /\blivekit\b/i,
   "Node.js": /\bnode(\.js)?\b/i, "React": /\breact\b(?! native)/i, "Java": /\bjava\b(?!script)/i, "Tailwind CSS": /\btailwind\b/i,
   "PWA / offline": /\bpwa\b|offline-first/i, "REST APIs": /\brest\b/i, "Vercel": /\bvercel\b/i, "Groq": /\bgroq\b|llama/i,
-  "Multi-agent orchestration (LangGraph, LangChain)": /\blanggraph\b|\blangchain\b|multi-agent/i, "Tool calling and LLM APIs (Groq, OpenAI, Gemini)": /\b(groq|gemini|gpt-|llama)|(?<!azure )\bopenai\b/i,
+  "Multi-agent orchestration (LangGraph, LangChain)": /\blanggraph\b|\blangchain\b|multi-agent/i, "Tool calling and LLM APIs (Groq, OpenAI, Gemini)": /\b(groq|gemini|gpt-|llama|nvidia|nemotron)|(?<!azure )\bopenai\b/i,
   "Model fallback chains": /\bfall(s)? ?back\b|model chain/i, "RAG and vector search (Pinecone)": /\brag\b|retriev|pinecone/i,
   "Voice agents (LiveKit, Deepgram, Whisper)": /\blivekit\b|\bdeepgram\b|\bwhisper\b/i, "Prompt-injection guards": /prompt guard|injection/i,
   // his Novulis work lists the Azure pieces inside one phrase ("Azure (App Service, Functions, …)")
