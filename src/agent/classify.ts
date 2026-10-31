@@ -97,7 +97,8 @@ export function parseAnswer(content: string): { kind: Kind; confidence: number; 
     if (typeof j.kind !== "string" || !KINDS.includes(j.kind as Kind)) return null;
     const confidence = Math.min(1, Math.max(0, Number(j.confidence ?? 0))) || 0;
     const visitor: Visitor = {};
-    if (j.visitor && typeof j.visitor === "object") for (const f of VISITOR_FIELDS) { const v = j.visitor[f]; if (typeof v === "string" && v.trim()) visitor[f] = v.trim().slice(0, 80); }
+    // who the visitor is comes only from an introduction: on any other kind the field is the model guessing
+    if (j.kind === "visitor_intro" && j.visitor && typeof j.visitor === "object") for (const f of VISITOR_FIELDS) { const v = j.visitor[f]; if (typeof v === "string" && v.trim()) visitor[f] = v.trim().slice(0, 80); }
     return { kind: j.kind as Kind, confidence, ...(Object.keys(visitor).length ? { visitor } : {}) };
   } catch { return null; }
 }

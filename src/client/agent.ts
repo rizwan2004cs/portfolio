@@ -14,7 +14,8 @@ type Ev =
   | { type: "text"; text: string } | { type: "tool"; name: string; args: Record<string, unknown> }
   | { type: "panel"; panel: { kind: string; id?: string } } | { type: "approval"; action: "resume" | "contact" }
   | { type: "suggest"; options: string[] } | { type: "frontend"; name: string; args: { mode: string } }
-  | { type: "trace"; step: string; detail: string; level: string } | { type: "done"; meta: Meta };
+  | { type: "trace"; step: string; detail: string; level: string } | { type: "done"; meta: Meta }
+  | { type: "state"; state: Record<string, unknown> };
 
 const P = new Map(PROJECTS.map((p) => [p.id, p]));
 /** The projects a list panel shows: the ids in its key ("pack,ccr"), or all of them. */
@@ -113,7 +114,9 @@ export function mountAgent(shell: HTMLElement): () => void {
   }
 
   /* ---------- shared state + AG-UI event log ---------- */
-  const S: Record<string, unknown> = { visitor: null, focus: null, model: "online", mode: "agent", onScreen: [], shortlist: [], approvals: {} };
+  // `session` is the server's snapshot of the conversation (focus, what was shown and offered, who the visitor is):
+  // it goes back with every message, so the agent remembers across turns and reloads
+  const S: Record<string, unknown> = { visitor: null, focus: null, model: "online", mode: "agent", onScreen: [], shortlist: [], approvals: {}, session: null };
   function renderState(changed: string[] = []) {
     const lines = Object.entries(S).map(([k, v]) => `  <span class="k">"${k}"</span>: <span${changed.includes(k) ? ' class="flash"' : ""}>${esc(JSON.stringify(v))}</span>`);
     q("#state").innerHTML = `{\n${lines.join(",\n")}\n}`;
@@ -567,7 +570,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     try { return await stream(text, setNext, think); } finally { think.remove(); } // never leave "working" behind, even on a dropped connection
   }
   async function stream(text: string, setNext: (o: string[]) => void, think: HTMLElement): Promise<Meta> {
-    const res = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ history: trimHistory([...convo, { user: text }].slice(-6)), shown: [...shown], killModel: down }) });
+    const res = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ history: trimHistory([...convo, { user: text }].slice(-6)), shown: [...shown], state: S.session, killModel: down }) });
     if (res.status === 429) { think.remove(); await say("You’re going fast. Give it a minute; the buttons below still work."); return { mode: "local" }; }
     if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
     let meta: Meta | null = null, plan: ReturnType<typeof planCard> | null = null, pending: number | null = null, compactNext = false;
@@ -576,6 +579,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     const handle = async (e: Ev) => {
       if (e.type !== "trace") think.remove();
       if (e.type === "trace") tr(e.level, e.step, e.detail);
+      else if (e.type === "state") setState({ session: e.state, focus: (e.state.focus as string | null) ?? S.focus });
       else if (e.type === "text") await say(e.text);
       else if (e.type === "tool") {
         if (e.name === "suggest") return;
@@ -613,6 +617,7 @@ export function mountAgent(shell: HTMLElement): () => void {
           else if (a.name === "frontend_tool") ui = { type: "frontend", name: a.value.name, args: a.value.args };
           else if (a.name === "trace") ui = { type: "trace", ...a.value };
           break;
+        case "STATE_SNAPSHOT": ui = { type: "state", state: a.snapshot }; break;
         case "RUN_FINISHED": ui = { type: "done", meta: a.result ?? { mode: "local" } }; break;
         case "RUN_ERROR": ui = { type: "trace", step: "run", detail: a.message, level: "err" }; break;
       }

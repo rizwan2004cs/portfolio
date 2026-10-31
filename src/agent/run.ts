@@ -14,6 +14,8 @@ import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind } from "./behavior";
 import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
+import { contextBlock, EMPTY_STATE, nextState } from "./state";
+import type { Visitor } from "./classify";
 
 /** Everything the site says about him, compact: the model reasons over this directly instead of looking it up. */
 export const KNOWLEDGE = [
@@ -96,6 +98,10 @@ export function narrated(text: string, shownNow: string): { text: string; cut: n
 }
 
 /** Whether the router has something to say for a message as it stands: a fact answer, a project it names, or a skill. */
+/** Does the message name a project, a skill, a topic or a thing the site offers? A greeting or "not animal" does not. */
+function namesSomething(text: string): boolean {
+  return clearPick(text) !== undefined || skillAsked(text) !== undefined || topicsIn(text).length > 0 || /\b(resume|cv|projects?|built|everything|shipped|work|hire|hiring|contact|email)\b/i.test(text);
+}
 function answerable(text: string): boolean {
   let any = false; factAnswer(text, () => { any = true; });
   return any || clearPick(text) !== undefined || skillAsked(text) !== undefined || topicsIn(text).length > 0 || /\b(projects?|built|everything|shipped|work)\b/i.test(text);
@@ -115,7 +121,15 @@ export function transcript(history: Exchange[]): ChatMessage[] {
 /** Did the deterministic layer give up on the message rather than answer it? */
 export const isUnclearReply = (events: AgentEvent[]) => events.some((e) => e.type === "text" && /^Not sure what you mean/.test(e.text));
 
+/** One turn: the kind, the deterministic paths, then the model chain with the conversation; the visitor's intro, when
+ *  there was one, rides on the meta so the handler can carry it into the next state. */
 export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Promise<RunMeta> {
+  let visitor: Visitor | undefined;
+  const meta = await runTurn(input, emit, { ...deps, onClassified: (c) => { visitor = c.visitor; } });
+  return visitor ? { ...meta, visitor } : meta;
+}
+
+async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassified?: (c: Classification) => void }): Promise<RunMeta> {
   // "wat projcts has he biult": a slip one edit from a word the router keys on is read as that word, but only when the
   // message as typed answers nothing and the corrected one does; a message the rules already place (private, abusive,
   // playful, a greeting) is never touched
@@ -151,8 +165,14 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   const before = history.length > 1 ? history.at(-2) : undefined;
   const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal, before ? { user: before.user, agent: before.agent } : undefined));
   // "unclear" is a first-turn verdict: two words after a reply ("Not animal") are a follow-up, and the model has the transcript
-  const decided = decide(sorted), kind = decided === "unclear" && history.length > 1 ? "work" : decided;
-  emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : decided === "unclear" ? `${sorted.note} · a follow-up, not a first turn: goes to the model` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
+  deps.onClassified?.(sorted);
+  // the classifier's verdict yields to the facts: a message that names a project or asks something the facts answer
+  // ("show me PACK", "resume") is work however it is phrased, and two words after a reply ("Not animal") are a follow-up
+  const decided = decide(sorted), overruled = (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : null;
+  const kind = overruled ? "work" : decided;
+  // the prompt's "conversation so far": the state the client echoed plus whatever is on screen this turn
+  const context = contextBlock(nextState(input.state ?? EMPTY_STATE, [], input.shown));
+  emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : overruled ? `${sorted.note} · ${overruled}: treated as work` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
   if (BEHAVIOR[kind].reply) {
     emit({ type: "trace", step: "policy", detail: `${kind} · fixed reply from the behaviour policy, no model, no panel · 0 tokens`, level: "info" });
     emit({ type: "text", text: BEHAVIOR[kind].reply!(last) });
@@ -254,7 +274,7 @@ export async function runAgent(input: RunInput, emit: Emit, deps: RunDeps): Prom
   if (!deps.models.length) { emit({ type: "trace", step: "model", detail: "no model configured", level: "err" }); return fallbackToRouter(ROUTER); }
 
   const base: ChatMessage[] = [
-    { role: "system", content: SYSTEM + (input.shown.length ? `\nAlready on screen: ${input.shown.join(", ")}.` : "") + (BEHAVIOR[kind].tone ? `\n${BEHAVIOR[kind].tone}` : "") },
+    { role: "system", content: SYSTEM + (context ? `\n${context}` : "") + (BEHAVIOR[kind].tone ? `\n${BEHAVIOR[kind].tone}` : "") },
     ...transcript(history),
   ];
 

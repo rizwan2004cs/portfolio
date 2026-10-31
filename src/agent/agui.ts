@@ -30,6 +30,7 @@ export function toAgui(ev: AgentEvent): BaseEvent[] {
     case "suggest": return [custom("suggest", { options: ev.options })];
     case "frontend": return [custom("frontend_tool", { name: ev.name, args: ev.args })];
     case "trace": return [custom("trace", { step: ev.step, detail: ev.detail, level: ev.level })];
+    case "state": return [{ type: EventType.STATE_SNAPSHOT, snapshot: ev.state } as BaseEvent];
   }
 }
 

@@ -868,6 +868,15 @@ describe("follow-ups with the conversation in hand", () => {
     const r = await turn({ turns: [prev.user, "Not animal"], history: [prev, { user: "Not animal" }], shown: ["pack"] }, [m], passScreen, undefined, async () => ({ kind: "playful" as const, confidence: 0.9, source: "model" as const, note: "playful" }));
     expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/compiler/); expect(r.of("trace").map((e) => e.detail).join("\n")).not.toMatch(/blocked opening pack/);
   });
+  it("the classifier's 'unclear' or 'small_talk' verdict yields to a message that names something on the site", async () => {
+    const unclear = async () => ({ kind: "unclear" as const, confidence: 0.9, source: "model" as const, note: "unclear · 0.90 confidence" });
+    const r = await turn({ turns: ["show me PACK"], history: [{ user: "show me PACK" }] }, [never()], passScreen, undefined, unclear);
+    expect(r.text).not.toMatch(/Not sure what you mean/); expect(r.of("tool").some((t) => t.name === "open_project" && t.args.id === "pack")).toBe(true);
+    expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/names something on the site: treated as work/);
+    const small = async () => ({ kind: "small_talk" as const, confidence: 0.95, source: "model" as const, note: "small_talk" });
+    expect((await turn({ turns: ["resume"], history: [{ user: "resume" }] }, [never()], passScreen, undefined, small)).of("approval").length).toBe(1);
+    expect((await turn({ turns: ["hello"], history: [{ user: "hello" }] }, [never()], passScreen, undefined, small)).meta.mode).toBe("scope"); // a real greeting still gets the fixed line
+  });
   it("a one-word first turn still gets the 'not sure' reply without a model call", async () => {
     const r = await turn({ turns: ["count"], history: [{ user: "count" }] }, [never()]);
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/Not sure what you mean/);

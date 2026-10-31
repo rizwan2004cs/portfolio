@@ -4,6 +4,7 @@ import { isProjectId } from "@/content/data";
 import { newIds, runError, runFinished, runStarted, toAgui } from "./agui";
 import { cacheKey, makeCache, type AnswerCache } from "./cache";
 import { groqScreen, modelChain } from "./models";
+import { nextState, sanitizeState } from "./state";
 import { classifierEndpoints, nemotronClassifier, type Classifier } from "./classify";
 import { router } from "./router";
 import { waitUntil } from "@vercel/functions";
@@ -29,6 +30,8 @@ const Body = z.object({
   history: z.array(ExchangeBody).optional(),
   shown: z.array(z.string()).optional().default([]),
   killModel: z.boolean().optional().default(false),
+  /** the session state from the last snapshot; a claim, sanitised before use */
+  state: z.unknown().optional(),
   threadId: z.string().max(80).optional(),
 });
 
@@ -90,7 +93,8 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
     .filter((h) => h.user).slice(-LIMITS.turns);
   const turns = history.map((h) => h.user);
   if (!turns.length) return new Response("bad request", { status: 400 });
-  const shown = parsed.shown.map(String).filter((s) => isProjectId(s) || SHOWN_OK.has(s)).slice(0, LIMITS.shown);
+  const state = sanitizeState(parsed.state);
+  const shown = [...new Set([...state.shown, ...parsed.shown.map(String)])].filter((s) => isProjectId(s) || SHOWN_OK.has(s)).slice(0, LIMITS.shown);
   const now = deps.now();
   if (rateLimited(ip, now)) return new Response("slow down", { status: 429, headers: { "Retry-After": "60" } });
 
@@ -111,7 +115,8 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
       let meta: RunMeta | undefined, error: string | undefined;
       send(runStarted(threadId, runId));
       try {
-        const key = `${cacheKey(turns, shown)}:${PROMPT_HASH}`;
+        // the same question answered for another visitor or focus is a different answer
+        const key = `${cacheKey(turns, shown)}:${JSON.stringify([state.focus, state.offered, state.visitor])}:${PROMPT_HASH}`;
         const hit = !parsed.killModel ? deps.cache.get(key) : undefined;
         if (hit) {
           emit({ type: "trace", step: "cache", detail: "same question answered before · replayed, 0 tokens", level: "ok" });
@@ -119,14 +124,16 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           meta = { mode: "cache" };
         } else {
           const recorded: AgentEvent[] = [];
-          const record = (ev: AgentEvent) => { if (ev.type !== "trace") recorded.push(ev); emit(ev); };
+          const record = (ev: AgentEvent) => { if (ev.type !== "trace" && ev.type !== "state") recorded.push(ev); emit(ev); };
           const budgetOut = overBudget(now);
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
-          meta = await runAgent({ turns, history, shown, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, signal: ctl.signal });
+          meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, signal: ctl.signal });
           if (meta.mode === "model" || meta.mode === "partial") budget.runs++;
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
         }
-        send(runFinished(threadId, runId, meta));
+        emit({ type: "state", state: nextState(state, seen, shown, meta.visitor) });
+        const { visitor: _visitor, ...result } = meta;
+        send(runFinished(threadId, runId, result));
       } catch (err) {
         console.error("agent run failed", err);
         error = err instanceof Error ? err.message.slice(0, 300) : "unknown error";
