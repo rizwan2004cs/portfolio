@@ -12,7 +12,7 @@ import { neonTurnLog, type TurnLogger } from "@/server/log";
 import { opikClient, traceTurn, type TurnTrace } from "@/server/opik";
 import { runAgent, SYSTEM } from "./run";
 import { ALL_FACTS_SOURCE, TOOL_DEFS, toolContext } from "./tools";
-import type { AgentEvent, ModelClient, RunMeta, Screen } from "./types";
+import type { AgentEvent, Exchange, ModelClient, RunMeta, Screen } from "./types";
 
 // modelRunsPerDay: Groq's free tier allows 1,000 requests/day per model and a run makes 2–3, so ~600 runs across both models.
 // turnChars fits a pasted job description; bodyBytes fits six of them
@@ -22,8 +22,11 @@ const PROMPT_HASH = [...`${SYSTEM}${JSON.stringify(TOOL_DEFS)}${ALL_FACTS_SOURCE
 export const LIMITS = { bodyBytes: 24576, turnChars: 2000, turns: 6, shown: 20, perMinute: 12, modelRunsPerDay: 600 } as const;
 const SHOWN_OK = new Set(["profile", "index", "harness", "done:resume", "done:contact"]);
 
+const ExchangeBody = z.object({ user: z.string(), agent: z.string().optional(), showed: z.array(z.string()).max(5).optional() });
 const Body = z.object({
-  turns: z.array(z.string()).min(1),
+  turns: z.array(z.string()).optional(),
+  /** the conversation so far, newest last: replaces `turns`, which old clients still send */
+  history: z.array(ExchangeBody).optional(),
   shown: z.array(z.string()).optional().default([]),
   killModel: z.boolean().optional().default(false),
   threadId: z.string().max(80).optional(),
@@ -81,7 +84,11 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
   let parsed: z.infer<typeof Body>;
   try { parsed = Body.parse(JSON.parse(raw)); } catch { return new Response("bad request", { status: 400 }); }
 
-  const turns = parsed.turns.map((t) => t.trim().slice(0, LIMITS.turnChars)).filter(Boolean).slice(-LIMITS.turns);
+  const trim = (t: string) => t.trim().slice(0, LIMITS.turnChars);
+  const history = (parsed.history ?? parsed.turns?.map((user): z.infer<typeof ExchangeBody> => ({ user })) ?? [])
+    .map((h): Exchange => ({ user: trim(h.user), ...(h.agent?.trim() ? { agent: trim(h.agent) } : {}), ...(h.showed?.length ? { showed: h.showed.map((s) => s.trim().slice(0, 80)).filter(Boolean) } : {}) }))
+    .filter((h) => h.user).slice(-LIMITS.turns);
+  const turns = history.map((h) => h.user);
   if (!turns.length) return new Response("bad request", { status: 400 });
   const shown = parsed.shown.map(String).filter((s) => isProjectId(s) || SHOWN_OK.has(s)).slice(0, LIMITS.shown);
   const now = deps.now();
@@ -115,7 +122,7 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           const record = (ev: AgentEvent) => { if (ev.type !== "trace") recorded.push(ev); emit(ev); };
           const budgetOut = overBudget(now);
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
-          meta = await runAgent({ turns, shown, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, signal: ctl.signal });
+          meta = await runAgent({ turns, history, shown, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, signal: ctl.signal });
           if (meta.mode === "model" || meta.mode === "partial") budget.runs++;
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
         }
@@ -134,7 +141,7 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
       } finally {
         controller.close();
         // the visitor already has the answer; the log write runs after the response, and never fails the turn
-        const row = { session: parsed.threadId, turn: parsed.turns.length, question: turns.at(-1)!, events: seen, meta, ms: deps.now() - now, killed: parsed.killModel, country, error };
+        const row = { session: parsed.threadId, turn: history.length, question: turns.at(-1)!, events: seen, meta, ms: deps.now() - now, killed: parsed.killModel, country, error };
         if (deps.log) waitUntil(deps.log(row).catch((e) => console.error("turn log failed", e instanceof Error ? e.message : e)));
         if (tt) waitUntil(tt.end({ meta, events: seen, error }).catch((e) => console.error("opik trace failed", e instanceof Error ? e.message : e)));
       }
