@@ -1,6 +1,7 @@
 // Runs the labelled message set (tests/fixtures/intents.json) through the live classifier and checks every message
 // lands in a kind the behaviour policy accepts for it. This replaces testing the agent by hand, one phrasing at a time.
 //   NVIDIA_API_KEY=… node scripts/eval-intents.mjs              all messages
+//   CLASSIFIER_MODEL=nvidia/… node scripts/eval-intents.mjs      another NVIDIA model
 //   MIN_ACCURACY=0.9 node scripts/eval-intents.mjs              fail below this share
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
@@ -17,7 +18,10 @@ const criteria = Object.fromEntries([...src.matchAll(/^\s{2}(\w+): \{\s*(?:\n\s*
 const SENSITIVE = ["personal", "abusive", "accusation"];
 // the same prompt as classifierMessages() in src/agent/classify.ts: change both together
 const SITE = "A portfolio site for Syed Mohammad Rizwan, an AI engineer, with an AI agent visitors chat with.";
+const PROMPT = JSON.parse(readFileSync(new URL("../src/agent/classifier-prompt.json", import.meta.url), "utf8"));
+const MODEL = process.env.CLASSIFIER_MODEL || "nvidia/nemotron-3.5-lightning-30b-a3b";
 const system = `${SITE}\nSort the visitor's newest message into exactly one kind. A short follow-up takes the kind of the exchange before it.\nKinds:\n${Object.entries(criteria).map(([k, d]) => `- ${k}: ${d}`).join("\n")}\n`
+  + `Rules:\n${PROMPT.guidance.map((g) => `- ${g}`).join("\n")}\nExamples:\n${PROMPT.examples.map((e) => `"${e.text}" → ${e.kind}`).join("\n")}\n`
   + `Reply with JSON only: {"kind": <kind>, "confidence": <0 to 1>, "visitor": {"name", "company", "role", "hiringFor"}} where "visitor" appears only when the kind is visitor_intro, with only the fields the message states.`;
 // the same rule as decide() in src/agent/classify.ts
 const decide = (kind, conf, p = {}) => {
@@ -34,7 +38,7 @@ for (const c of cases) {
       const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: "POST", signal: AbortSignal.timeout(20_000),
         headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
-        body: JSON.stringify({ model: "nvidia/nemotron-3.5-lightning-30b-a3b", temperature: 0, max_tokens: 120, chat_template_kwargs: { enable_thinking: false }, messages: [{ role: "system", content: system }, { role: "user", content: `Visitor message: ${c.text.slice(0, 1500)}` }] }),
+        body: JSON.stringify({ model: MODEL, temperature: 0, max_tokens: 120, chat_template_kwargs: { enable_thinking: false }, messages: [{ role: "system", content: system }, { role: "user", content: `Visitor message: ${c.text.slice(0, 1500)}` }] }),
       });
       if (r.ok) { const m = /\{[\s\S]*\}/.exec((await r.json()).choices?.[0]?.message?.content ?? ""); try { const a = m ? JSON.parse(m[0]) : {}; kind = a.kind ?? "error"; conf = Number(a.confidence ?? 0); } catch { kind = "error"; } }
       else await new Promise((res) => setTimeout(res, 2000));
