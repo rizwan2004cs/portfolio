@@ -94,6 +94,18 @@ describe("route · input validation", () => {
     expect(plain.some((e) => e.type === "CUSTOM" && e.name === "trace" && /answered before/.test(e.value.detail))).toBe(false);
   });
 
+  it("with the shared limiter, the per-IP window and the daily budget hold across instances and count provider-touching turns", async () => {
+    const counts = new Map<string, number>();
+    const limiter = { hit: async (key: string) => { const n = (counts.get(key) ?? 0) + 1; counts.set(key, n); return n; } };
+    const a = { ...deps(), limiter }, b = { ...deps(), limiter }; // two "instances" sharing one counter
+    for (let i = 0; i < LIMITS.perMinute; i++) expect((await handleAgent(post({ turns: [`q${i}`] }), i % 2 ? a : b, "7.7.7.7")).status).toBe(200);
+    expect((await handleAgent(post({ turns: ["one more"] }), a, "7.7.7.7")).status).toBe(429);
+    expect(counts.get("ip:7.7.7.7")).toBe(LIMITS.perMinute + 1);
+    expect([...counts.keys()].some((k) => k.startsWith("budget:"))).toBe(true); // every uncached turn that may touch a provider is counted, with no refund
+    const down = { ...deps(), limiter: { hit: async () => null } };
+    expect((await handleAgent(post({ turns: ["still answers"] }), down, "8.8.8.8")).status).toBe(200); // database down: local limits take over
+  });
+
   it("413 for an oversized body", async () => {
     expect((await handleAgent(post({ turns: ["x".repeat(LIMITS.bodyBytes + 100)] }), deps())).status).toBe(413);
   });

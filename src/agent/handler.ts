@@ -8,6 +8,7 @@ import { groqScreen, modelChain } from "./models";
 import { nextState, sanitizeState } from "./state";
 import { neonRetriever, type Retriever } from "@/server/retrieval";
 import { nemotronSelfCheck, type SelfCheck } from "./check";
+import { neonLimiter, type Limiter } from "@/server/limits";
 import { introFacts, ruleKind } from "./behavior";
 import { classifierEndpoints, nemotronClassifier, type Classifier } from "./classify";
 import { router } from "./router";
@@ -49,6 +50,8 @@ export interface HandlerDeps {
   classify?: Classifier;
   retriever?: Retriever;
   selfCheck?: SelfCheck;
+  /** the shared per-IP and daily counters; absent in tests and when no database is configured */
+  limiter?: Limiter;
   cache: AnswerCache;
   now: () => number;
   /** stores each finished turn (Neon in production); absent locally and in tests */
@@ -64,6 +67,7 @@ export function defaultDeps(env = process.env): HandlerDeps {
     screen: groqScreen(groqKeys),
     classify: nemotronClassifier(classifierEndpoints(env.NVIDIA_API_KEY?.trim() || undefined, env.OPENROUTER_API_KEY?.trim() || undefined)),
     retriever: neonRetriever(env.DATABASE_URL, env.NVIDIA_API_KEY?.trim() || undefined),
+    limiter: neonLimiter(env.DATABASE_URL),
     selfCheck: nemotronSelfCheck(env.NVIDIA_API_KEY?.trim() || undefined),
     cache: makeCache(),
     now: () => Date.now(),
@@ -72,7 +76,9 @@ export function defaultDeps(env = process.env): HandlerDeps {
   };
 }
 
-// Per-IP sliding window and a daily model budget. In-memory per warm instance; Vercel WAF adds the hard edge limit.
+// Per-IP window and a daily budget of provider-touching runs. The shared counter in Neon (src/server/limits.ts) makes
+// both hold across every instance; the in-memory copies are the fallback when it is slow or down. There is no edge
+// rate limit in front of this route (the project's Vercel Firewall has no rules; rate-limit rules need a paid plan).
 const hits = new Map<string, number[]>();
 let budget = { day: "", runs: 0 };
 export function rateLimited(ip: string, now: number): boolean {
@@ -82,10 +88,21 @@ export function rateLimited(ip: string, now: number): boolean {
   if (hits.size > 5000) hits.delete(hits.keys().next().value as string);
   return recent.length > LIMITS.perMinute;
 }
-function overBudget(now: number): boolean {
-  const day = new Date(now).toISOString().slice(0, 10);
-  if (budget.day !== day) budget = { day, runs: 0 };
+const dayOf = (now: number) => new Date(now).toISOString().slice(0, 10);
+function overBudgetLocal(now: number): boolean {
+  if (budget.day !== dayOf(now)) budget = { day: dayOf(now), runs: 0 };
   return budget.runs >= LIMITS.modelRunsPerDay;
+}
+/** Shared first, local as the fallback. A run counts the moment it may touch a provider (classifier, retrieval, models), not only when a model answers. */
+async function spend(limiter: Limiter | undefined, ip: string, now: number): Promise<{ limited: boolean; budgetOut: boolean; shared: boolean }> {
+  const local = () => { const limited = rateLimited(ip, now); const budgetOut = limited || overBudgetLocal(now); if (!limited && !budgetOut) budget.runs++; return { limited, budgetOut, shared: false }; };
+  if (!limiter) return local();
+  const n = await limiter.hit(`ip:${ip}`, 60);
+  if (n === null) return local();
+  if (n > LIMITS.perMinute) return { limited: true, budgetOut: true, shared: true };
+  const runs = await limiter.hit(`budget:${dayOf(now)}`, 86_400);
+  if (runs === null) return local();
+  return { limited: false, budgetOut: runs > LIMITS.modelRunsPerDay, shared: true };
 }
 export const _resetLimits = () => { hits.clear(); budget = { day: "", runs: 0 }; };
 
@@ -107,7 +124,8 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
   const state = sanitizeState(parsed.state);
   const shown = [...new Set([...state.shown, ...parsed.shown.map(String)])].filter((s) => isProjectId(s) || SHOWN_OK.has(s)).slice(0, LIMITS.shown);
   const now = deps.now();
-  if (rateLimited(ip, now)) return new Response("slow down", { status: 429, headers: { "Retry-After": "60" } });
+  const spent = await spend(deps.limiter, ip, now);
+  if (spent.limited) return new Response("slow down", { status: 429, headers: { "Retry-After": "60" } });
 
   const encoder = new EventEncoder({ accept: req.headers.get("accept") ?? undefined });
   const { threadId: newThread, runId } = newIds();
@@ -139,11 +157,10 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
         } else {
           const recorded: AgentEvent[] = [];
           const record = (ev: AgentEvent) => { if (ev.type !== "trace" && ev.type !== "state") recorded.push(ev); emit(ev); };
-          const budgetOut = overBudget(now);
-          if (!budgetOut) budget.runs++; // counted up front, so a burst of concurrent runs cannot all slip under the cap
+          const budgetOut = spent.budgetOut;
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
           meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, retriever: deps.retriever, selfCheck: deps.selfCheck, signal: ctl.signal });
-          if (!budgetOut && meta.mode !== "model" && meta.mode !== "partial") budget.runs--; // no model was used after all
+          if (!spent.shared && !budgetOut && meta.mode !== "model" && meta.mode !== "partial") budget.runs--; // local fallback only: a turn that touched no model is given back
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
         }
         emit({ type: "state", state: nextState(state, seen, shown, meta.visitor) });
