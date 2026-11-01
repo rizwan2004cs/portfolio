@@ -1,6 +1,7 @@
 import { isProjectId, projectById } from "@/content/data";
 import type { Visitor } from "./classify";
 import { fitRows } from "./fit";
+import { isAttack, offScope } from "./scope";
 import type { AgentEvent } from "./types";
 
 /** What the conversation has established so far. The server computes it after every turn and sends it as an AG-UI
@@ -31,7 +32,12 @@ const PANELS = new Set(["profile", "index", "harness", "done:resume", "done:cont
 const VISITOR_FIELDS = ["name", "company", "role", "hiringFor"] as const;
 const MAX = { list: 20, text: 80, topics: 10 } as const;
 
-const str = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, MAX.text) : "");
+// one line of plain text, and never an instruction: a value that reads like an attack or an off-scope request is dropped
+const str = (v: unknown) => {
+  if (typeof v !== "string") return "";
+  const t = v.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, MAX.text);
+  return !t || isAttack(t) || offScope(t) ? "" : t;
+};
 const unique = <T,>(xs: T[]) => [...new Set(xs)];
 
 /** A state from the client is a claim, not a fact: unknown ids and fields are dropped, sizes are capped. */
@@ -88,7 +94,7 @@ export function contextBlock(s: SessionState): string {
   const v = s.visitor, who = [v.name, v.company, v.role].filter(Boolean).join(", ");
   if (who || v.hiringFor) lines.push(`Visitor: ${who || "unnamed"}${v.hiringFor ? `, hiring for ${v.hiringFor}` : ""}.${v.name ? " Use their name once, not every turn." : ""}${v.hiringFor ? " Tailor answers to that role." : ""}`);
   if (s.topics.length) lines.push(`Asked about so far: ${s.topics.join(", ")}.`);
-  if (s.pending) lines.push(`You just asked: "${s.pending.question}" with the options ${s.pending.options.join(" / ")}; the visitor's reply may be an answer to it.`);
+  if (s.pending) lines.push(`You just asked: "${s.pending.question.replace(/"/g, "'")}" with the options ${s.pending.options.map((o) => o.replace(/"/g, "'")).join(" / ")}; the visitor's reply may be an answer to it.`);
   if (s.fit) lines.push(`Fit so far: ${s.fit.matched.length} of ${s.fit.requirements.length} requirements shown in his projects${s.fit.gaps.length ? `; not shown: ${s.fit.gaps.join(", ")}` : ""}.`);
   return lines.length ? `Conversation so far:\n${lines.join("\n")}` : "";
 }

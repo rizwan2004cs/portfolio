@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && npx tsx scripts/index-facts.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests scripts",
@@ -41,6 +41,7 @@
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.3",
+    "jsdom": "^26.1.0",
     "schema-dts": "2.1.0",
     "tsx": "^4.23.15",
     "typescript": "5.9.3",

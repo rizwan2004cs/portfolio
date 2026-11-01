@@ -1,11 +1,9 @@
-# Rebuilds the facts index in Neon (pgvector) whenever the content changes on main, so retrieval and the grounding check
-# by meaning read what the site says. Needs repository secrets DATABASE_URL and NVIDIA_API_KEY.
+# The facts index in Neon (pgvector) is rebuilt by every Vercel build (`npm run build` ends with scripts/index-facts.ts,
+# and the build has DATABASE_URL and NVIDIA_API_KEY). This workflow is a by-hand rebuild for when the database changes;
+# it needs repository secrets DATABASE_URL and NVIDIA_API_KEY.
 name: Facts index
 
 on:
-  push:
-    branches: [main]
-    paths: ["src/content/**", "scripts/index-facts.ts", "src/server/retrieval.ts"]
   workflow_dispatch:
 
 jobs:
@@ -23,4 +21,4 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-        run: npx tsx scripts/index-facts.ts
+        run: REQUIRE_INDEX=1 npx tsx scripts/index-facts.ts

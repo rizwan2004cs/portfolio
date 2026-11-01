@@ -1,5 +1,6 @@
 import type { Classifier } from "@/agent/classify";
 import type { Retriever } from "@/server/retrieval";
+import type { SelfCheck } from "@/agent/check";
 import { isToolName } from "@/agent/tools";
 import { expect } from "vitest";
 import { runAgent } from "@/agent/run";
@@ -32,10 +33,10 @@ export const tools = (...tool_calls: ReturnType<typeof call>[]): AssistantMessag
 export const passScreen: Screen = async () => ({ ok: true, note: "pass · <0.001" });
 export const blockScreen: Screen = async () => ({ ok: false, note: "flagged · 0.999" });
 
-export async function turn(input: Partial<RunInput> & { turns: string[]; retriever?: Retriever }, models: ModelClient[], screen: Screen = passScreen, signal = new AbortController().signal, classify?: Classifier) {
-  const { retriever, ...rest } = input;
+export async function turn(input: Partial<RunInput> & { turns: string[]; retriever?: Retriever; selfCheck?: SelfCheck }, models: ModelClient[], screen: Screen = passScreen, signal = new AbortController().signal, classify?: Classifier) {
+  const { retriever, selfCheck, ...rest } = input;
   const evs: AgentEvent[] = [];
-  const meta: RunMeta = await runAgent({ shown: [], killModel: false, ...rest }, (e) => evs.push(e), { models, screen, signal, classify, retriever });
+  const meta: RunMeta = await runAgent({ shown: [], killModel: false, ...rest }, (e) => evs.push(e), { models, screen, signal, classify, retriever, selfCheck });
   return { evs, meta, text: evs.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" "), of: <T extends AgentEvent["type"]>(t: T) => evs.filter((e): e is Extract<AgentEvent, { type: T }> => e.type === t) };
 }
 

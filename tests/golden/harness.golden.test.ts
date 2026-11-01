@@ -955,6 +955,24 @@ describe("follow-ups with the conversation in hand", () => {
     const r = await turn({ turns: [prev.user, "would he suit us?"], history: [prev, { user: "would he suit us?" }], shown: ["pack"] }, [m]);
     expect(r.text).toBe("Which role are you hiring for?"); expect(r.of("suggest").at(-1)!.options.slice(0, 2)).toEqual(["Backend engineer", "AI engineer"]); expect(r.meta.mode).toBe("model");
   });
+  it("a long answer gets a second reader: a sentence it rejects is dropped even when the word check let it through", async () => {
+    const m = scripted("gpt-oss-120b", [say("A LangGraph state machine runs the game. Seven agents reason, speak and bet. Each agent keeps private reasoning while the UI shows dialogue.", call("open_project", { id: "pack" }), call("suggest", { options: ["x"] }))]);
+    const selfCheck = async (draft: string) => draft.split(/(?<=\.)\s+/).map((sentence, i) => ({ sentence, ok: i !== 1, why: i === 1 ? "bet is not in the facts" : "" }));
+    const r = await turn({ turns: ["how does PACK work?"], selfCheck }, [m]);
+    expect(r.text).toBe("A LangGraph state machine runs the game. Each agent keeps private reasoning while the UI shows dialogue.");
+    expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/a second model read 3 sentences · removed 1/);
+    const harsh = await turn({ turns: ["how does PACK work?"], selfCheck: async (draft: string) => draft.split(/(?<=\.)\s+/).map((sentence) => ({ sentence, ok: false, why: "no" })) }, [m]);
+    expect(harsh.text).toMatch(/^A LangGraph state machine runs the game\. Seven agents/); expect(harsh.of("trace").map((e) => e.detail).join("\n")).toMatch(/rejected all 3 sentences .* not trusted/);
+    const quiet = await turn({ turns: ["how does PACK work?"], selfCheck: async () => null }, [m]);
+    expect(quiet.text).toMatch(/^A LangGraph state machine runs the game\. Seven agents reason, speak and bet\./); expect(quiet.of("trace").map((e) => e.detail).join("\n")).toMatch(/second reader unavailable/);
+  });
+  it("a question the word scoring cannot place reaches the model with the facts closest to it", async () => {
+    let system = "";
+    const m = { name: "m", complete: async (ms: { role: string; content?: string | null }[]) => { system = String(ms[0].content); return { role: "assistant" as const, content: "CCR Compliance Advisor cites one section per claim." }; } };
+    const retriever = { search: async () => [{ id: "project:x", project: "ccr", kind: "project", text: "Answers come only from retrieved sections, one citation per claim.", score: 0.03, cosine: 0.5 }], support: async () => null, verify: async () => null };
+    const r = await turn({ turns: ["what makes his work hold up when things go wrong?"], retriever }, [m]);
+    expect(system).toContain("Facts closest to this question"); expect(system).toContain("one citation per claim"); expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/1 facts by meaning and keywords \(ccr/);
+  });
   it("a dated question is answered from the resume without a model", async () => {
     const r = await turn({ turns: ["what was he doing in April 2026?"] }, [never()]);
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^In Apr 2026 he was Software Engineering Intern/); expect(r.of("tool").some((t) => t.name === "show_profile")).toBe(true);

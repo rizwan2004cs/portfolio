@@ -426,3 +426,12 @@ describe("comparing projects", () => {
     expect(namedProjects("how does he test?")).toEqual([]);
   });
 });
+
+describe("links built from text stay on the site", () => {
+  it("a doubled slash after the host is not a link to another host", async () => {
+    const { answerHtml, safeUrl } = await import("@/render/html");
+    expect(answerHtml("See mohammad-rizwan.tech//evil.example for more.")).not.toMatch(/href="\/\//);
+    expect(answerHtml("See mohammad-rizwan.tech/work/pack for more.")).toMatch(/href="[^"]*\/work\/pack"/);
+    expect(safeUrl("//evil.example")).toBe("#"); expect(safeUrl("/films")).toBe("/films");
+  });
+});

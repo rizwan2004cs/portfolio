@@ -5,7 +5,7 @@ import { bestFact, groundAnswer } from "./grounding";
 import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
-import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router } from "./router";
+import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router, scoreProjects } from "./router";
 import { ATTACK_REPLY, BAD_OUTPUT, CODEY, GUARD_REFUSAL, isAttack, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
 import { fixTypos, hinglish } from "./typos";
 import { skillAsked } from "./skills";
@@ -19,6 +19,7 @@ import { nextOffer } from "./offers";
 import { resolvePending, whichOne } from "./clarify";
 import type { Visitor } from "./classify";
 import type { Retriever } from "@/server/retrieval";
+import type { SelfCheck } from "./check";
 
 /** Everything the site says about him, compact: the model reasons over this directly instead of looking it up. */
 export const KNOWLEDGE = [
@@ -59,6 +60,8 @@ export interface RunDeps {
   classify?: Classifier;
   /** his facts by meaning (Neon pgvector + a small judge): a sentence the word check drops gets a second reading */
   retriever?: Retriever;
+  /** one read of a long draft against the facts, a verdict per sentence */
+  selfCheck?: SelfCheck;
 }
 
 const MAX_STEPS = 4;
@@ -196,7 +199,17 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
     return { mode: "facts" };
   }
   // the prompt's "conversation so far": the state the client echoed plus whatever is on screen this turn
-  const context = contextBlock(nextState(input.state ?? EMPTY_STATE, [], input.shown));
+  let context = contextBlock(nextState(input.state ?? EMPTY_STATE, [], input.shown));
+  // a question the word scoring cannot place ("something with retrieval and citations?") still reaches the model with
+  // the facts closest to it in meaning, from the index; the tools remain the only way to show anything
+  if (deps.retriever && !input.killModel && !scoreProjects(last).some((x) => x.s > 0) && !clearPick(subject)) {
+    const t0 = Date.now();
+    const hits = await deps.retriever.search(last, 4, deps.signal).catch(() => []);
+    if (hits.length) {
+      context += `${context ? "\n" : ""}Facts closest to this question (from his write-ups; cite them, don't add to them):\n${hits.map((h) => `- ${h.text}`).join("\n")}`;
+      emit({ type: "trace", step: "retrieval", detail: `${hits.length} facts by meaning and keywords (${hits.map((h) => h.project ?? h.kind).join(", ")} · ${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "info" });
+    }
+  }
   emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : overruled ? `${sorted.note} · ${overruled}: treated as work` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
   if (BEHAVIOR[kind].reply) {
     emit({ type: "trace", step: "policy", detail: `${kind} · fixed reply from the behaviour policy, no model, no panel · 0 tokens`, level: "info" });
@@ -395,7 +408,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           if (["open_project", "search_projects", "list_projects", "show_profile", "match_role", "compare_projects"].includes(d.name)) looked = true;
           const result = runTool(d.name, d.args, out);
           // the agent asked the visitor something: the turn ends on the question, the answer comes next turn
-          if (d.name === "ask_visitor" && !("error" in result)) { spoke = true; emit({ type: "trace", step: "clarify", detail: `asked “${String(result.asked)}” instead of guessing`, level: "ok" }); return finish({ mode: "model", model: model.name, tools }); }
+          // a question is never cached: it belongs to this conversation, and it did not pass the grounding check
+          if (d.name === "ask_visitor" && !("error" in result)) { spoke = true; emit({ type: "trace", step: "clarify", detail: `asked “${String(result.asked)}” instead of guessing`, level: "ok" }); return finish({ mode: "model", model: model.name, tools, stock: true }); }
           if (d.name === "match_role" && typeof result.total === "number") fitNote = fitLine(fitRows((d.args.requirements as string[]) ?? []));
           source += ` ${JSON.stringify(result)} ${toolContext(d.name)}`;
           if (Array.isArray(result.facts) && typeof result.title === "string") { lastTitle = result.title; lastFacts = result.facts.map(String); }
@@ -412,6 +426,22 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       const answer = texts.join(" ").trim();
       if (answer) {
         const gr = groundAnswer(answer, source, last, lastTitle, `${source} ${ALL_FACTS_SOURCE}`, lastFacts, { loose: kind === "playful" || natural });
+        // a long answer gets a second reader before the visitor does: one model read of every sentence against the
+        // facts the tools returned; a sentence it rejects is dropped even when the word check let it through
+        if (deps.selfCheck && !natural && kind !== "playful" && gr.parts.filter((p) => p.ok).length >= 3 && !deps.signal.aborted) {
+          const t0 = Date.now();
+          const verdicts = await deps.selfCheck(gr.parts.filter((p) => p.ok).map((p) => p.s).join(" "), `${source} ${lastFacts.join(" ")}`, deps.signal);
+          const bad = verdicts?.filter((v) => !v.ok) ?? [];
+          if (verdicts === null) emit({ type: "trace", step: "self-check", detail: `second reader unavailable (${((Date.now() - t0) / 1000).toFixed(1)}s) · word check stands`, level: "info" });
+          // a reader that rejects every sentence of an answer the word check passed is the one being wrong: not trusted
+          else if (bad.length === verdicts.length) emit({ type: "trace", step: "self-check", detail: `a second model rejected all ${verdicts.length} sentences the word check passed · not trusted, word check stands (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "warn" });
+          else if (!bad.length) emit({ type: "trace", step: "self-check", detail: `a second model read all ${verdicts.length} sentences against the facts · supported (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "ok" });
+          else {
+            for (const b of bad) { const p = gr.parts.find((x) => x.ok && x.s === b.sentence); if (p) { p.ok = false; p.why = "claims"; p.miss = [b.why || "second reader"]; gr.dropped.push([b.why || "second reader"]); } }
+            gr.text = gr.parts.filter((p) => p.ok).map((p) => p.s).join(" ") || gr.text;
+            emit({ type: "trace", step: "self-check", detail: `a second model read ${verdicts.length} sentences · removed ${bad.length}: ${bad.map((b) => `“${b.sentence.slice(0, 40)}…” (${b.why})`).join("; ")} (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "warn" });
+          }
+        }
         // a sentence dropped for its wording alone gets a second reading: the closest facts are retrieved by meaning and
         // a small model says whether they support it; a sentence dropped for a number, a name or puffery stays dropped
         const byWords = gr.parts.filter((p) => !p.ok && p.why === "words");

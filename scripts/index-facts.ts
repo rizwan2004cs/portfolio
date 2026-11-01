@@ -10,7 +10,8 @@ for (const f of [".env.local", ".env.neon.local"]) {
   try { for (const line of readFileSync(f, "utf8").split("\n")) { const m = /^([A-Z_]+)=(.*)$/.exec(line.trim()); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^"(.*)"$/, "$1"); } } catch { /* optional */ }
 }
 const url = process.env.DATABASE_URL, key = process.env.NVIDIA_API_KEY;
-if (!url || !key) { console.error("DATABASE_URL and NVIDIA_API_KEY are required"); process.exit(1); }
+// run as a build step on Vercel (where both are set) and by hand; a build without them just skips the index
+if (!url || !key) { console.log(`facts index: skipped (${!url ? "no DATABASE_URL" : "no NVIDIA_API_KEY"})`); process.exit(process.env.REQUIRE_INDEX ? 1 : 0); }
 const sql = neon(url);
 
 await sql`create extension if not exists vector`;

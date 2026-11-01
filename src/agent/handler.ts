@@ -6,6 +6,7 @@ import { cacheKey, makeCache, type AnswerCache } from "./cache";
 import { groqScreen, modelChain } from "./models";
 import { nextState, sanitizeState } from "./state";
 import { neonRetriever, type Retriever } from "@/server/retrieval";
+import { nemotronSelfCheck, type SelfCheck } from "./check";
 import { classifierEndpoints, nemotronClassifier, type Classifier } from "./classify";
 import { router } from "./router";
 import { waitUntil } from "@vercel/functions";
@@ -21,6 +22,7 @@ import type { AgentEvent, Exchange, ModelClient, RunMeta, Screen } from "./types
 // the prompt, the tools and every fact the tools return: changing any of them must not serve old answers
 const PROMPT_HASH = [...`${SYSTEM}${JSON.stringify(TOOL_DEFS)}${ALL_FACTS_SOURCE}${toolContext("show_harness")}`].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7).toString(36);
 
+const digest = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7).toString(36);
 export const LIMITS = { bodyBytes: 24576, turnChars: 2000, turns: 6, shown: 20, perMinute: 12, modelRunsPerDay: 600 } as const;
 const SHOWN_OK = new Set(["profile", "index", "harness", "done:resume", "done:contact"]);
 
@@ -33,7 +35,7 @@ const Body = z.object({
   killModel: z.boolean().optional().default(false),
   /** the session state from the last snapshot; a claim, sanitised before use */
   state: z.unknown().optional(),
-  threadId: z.string().max(80).optional(),
+  threadId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(),
 });
 
 export interface HandlerDeps {
@@ -42,6 +44,7 @@ export interface HandlerDeps {
   /** the outer agent that sorts each message into a kind (src/agent/behavior.ts) */
   classify?: Classifier;
   retriever?: Retriever;
+  selfCheck?: SelfCheck;
   cache: AnswerCache;
   now: () => number;
   /** stores each finished turn (Neon in production); absent locally and in tests */
@@ -57,6 +60,7 @@ export function defaultDeps(env = process.env): HandlerDeps {
     screen: groqScreen(groqKeys),
     classify: nemotronClassifier(classifierEndpoints(env.NVIDIA_API_KEY?.trim() || undefined, env.OPENROUTER_API_KEY?.trim() || undefined)),
     retriever: neonRetriever(env.DATABASE_URL, env.NVIDIA_API_KEY?.trim() || undefined),
+    selfCheck: nemotronSelfCheck(env.NVIDIA_API_KEY?.trim() || undefined),
     cache: makeCache(),
     now: () => Date.now(),
     log: neonTurnLog(env.DATABASE_URL),
@@ -118,8 +122,9 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
       let meta: RunMeta | undefined, error: string | undefined;
       send(runStarted(threadId, runId));
       try {
-        // the same question answered for another visitor or focus is a different answer
-        const key = `${cacheKey(turns, shown)}:${JSON.stringify([state.focus, state.offered, state.visitor])}:${PROMPT_HASH}`;
+        // everything that shapes the prompt is in the key: the conversation as sent (its agent turns too), the whole
+        // sanitised state (focus, visitor, fit, a pending question that rewrites the message), and the prompt itself
+        const key = `${cacheKey(turns, shown)}:${digest(JSON.stringify([history.map((h) => [h.agent ?? "", h.showed ?? []]), state]))}:${PROMPT_HASH}`;
         const hit = !parsed.killModel ? deps.cache.get(key) : undefined;
         if (hit) {
           emit({ type: "trace", step: "cache", detail: "same question answered before · replayed, 0 tokens", level: "ok" });
@@ -130,7 +135,7 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           const record = (ev: AgentEvent) => { if (ev.type !== "trace" && ev.type !== "state") recorded.push(ev); emit(ev); };
           const budgetOut = overBudget(now);
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
-          meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, retriever: deps.retriever, signal: ctl.signal });
+          meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, retriever: deps.retriever, selfCheck: deps.selfCheck, signal: ctl.signal });
           if (meta.mode === "model" || meta.mode === "partial") budget.runs++;
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
         }

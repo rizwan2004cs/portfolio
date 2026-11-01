@@ -7,7 +7,7 @@ import type { FitRow } from "@/agent/fit";
 import { EDUCATION, EVENTS, EXPERIENCE, PROJECTS, roleDetail } from "@/content/data";
 
 export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-export const safeUrl = (u: unknown) => (/^(https?:|mailto:|\/)/.test(String(u)) ? String(u) : "#");
+export const safeUrl = (u: unknown) => (/^(https?:|mailto:|\/(?!\/))/.test(String(u)) ? String(u) : "#");
 
 export const CHEV = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>';
 export const BOLT = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 1.5L3 9h4.5L7 14.5 13 7H8.5z"/></svg>';
@@ -136,7 +136,7 @@ export function profilePart(pr: Profile, focus?: string) {
 const TITLES = [...PROJECTS].sort((a, b) => b.title.length - a.title.length);
 const TOKEN = new RegExp(`(${TITLES.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})|((?:\\$|₹)?\\d[\\d,]*(?:\\.\\d+)?(?:%|k\\b|\\+)?)`, "g");
 /** "mohammad-rizwan.tech/films" or "/films" in an answer becomes a link to it. */
-const SITE_PATH = /(?:https?:\/\/)?(?:www\.)?mohammad-rizwan\.tech(\/[\w/-]*)?|(?<![\w/])(\/(?:films|agent|resume\.pdf|work\/[\w-]+))\b/g;
+const SITE_PATH = /(?:https?:\/\/)?(?:www\.)?mohammad-rizwan\.tech(\/(?!\/)[\w-]*(?:\/[\w-]+)*\/?)?|(?<![\w/])(\/(?:films|agent|resume\.pdf|work\/[\w-]+))\b/g;
 // a project's live or source URL named in an answer ("live at finboom-cyan.vercel.app") becomes the same link its panel has
 const LINK_BY_HOST = new Map(PROJECTS.flatMap((p) => Object.values(p.links ?? {})).map((u) => [u.replace(/^https?:\/\//, "").replace(/\/$/, ""), u]));
 const PROJECT_LINK = new RegExp([...LINK_BY_HOST.keys()].sort((a, b) => b.length - a.length).map((h) => h.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")).join("|"), "g");
