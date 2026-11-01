@@ -17,7 +17,7 @@ import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange
 import { contextBlock, EMPTY_STATE, nextState } from "./state";
 import { nextOffer } from "./offers";
 import { resolvePending, whichOne } from "./clarify";
-import type { Visitor } from "./classify";
+import { nameFrom, type Visitor } from "./classify";
 import type { Retriever } from "@/server/retrieval";
 import type { SelfCheck } from "./check";
 
@@ -177,6 +177,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const before = history.length > 1 ? history.at(-2) : undefined;
   const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal, before ? { user: before.user, agent: before.agent } : undefined));
   // "unclear" is a first-turn verdict: two words after a reply ("Not animal") are a follow-up, and the model has the transcript
+  // an introduction with no fields from the classifier still yields the name written in it
+  if (sorted.kind === "visitor_intro" && !sorted.visitor?.name) { const name = nameFrom(last); if (name) sorted.visitor = { ...sorted.visitor, name }; }
   deps.onClassified?.(sorted);
   // the classifier's verdict yields to the facts: a message that names a project or asks something the facts answer
   // ("show me PACK", "resume") is work however it is phrased, and two words after a reply ("Not animal") are a follow-up

@@ -92,6 +92,15 @@ export function nemotronClassifier(endpoints: ClassifierEndpoint[] | string | un
   };
 }
 
+/** The visitor's name from the introduction itself ("I'm Priya from Razorpay", "this is Arjun, a founder"), for when
+ *  the classifier placed the message but gave no fields: one capitalised word after the intro phrase, nothing else. */
+export function nameFrom(text: string): string | undefined {
+  const m = /\b(?:i\s*['’]?\s*a?m|i am|this is|my name is|it['’]s)\s+(\S+)/i.exec(text.trim());
+  const word = m?.[1].replace(/[,.!?]+$/, "");
+  // a name is one capitalised word, and never a role, a pronoun or a filler the phrase can be followed by
+  return word && /^[A-Z][a-z]{1,20}$/.test(word) && !/^(?:His|Her|Their|The|Just|Here|From|Also|Not|A|An|Another|Rizwan|Hiring|Recruiter|Founder|Friend|Manager|Student|Developer|Engineer)$/.test(word) ? word : undefined;
+}
+
 /** The first JSON object in the model's text, with only the fields the policy knows. */
 export function parseAnswer(content: string): { kind: Kind; confidence: number; visitor?: Visitor } | null {
   const m = /\{[\s\S]*\}/.exec(content);
