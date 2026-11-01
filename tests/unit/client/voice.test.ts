@@ -12,7 +12,8 @@ class FakeRecognition {
   constructor() { FakeRecognition.last = this; }
   start() { this.started++; }
   stop() { this.stopped++; }
-  hear(text: string) { this.onresult?.({ results: [[{ transcript: text }]] }); this.onend?.(); }
+  hear(text: string) { this.onresult?.({ results: [Object.assign([{ transcript: text }], { isFinal: true })] }); this.onend?.(); }
+  partial(text: string) { this.onresult?.({ results: [Object.assign([{ transcript: text }], { isFinal: false })] }); }
 }
 
 describe("voice input", () => {
@@ -60,5 +61,21 @@ describe("voice input failures", () => {
     expect(button.getAttribute("aria-pressed")).toBe("false"); expect(input.placeholder).toMatch(/^Microphone blocked for this site/);
     button.click(); FakeRecognition.last!.fail("no-speech");
     expect(input.placeholder).toMatch(/^Didn’t catch that/);
+  });
+});
+
+describe("only the final result is sent, once", () => {
+  it("ignores an early partial result and a repeated final one", () => {
+    document.body.innerHTML = '<form id="form"><input id="inp"><button type="button" id="mic" hidden></button></form>';
+    (window as unknown as Record<string, unknown>).SpeechRecognition = FakeRecognition;
+    const sent: string[] = [];
+    mountVoice(document.querySelector<HTMLButtonElement>("#mic")!, document.querySelector<HTMLInputElement>("#inp")!, (t) => sent.push(t));
+    document.querySelector<HTMLButtonElement>("#mic")!.click();
+    FakeRecognition.last!.partial("Show");
+    expect(sent).toEqual([]);
+    FakeRecognition.last!.onresult?.({ results: [Object.assign([{ transcript: "Show" }], { isFinal: true }), Object.assign([{ transcript: "Show me PACK" }], { isFinal: true })] });
+    FakeRecognition.last!.onresult?.({ results: [Object.assign([{ transcript: "Show me PACK" }], { isFinal: true })] });
+    FakeRecognition.last!.onend?.();
+    expect(sent).toEqual(["Show me PACK"]);
   });
 });
