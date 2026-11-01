@@ -9,6 +9,8 @@ import { EMBED_DIMS, embed, vec } from "../src/server/retrieval";
 for (const f of [".env.local", ".env.neon.local"]) {
   try { for (const line of readFileSync(f, "utf8").split("\n")) { const m = /^([A-Z_]+)=(.*)$/.exec(line.trim()); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^"(.*)"$/, "$1"); } } catch { /* optional */ }
 }
+// a preview build must not rewrite what production reads: on Vercel only the production build indexes
+if (process.env.VERCEL && process.env.VERCEL_ENV !== "production") { console.log(`facts index: skipped (${process.env.VERCEL_ENV} build)`); process.exit(0); }
 const url = process.env.DATABASE_URL, key = process.env.NVIDIA_API_KEY;
 // run as a build step on Vercel (where both are set) and by hand; a build without them just skips the index
 if (!url || !key) { console.log(`facts index: skipped (${!url ? "no DATABASE_URL" : "no NVIDIA_API_KEY"})`); process.exit(process.env.REQUIRE_INDEX ? 1 : 0); }

@@ -435,3 +435,10 @@ describe("links built from text stay on the site", () => {
     expect(safeUrl("//evil.example")).toBe("#"); expect(safeUrl("/films")).toBe("/films");
   });
 });
+
+describe("hardening from the review", () => {
+  it("the model may switch views only when the visitor asked for a view", () => {
+    expect(checkToolCall({ name: "switch_mode", args: { mode: "classic" } }, { last: "show me PACK", shown: [], openedThisRun: new Set() }).action).toBe("drop");
+    expect(checkToolCall({ name: "switch_mode", args: { mode: "classic" } }, { last: "take me to the classic site", shown: [], openedThisRun: new Set() }).action).toBe("allow");
+  });
+});

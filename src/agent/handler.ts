@@ -10,6 +10,7 @@ import { nemotronSelfCheck, type SelfCheck } from "./check";
 import { introFacts, ruleKind } from "./behavior";
 import { classifierEndpoints, nemotronClassifier, type Classifier } from "./classify";
 import { router } from "./router";
+import { isAttack } from "./scope";
 import { waitUntil } from "@vercel/functions";
 import * as Sentry from "@sentry/nextjs";
 import { neonTurnLog, type TurnLogger } from "@/server/log";
@@ -97,7 +98,7 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
 
   const trim = (t: string) => t.trim().slice(0, LIMITS.turnChars);
   const history = (parsed.history ?? parsed.turns?.map((user): z.infer<typeof ExchangeBody> => ({ user })) ?? [])
-    .map((h): Exchange => ({ user: trim(h.user), ...(h.agent?.trim() ? { agent: trim(h.agent) } : {}), ...(h.showed?.length ? { showed: h.showed.map((s) => s.trim().slice(0, 80)).filter(Boolean) } : {}) }))
+    .map((h): Exchange => ({ user: trim(h.user), ...(h.agent?.trim() && !isAttack(h.agent) ? { agent: trim(h.agent) } : {}), ...(h.showed?.length ? { showed: h.showed.map((s) => s.trim().slice(0, 80)).filter((s) => s && !isAttack(s)) } : {}) }))
     .filter((h) => h.user).slice(-LIMITS.turns);
   const turns = history.map((h) => h.user);
   if (!turns.length) return new Response("bad request", { status: 400 });
@@ -137,9 +138,10 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           const recorded: AgentEvent[] = [];
           const record = (ev: AgentEvent) => { if (ev.type !== "trace" && ev.type !== "state") recorded.push(ev); emit(ev); };
           const budgetOut = overBudget(now);
+          if (!budgetOut) budget.runs++; // counted up front, so a burst of concurrent runs cannot all slip under the cap
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
           meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, retriever: deps.retriever, selfCheck: deps.selfCheck, signal: ctl.signal });
-          if (meta.mode === "model" || meta.mode === "partial") budget.runs++;
+          if (!budgetOut && meta.mode !== "model" && meta.mode !== "partial") budget.runs--; // no model was used after all
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
         }
         emit({ type: "state", state: nextState(state, seen, shown, meta.visitor) });
