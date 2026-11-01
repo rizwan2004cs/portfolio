@@ -451,3 +451,10 @@ describe("audit fixes: the cache key sees what the model sees", () => {
     expect(cacheKey(["उसका python"], [])).not.toBe(cacheKey(["python"], []));
   });
 });
+
+describe("a toolkit term is attributed through its own pattern", () => {
+  it("'RAG' is not a misattribution for CCR, whose facts say retrieval and Pinecone; a tech a project never used still is", () => {
+    expect(misattributedTech("CCR Compliance Advisor is his RAG project: it cites a section for every claim.")).toEqual([]);
+    expect(misattributedTech("PACK stores its game state in Pinecone.")).toContain("pinecone");
+  });
+});
