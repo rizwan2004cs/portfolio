@@ -985,6 +985,15 @@ describe("follow-ups with the conversation in hand", () => {
     expect(r.meta.model).toBe("nemotron-3.5-lightning-30b-a3b"); expect(r.text).toMatch(/Swiss Army knife/);
     expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/gpt-oss-20b returned nothing → (falling back to|switching provider: )nemotron/);
   });
+  it("the rules win where they are certain: a named intro the classifier called work, a corrected message it called small talk", async () => {
+    const work = async () => ({ kind: "work" as const, confidence: 0.9, source: "model" as const, note: "work · 0.90" });
+    const r = await turn({ turns: ["hi I'm Priya from Razorpay, hiring backend engineers"] }, [{ name: "m", complete: async () => ({ role: "assistant" as const, content: "What can I help you with?" }) }], passScreen, undefined, work);
+    expect(r.text).toMatch(/^Hi Priya\. What can I help/); expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/a named introduction: treated as visitor_intro/);
+    const small = async () => ({ kind: "small_talk" as const, confidence: 0.95, source: "model" as const, note: "small_talk · 0.95" });
+    const py = scripted("gpt-oss-120b", [say("Python shows in PACK, CCR Compliance Advisor and PULSEVO.", call("suggest", { options: ["x"] }))]);
+    const h = await turn({ turns: ["uska python experience kitna hai"] }, [py], passScreen, undefined, small);
+    expect(h.meta.mode).not.toBe("scope"); expect(h.text).toMatch(/Python/); expect(h.of("trace").map((e) => e.detail).join("\n")).toMatch(/read through a correction: treated as work/);
+  });
   it("a dated question is answered from the resume without a model", async () => {
     const r = await turn({ turns: ["what was he doing in April 2026?"] }, [never()]);
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^In Apr 2026 he was Software Engineering Intern/); expect(r.of("tool").some((t) => t.name === "show_profile")).toBe(true);
