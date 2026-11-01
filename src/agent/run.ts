@@ -353,7 +353,9 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         // the visitor sees the agent reach for a tool the moment the model names it, before the reply is complete
         const msg = await model.complete(messages, deps.signal, (name) => { if (name !== "suggest") emit({ type: "trace", step: "working", detail: `${model.name} is calling ${name}…`, level: "info" }); });
         // an empty reply with nothing said yet is a failure like any other: the next model in the chain gets the turn
-        if (!msg.content?.trim() && !msg.tool_calls?.length && !texts.length && deps.models[mi + 1]) throw new ModelError("returned nothing");
+        // no text and no real tool call (a lone suggest is chips, not an answer): the next model gets the turn
+        const realCall = (msg.tool_calls ?? []).some((c) => c.function.name !== "suggest");
+        if (!msg.content?.trim() && !realCall && !texts.length && deps.models[mi + 1]) throw new ModelError("returned nothing");
         flushSkips(model.name); // this model answered: say which resting keys were passed over to reach it
         const leak = leakedCalls(msg.content ?? "");
         if (leak.calls.length) {

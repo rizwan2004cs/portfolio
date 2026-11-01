@@ -7,7 +7,9 @@ import { appendFileSync, readFileSync } from "node:fs";
 const base = (process.argv[2] ?? process.env.BASE_URL ?? "http://localhost:3010").replace(/\/$/, "");
 const only = process.env.ONLY ? new RegExp(process.env.ONLY, "i") : null;
 const convos = JSON.parse(readFileSync(new URL("../tests/fixtures/conversations.json", import.meta.url), "utf8")).filter((c) => !only || only.test(c.name));
-const gap = Number(process.env.GAP_MS ?? 5200); // the route allows 12 requests a minute per address
+// the route allows 12 requests a minute per address, and a turn can cost the one NVIDIA key up to five calls
+// (classifier, embeddings, judge, second reader, the chain) against its 40 a minute: paced to stay under both
+const gap = Number(process.env.GAP_MS ?? 8000);
 
 async function ask(history, shown, state) {
   const r = await fetch(`${base}/api/agent`, { method: "POST", headers: { "content-type": "application/json", accept: "text/event-stream" }, body: JSON.stringify({ history, shown, state }) });
