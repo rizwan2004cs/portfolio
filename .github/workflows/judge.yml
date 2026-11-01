@@ -1,5 +1,5 @@
 # Every night (02:00 IST), a free OpenRouter model scores a sample of the day's agent conversations and the
-# scores land on each trace in Opik. Needs repository secrets OPIK_API_KEY and OPENROUTER_API_KEY.
+# scores land on each trace in Opik. Needs repository secrets OPIK_API_KEY and NVIDIA_API_KEY.
 name: Nightly judge
 
 on:
@@ -29,7 +29,7 @@ jobs:
       - name: Score the day's conversations
         env:
           OPIK_API_KEY: ${{ secrets.OPIK_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           OPIK_WORKSPACE: mohammad-rizwan
           OPIK_PROJECT_NAME: Portfolio agent
           HOURS: ${{ inputs.hours || '24' }}
