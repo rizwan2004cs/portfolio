@@ -430,6 +430,8 @@ describe("golden · panels only for questions about him or his work", () => {
     const intro = async () => ({ kind: "visitor_intro" as const, confidence: 0.95, source: "model" as const, note: "visitor_intro", visitor: { name: "Priya", company: "Razorpay", hiringFor: "backend engineer" } });
     const r = await turn({ turns: ["hi I'm Priya from Razorpay, hiring backend engineers"] }, [m], passScreen, undefined, intro);
     expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/^Hi Priya/); expect(system).toContain("The visitor just introduced themselves.");
+    const nameless = { name: "m", complete: async () => ({ role: "assistant" as const, content: "His email, LinkedIn and GitHub are one click away." }) };
+    expect((await turn({ turns: ["hi I'm Priya from Razorpay, hiring backend engineers"] }, [nameless], passScreen, undefined, intro)).text).toMatch(/^Hi Priya\. His email/);
     const f = await turn({ turns: ["hi I'm Priya from Razorpay, hiring backend engineers"] }, [never()], passScreen, undefined, intro);
     expect(f.text).toBe("Welcome, Priya. Paste the role’s requirements and I’ll map them to his work, or start with his strongest projects.");
     const who = await turn({ turns: ["I'm Priya", "who am i?"], history: [{ user: "I'm Priya", agent: "Hi Priya." }, { user: "who am i?" }], state: { focus: null, shown: [], offered: [], visitor: { name: "Priya", company: "Razorpay" }, topics: [] } }, [never()]);
