@@ -182,8 +182,15 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   deps.onClassified?.(sorted);
   // the classifier's verdict yields to the facts: a message that names a project or asks something the facts answer
   // ("show me PACK", "resume") is work however it is phrased, and two words after a reply ("Not animal") are a follow-up
-  const decided = decide(sorted), overruled = (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : null;
-  const kind = overruled ? "work" : decided;
+  const decided0 = decide(sorted);
+  // two things the rules know for certain win over a model's guess: a named introduction ("I'm Priya from Razorpay")
+  // is an introduction, and a message that was corrected (a typo, Hinglish) is the work question its correction reads as
+  const certain = sorted.source === "model" && ruleKind(last) === "visitor_intro" && nameFrom(last) && decided0 !== "visitor_intro" ? "visitor_intro" as const
+    : sorted.source === "model" && last !== raw && BEHAVIOR[decided0].fallback ? "work" as const : null;
+  if (certain === "visitor_intro") sorted.visitor = { ...sorted.visitor, name: nameFrom(last)! };
+  const decided = certain ?? decided0;
+  const overruled = certain ? (certain === "visitor_intro" ? "a named introduction" : "read through a correction") : (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : null;
+  const kind = overruled && !certain ? "work" : decided;
   // greetings, intros and "who am I" are conversation: the model answers them in its own words with the transcript,
   // and the policy's line is only the fallback when no model can
   const natural = !!BEHAVIOR[kind].fallback, naturalLine = () => BEHAVIOR[kind].fallback!(last, sorted.visitor ?? input.state?.visitor);
@@ -212,7 +219,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       emit({ type: "trace", step: "retrieval", detail: `${hits.length} facts by meaning and keywords (${hits.map((h) => h.project ?? h.kind).join(", ")} · ${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "info" });
     }
   }
-  emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : overruled ? `${sorted.note} · ${overruled}: treated as work` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
+  emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : overruled ? `${sorted.note} · ${overruled}: treated as ${kind}` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
   if (BEHAVIOR[kind].reply) {
     emit({ type: "trace", step: "policy", detail: `${kind} · fixed reply from the behaviour policy, no model, no panel · 0 tokens`, level: "info" });
     emit({ type: "text", text: BEHAVIOR[kind].reply!(last) });
