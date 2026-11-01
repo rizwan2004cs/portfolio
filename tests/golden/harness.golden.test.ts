@@ -433,7 +433,9 @@ describe("golden · panels only for questions about him or his work", () => {
     const f = await turn({ turns: ["hi I'm Priya from Razorpay, hiring backend engineers"] }, [never()], passScreen, undefined, intro);
     expect(f.text).toBe("Welcome, Priya. Paste the role’s requirements and I’ll map them to his work, or start with his strongest projects.");
     const who = await turn({ turns: ["I'm Priya", "who am i?"], history: [{ user: "I'm Priya", agent: "Hi Priya." }, { user: "who am i?" }], state: { focus: null, shown: [], offered: [], visitor: { name: "Priya", company: "Razorpay" }, topics: [] } }, [never()]);
-    expect(who.text).toBe("You told me you’re Priya from Razorpay. I can show you what Rizwan has built.");
+    expect(who.text).toBe("You told me you’re Priya from Razorpay. I can show you what Rizwan has built."); expect(who.meta.mode).toBe("facts"); // on record: no model, even when one is there
+    const known = await turn({ turns: ["who am i?"], state: { focus: null, shown: [], offered: [], visitor: { name: "Arjun" }, topics: [] } }, [scripted("m", [say("No idea.", call("suggest", { options: ["x"] }))])]);
+    expect(known.text).toBe("You told me you’re Arjun. I can show you what Rizwan has built.");
   });
   it("the model's project list and profile are dropped when the message isn't about his work or him", async () => {
     const m = scripted("a", [say("I can hear you fine.", call("list_projects"), call("show_profile"), call("suggest", { options: ["x"] }))]);
@@ -929,6 +931,14 @@ describe("follow-ups with the conversation in hand", () => {
     expect(hiring.of("suggest").at(-1)!.options[0]).toBe("Is he a fit for your role?");
     const three = await turn({ turns: ["show me PACK"], state: { focus: null, shown: ["ccr", "finboom"], offered: [], visitor: {}, topics: [] } }, [never()]);
     expect(three.of("suggest").at(-1)!.options[0]).toBe("Get resume"); expect(three.of("trace").map((e) => e.detail).join("\n")).toMatch(/offered “Get resume”/);
+  });
+  it("'compare PACK and FinBoom' gets the side-by-side table without a model; the model may call the same tool", async () => {
+    const r = await turn({ turns: ["compare PACK and FinBoom"] }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^PACK \(2026, team of two with Mahesh Babu Kona\) and FinBoom \(2026, solo\), side by side\. FinBoom is live; the rest has no public demo\.$/);
+    expect(r.of("panel").some((p) => p.panel.kind === "compare" && p.panel.id === "pack|finboom")).toBe(true);
+    const m = scripted("gpt-oss-120b", [say("FinBoom is the one that is live: it runs Vitest in CI and keeps an offline queue, while PACK is a weekend hackathon build with a four-step model fallback chain.", call("compare_projects", { ids: ["pack", "finboom"] }), call("suggest", { options: ["x"] }))]);
+    const q = await turn({ turns: ["which of PACK and FinBoom would you put in front of a customer?"] }, [m]);
+    expect(q.of("panel").some((p) => p.panel.kind === "compare")).toBe(true); expect(q.text).toMatch(/^FinBoom is the one that is live/);
   });
   it("a dated question is answered from the resume without a model", async () => {
     const r = await turn({ turns: ["what was he doing in April 2026?"] }, [never()]);

@@ -3,10 +3,11 @@
 import { EXPERIENCE, PROFILE, PROJECTS } from "@/content/data";
 import type { Project } from "@/content/types";
 import { fitRows } from "@/agent/fit";
+import { compareTable } from "@/agent/compare";
 import type { Exchange } from "@/agent/types";
 import { trimHistory } from "./history";
 import { wireContactForms } from "./contact";
-import { answerHtml, CHEV, connectPanel, esc, fitPanel, harnessPanel, homeIntro, ICON, indexPanel, profilePart, projectPanel, resumePanel, shortlistPanel } from "@/render/html";
+import { answerHtml, CHEV, comparePanel, connectPanel, esc, fitPanel, harnessPanel, homeIntro, ICON, indexPanel, profilePart, projectPanel, resumePanel, shortlistPanel } from "@/render/html";
 import { fine, fmt, installImageHandling, paintClocks, readShortlist, reduce, runSim, startClock, wait, wireArch, writeShortlist } from "./shared";
 
 type Meta = { mode: string; model?: string; ms?: number; tools?: number; fallback?: boolean };
@@ -226,6 +227,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     else if (kind === "resume") { html = resumePanel(); }
     else if (kind === "connect") { html = connectPanel(PROFILE); }
     else if (kind === "fit" && id) { html = fitPanel(fitRows(id.split("|"))); }
+    else if (kind === "compare" && id) { html = comparePanel(compareTable(id.split("|"))); if (!html) return; }
     else if (kind === "shortlist") { html = shortlistPanel(shortlisted()); }
     else {
       const p = id ? P.get(id) : undefined; if (!p) return;
@@ -734,7 +736,7 @@ export function mountAgent(shell: HTMLElement): () => void {
         : kind === "architecture" && p ? projectPanel(p, { arch: true, shortlisted: (S.shortlist as string[]).includes(p.id), permalink: true })
         : kind === "index" ? indexPanel(listed(id), PROJECTS.length) : kind === "profile" ? profilePart(PROFILE, id) : kind === "harness" ? harnessPanel()
         : kind === "resume" ? resumePanel() : kind === "shortlist" ? shortlistPanel(shortlisted()) : kind === "connect" ? connectPanel(PROFILE)
-        : kind === "fit" && id ? fitPanel(fitRows(key.slice(4).split("|"))) : null;
+        : kind === "fit" && id ? fitPanel(fitRows(key.slice(4).split("|"))) : kind === "compare" && id ? comparePanel(compareTable(key.slice(8).split("|"))) : null;
       if (!html) return;
       const d = document.createElement("div"); d.innerHTML = html.trim();
       const fresh = d.firstElementChild as HTMLElement; fresh.dataset.key = key; el.replaceWith(fresh);

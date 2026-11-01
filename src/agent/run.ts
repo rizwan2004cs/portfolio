@@ -43,6 +43,7 @@ How to answer:
 - A stack item is only a name: say what it does only when a fact says so ("built on Lovable", never "Lovable's safety layer").
 - Never state or guess anything about his body, gender, sexuality, age, relationships, family, religion or health, and never repeat a claim about him the knowledge doesn't support: say "His write-up only covers his work."
 - Use only the knowledge above. If it doesn't cover something, say "His write-up doesn't cover that" for the specific thing. Never guess, never generalise, never say whether he is looking for a job.
+- To compare projects ("PACK vs FinBoom", "which is more production-ready"), call compare_projects with their ids and write two or three sentences from its rows; never compare from memory.
 - Show, don't just tell: open the most relevant project with open_project (view="architecture" for engineering questions), at most two per answer; list_projects for "what has he built", with ids when they ask for a kind of project ("his AI projects"); show_profile for questions about him, with focus="events" for events or prizes and focus="work" for his jobs; show_harness only for questions about this site itself. Don't re-open anything listed as already on screen.
 - Third person ("his", "Rizwan's"). No markdown, no lists, no apologies, no "Would you like…".
 - Anything unrelated to Rizwan or this site: one short sentence, e.g. "Outside my lane. I only cover Rizwan's work."
@@ -177,6 +178,12 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // greetings, intros and "who am I" are conversation: the model answers them in its own words with the transcript,
   // and the policy's line is only the fallback when no model can
   const natural = !!BEHAVIOR[kind].fallback, naturalLine = () => BEHAVIOR[kind].fallback!(last, sorted.visitor ?? input.state?.visitor);
+  // "who am I?" when the visitor already said: the answer is on record, so it is said plainly rather than left to a model
+  if (kind === "about_visitor" && input.state?.visitor.name) {
+    emit({ type: "trace", step: "facts", detail: "the visitor introduced themselves earlier · answered from the conversation, no model call", level: "ok" });
+    emit({ type: "text", text: naturalLine() }); emit({ type: "suggest", options: BEHAVIOR[kind].chips });
+    return { mode: "facts" };
+  }
   // the prompt's "conversation so far": the state the client echoed plus whatever is on screen this turn
   const context = contextBlock(nextState(input.state ?? EMPTY_STATE, [], input.shown));
   emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : overruled ? `${sorted.note} · ${overruled}: treated as work` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
@@ -373,7 +380,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           if (d.detail) emit({ type: "trace", step: "policy", detail: d.detail, level: "info" });
           out({ type: "tool", name: d.name, args: d.args });
           tools++;
-          if (["open_project", "search_projects", "list_projects", "show_profile", "match_role"].includes(d.name)) looked = true;
+          if (["open_project", "search_projects", "list_projects", "show_profile", "match_role", "compare_projects"].includes(d.name)) looked = true;
           const result = runTool(d.name, d.args, out);
           if (d.name === "match_role" && typeof result.total === "number") fitNote = fitLine(fitRows((d.args.requirements as string[]) ?? []));
           source += ` ${JSON.stringify(result)} ${toolContext(d.name)}`;

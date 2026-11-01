@@ -68,3 +68,16 @@ describe("resume facts", async () => {
     expect(new Set(FACTS.map((f) => f.id)).size).toBe(FACTS.length); // ids stay unique
   });
 });
+
+describe("the conversation fixture", async () => {
+  const { readFileSync } = await import("node:fs");
+  const convos = JSON.parse(readFileSync(new URL("../fixtures/conversations.json", import.meta.url), "utf8")) as { name: string; turns: { user: string; mode?: string[]; text?: string; panel?: string }[] }[];
+  it("has at least twelve conversations of two to five turns, each turn with a user line and at least one check, every regex valid", () => {
+    expect(convos.length).toBeGreaterThanOrEqual(12);
+    for (const c of convos) {
+      expect(c.turns.length).toBeGreaterThanOrEqual(2); expect(c.turns.length).toBeLessThanOrEqual(5);
+      for (const t of c.turns) { expect(t.user.length).toBeGreaterThan(0); expect(!!(t.mode || t.text || t.panel)).toBe(true); if (t.text) expect(() => new RegExp(t.text!)).not.toThrow(); }
+    }
+    expect(new Set(convos.map((c) => c.name)).size).toBe(convos.length);
+  });
+});
