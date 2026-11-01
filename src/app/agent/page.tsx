@@ -38,6 +38,10 @@ export default function AgentPage() {
                     </button>
                     <div className="menu" id="menu" role="menu" />
                     <input id="inp" name="q" placeholder="Ask about Rizwan’s work…" autoComplete="off" aria-label="Message the agent" maxLength={2000} />
+                    {/* shown only when the browser can listen; the transcript takes the same path as typed text */}
+                    <button type="button" className="mic" id="mic" aria-label="Speak your question" aria-pressed="false" hidden>
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="6" y="1.5" width="4" height="8" rx="2" /><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5" /></svg>
+                    </button>
                     <button type="submit">Send</button>
                   </form>
                   {/* said before the first message is sent: what is stored, and what is not */}

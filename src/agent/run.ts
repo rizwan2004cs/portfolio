@@ -16,6 +16,7 @@ import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type 
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
 import { contextBlock, EMPTY_STATE, nextState } from "./state";
 import { nextOffer } from "./offers";
+import { resolvePending, whichOne } from "./clarify";
 import type { Visitor } from "./classify";
 import type { Retriever } from "@/server/retrieval";
 
@@ -138,7 +139,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // "wat projcts has he biult": a slip one edit from a word the router keys on is read as that word, but only when the
   // message as typed answers nothing and the corrected one does; a message the rules already place (private, abusive,
   // playful, a greeting) is never touched
-  const raw = input.turns.at(-1) ?? "", corrected = fixTypos(raw);
+  // an answer to the question the agent just asked ("2", "the second", "PACK") is read as the option it picked
+  const picked = resolvePending(input.turns.at(-1) ?? "", input.state?.pending);
+  if (picked) emit({ type: "trace", step: "clarify", detail: `“${input.turns.at(-1)}” answers “${input.state!.pending!.question}” → ${picked}`, level: "ok" });
+  const raw = picked ?? input.turns.at(-1) ?? "", corrected = fixTypos(raw);
   // Hinglish markers ("kya", "uska") are unambiguous, so that reading needs no gate beyond the rules
   const last = corrected !== raw && ruleKind(raw) === "work" && (hinglish(raw) !== raw || (!answerable(raw) && answerable(corrected))) ? corrected : raw;
   if (last !== raw) emit({ type: "trace", step: "typos", detail: `read as “${last}”`, level: "info" });
@@ -178,6 +182,13 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // greetings, intros and "who am I" are conversation: the model answers them in its own words with the transcript,
   // and the policy's line is only the fallback when no model can
   const natural = !!BEHAVIOR[kind].fallback, naturalLine = () => BEHAVIOR[kind].fallback!(last, sorted.visitor ?? input.state?.visitor);
+  // "the other one?" with two projects on screen and no way to tell: one short question, two chips, no guess
+  const ambiguous = history.length > 1 ? whichOne(last, input.shown, input.state?.focus ?? null) : null;
+  if (ambiguous) {
+    emit({ type: "trace", step: "clarify", detail: `“${last}” could mean ${ambiguous.options.length} things on screen · asked instead of guessing`, level: "ok" });
+    emit({ type: "tool", name: "ask_visitor", args: { ...ambiguous } }); emit({ type: "text", text: ambiguous.question }); emit({ type: "suggest", options: ambiguous.options });
+    return { mode: "facts" };
+  }
   // "who am I?" when the visitor already said: the answer is on record, so it is said plainly rather than left to a model
   if (kind === "about_visitor" && input.state?.visitor.name) {
     emit({ type: "trace", step: "facts", detail: "the visitor introduced themselves earlier · answered from the conversation, no model call", level: "ok" });
@@ -382,6 +393,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           tools++;
           if (["open_project", "search_projects", "list_projects", "show_profile", "match_role", "compare_projects"].includes(d.name)) looked = true;
           const result = runTool(d.name, d.args, out);
+          // the agent asked the visitor something: the turn ends on the question, the answer comes next turn
+          if (d.name === "ask_visitor" && !("error" in result)) { spoke = true; emit({ type: "trace", step: "clarify", detail: `asked “${String(result.asked)}” instead of guessing`, level: "ok" }); return finish({ mode: "model", model: model.name, tools }); }
           if (d.name === "match_role" && typeof result.total === "number") fitNote = fitLine(fitRows((d.args.requirements as string[]) ?? []));
           source += ` ${JSON.stringify(result)} ${toolContext(d.name)}`;
           if (Array.isArray(result.facts) && typeof result.title === "string") { lastTitle = result.title; lastFacts = result.facts.map(String); }

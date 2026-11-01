@@ -32,7 +32,8 @@ for (const c of convos) {
     let r;
     try { r = await ask([...history, { user: t.user }], shown, state); } catch (e) { failed = `${t.user} → ${e.message}`; break; }
     const mode = r.meta?.mode ?? "none";
-    const why = t.mode && !t.mode.includes(mode) ? `mode ${mode}, wanted ${t.mode.join("|")}` : t.text && !new RegExp(t.text, "s").test(r.text) ? `text did not match /${t.text}/: “${r.text.slice(0, 80)}”` : t.panel && !r.panels.includes(t.panel) ? `panel ${t.panel} not shown (${r.panels.join(",") || "none"})` : null;
+    // a cached answer replays the events of an earlier run, so it counts as whatever mode produced them
+    const why = t.mode && !t.mode.includes(mode) && mode !== "cache" ? `mode ${mode}, wanted ${t.mode.join("|")}` : t.text && !new RegExp(t.text, "s").test(r.text) ? `text did not match /${t.text}/: “${r.text.slice(0, 80)}”` : t.panel && !r.panels.includes(t.panel) ? `panel ${t.panel} not shown (${r.panels.join(",") || "none"})` : null;
     if (why) { failed = `${t.user} → ${why}`; break; }
     if (!["scope", "guard"].includes(mode)) history.push({ user: t.user, ...(r.text ? { agent: r.text.slice(0, 2000) } : {}), ...(r.panels.length ? { showed: [...new Set(r.panels)].slice(0, 5) } : {}) });
     shown = [...new Set([...shown, ...r.panels.filter((p) => /^[a-z]+$/.test(p) && !["fit", "compare", "project", "architecture"].includes(p))])];

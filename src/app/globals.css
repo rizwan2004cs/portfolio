@@ -727,6 +727,12 @@
 
   /* ---------- role fit report ---------- */
   .fit .fithd { padding:var(--s4) var(--s4) 0; }
+  /* the mic sits like the plus button: same width, a hairline on its left, no fill */
+  #form .mic { all:unset; cursor:pointer; flex:0 0 auto; width:48px; display:flex; align-items:center; justify-content:center; border-left:1px solid var(--line); color:var(--soft); }
+  .hslot #form .mic { width:56px; }
+  #form .mic svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; }
+  #form .mic.on { color:var(--bad, #b00020); animation:micpulse 1s ease-in-out infinite; }
+  @keyframes micpulse { 50% { opacity:.55; } }
   .cmp { width:100%; border-collapse:collapse; margin:var(--s3) 0 0; font-size:14px; line-height:20px; }
   .cmp th, .cmp td { text-align:left; vertical-align:top; padding:var(--s2) var(--s4); border-bottom:1px solid var(--line); }
   .cmp thead th { font:500 13px/18px var(--f-mono); color:var(--soft); } .cmp tbody th { font:500 13px/20px var(--f-mono); color:var(--soft); white-space:nowrap; width:1%; }

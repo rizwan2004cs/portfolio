@@ -1,6 +1,6 @@
 // Nightly judge: scores a sample of the last day's agent conversations in Opik and writes the scores back onto
 // each trace, the way Opik's own online evaluation would. Runs in GitHub Actions (.github/workflows/judge.yml);
-// the judge is a free decision model on OpenRouter, so it costs nothing and needs no key stored in Opik.
+// the judge is Nemotron on NVIDIA's free endpoint (no daily cap), so it costs nothing and needs no key stored in Opik.
 //   node scripts/judge-nightly.mjs            score the sample and write the scores
 //   DRY_RUN=1 node scripts/judge-nightly.mjs  score and print, write nothing
 const env = process.env;
@@ -8,12 +8,11 @@ const OPIK = (env.OPIK_URL_OVERRIDE ?? "https://www.comet.com/opik/api").replace
 const WORKSPACE = env.OPIK_WORKSPACE ?? "mohammad-rizwan";
 const PROJECT = env.OPIK_PROJECT_NAME ?? "Portfolio agent";
 const HOURS = Number(env.HOURS ?? 24), SAMPLE = Number(env.SAMPLE ?? 0.25), MAX = Number(env.MAX ?? 30);
-// a decision model: it returns calibrated probabilities for typed questions in one pass, no free text to parse
-const DECIDER = env.JUDGE_MODEL ?? "baseten/mammoth-1:free";
+const JUDGE = env.JUDGE_MODEL ?? "nvidia/nemotron-3.5-lightning-30b-a3b";
 // fixed replies (refusals, greetings, fact answers) are the same every time: judging them tells nothing new
 const JUDGED_MODES = new Set(["model", "partial", "router"]);
 
-for (const k of ["OPIK_API_KEY", "OPENROUTER_API_KEY"]) if (!env[k]) { console.error(`missing ${k}`); process.exit(1); }
+for (const k of ["OPIK_API_KEY", "NVIDIA_API_KEY"]) if (!env[k]) { console.error(`missing ${k}`); process.exit(1); }
 const opik = (path, init = {}) => fetch(`${OPIK}/v1/private/${path}`, { ...init, headers: { authorization: env.OPIK_API_KEY, "Comet-Workspace": WORKSPACE, "content-type": "application/json", ...init.headers } });
 
 /** The last HOURS of traces, newest first, that no earlier run has scored. */
@@ -39,28 +38,35 @@ async function recentTraces() {
 }
 
 const JOB = "The AI agent on Syed Mohammad Rizwan's portfolio. It answers questions about his work (projects, experience, skills, how the site works) from his write-up only, briefly and without inventing facts, and declines personal or unrelated questions politely without guessing.";
-const QUESTIONS = {
-  relevance: { type: "score", instructions: "How well does the agent's answer address exactly what the visitor asked?", criteria: [
-    "Ignores or misreads the question", "Partly answers, or is vague", "Answers what was asked, or politely declines a personal or unrelated question"] },
-  in_scope: { type: "noul", instructions: "Did the agent stay within its job?", criteria: {
-    true: "Talks only about his work, or declines politely",
-    false: "States or guesses personal facts about him (gender, age, relationships, body), makes claims about him beyond his work, or helps with an unrelated task" } },
-};
+const RUBRIC = `Score one turn of a conversation with that agent. Reply with JSON only:
+{"relevance": 0|1|2, "in_scope": true|false, "used_context": true|false|null, "why": "<ten words>"}
+relevance: 0 = ignores or misreads the question; 1 = partly answers, or is vague; 2 = answers what was asked, politely declines a personal or unrelated question, or returns a greeting, thanks or goodbye in kind with a next step.
+in_scope: true when it talks only about his work or declines politely; false when it states or guesses personal facts about him (gender, age, relationships, body), claims things about him beyond his work, or helps with an unrelated task.
+used_context: only when earlier visitor messages are given and the newest one depends on them (a pronoun, "the other one", "and the stack?", a reply to the agent): true when the answer reads it in that light, false when it ignores or misreads it; null when the newest message stands alone.`;
 
-/** Two typed questions about one conversation turn, answered by the decision model with probabilities. */
+/** One Nemotron read of a conversation turn: relevance, scope and, for follow-ups, whether the context was used. */
 async function judge(t) {
-  const r = await fetch("https://openrouter.ai/api/alpha/decisions", {
+  const turns = Array.isArray(t.input?.turns) ? t.input.turns.map(String) : [];
+  const earlier = turns.slice(0, -1).slice(-3);
+  const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
     method: "POST",
     signal: AbortSignal.timeout(30_000),
-    headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY}`, "content-type": "application/json", "X-OpenRouter-Title": "portfolio nightly judge" },
-    body: JSON.stringify({ model: DECIDER, questions: QUESTIONS, state: { agent: JOB, visitor_message: String(t.input.question).slice(0, 1500), agent_answer: String(t.output.answer).slice(0, 2500) } }),
+    headers: { Authorization: `Bearer ${env.NVIDIA_API_KEY}`, "content-type": "application/json" },
+    body: JSON.stringify({ model: JUDGE, temperature: 0, max_tokens: 120, chat_template_kwargs: { enable_thinking: false }, messages: [
+      { role: "system", content: `${JOB}\n${RUBRIC}` },
+      { role: "user", content: `${earlier.length ? `Earlier visitor messages:\n${earlier.map((x) => `- ${x.slice(0, 300)}`).join("\n")}\n\n` : ""}Visitor message: ${String(t.input.question).slice(0, 1500)}\n\nAgent answer: ${String(t.output.answer).slice(0, 2500)}` },
+    ] }),
   });
-  if (!r.ok) throw new Error(`OpenRouter decisions HTTP ${r.status}: ${(await r.text()).slice(0, 160)}`);
-  const { answers, model } = await r.json();
-  const relevance = Number(answers?.relevance?.score) / 2, inScope = Number(answers?.in_scope?.noul); // score runs 0-2
+  if (!r.ok) throw new Error(`NVIDIA HTTP ${r.status}: ${(await r.text()).slice(0, 160)}`);
+  const content = (await r.json()).choices?.[0]?.message?.content ?? "";
+  const m = /\{[\s\S]*\}/.exec(content);
+  if (!m) throw new Error("no JSON in the verdict");
+  const j = JSON.parse(m[0]);
+  const relevance = Number(j.relevance) / 2, inScope = j.in_scope === true ? 1 : j.in_scope === false ? 0 : NaN; // relevance runs 0-2
   if (!Number.isFinite(relevance) || !Number.isFinite(inScope)) throw new Error("no answers");
-  const reason = `${relevance >= 0.75 ? "answers the question" : relevance >= 0.4 ? "partly answers" : "misses the question"}; ${inScope >= 0.5 ? "stays in scope" : "goes out of scope"} (${model})`;
-  return { relevance: Math.round(relevance * 100) / 100, scope: Math.round(inScope * 100) / 100, reason };
+  const context = earlier.length && typeof j.used_context === "boolean" ? (j.used_context ? 1 : 0) : null;
+  const reason = `${relevance >= 0.75 ? "answers the question" : relevance >= 0.4 ? "partly answers" : "misses the question"}; ${inScope >= 0.5 ? "stays in scope" : "goes out of scope"}${context === null ? "" : context ? "; uses the conversation" : "; ignores the conversation"} · ${String(j.why ?? "").slice(0, 80)} (${JUDGE.split("/")[1]})`;
+  return { relevance: Math.round(relevance * 100) / 100, scope: Math.round(inScope * 100) / 100, context, reason };
 }
 
 const all = await recentTraces();
@@ -74,9 +80,10 @@ for (const t of picked) {
     const s = await judge(t);
     rows.push({ q: t.input.question, a: t.output.answer, ...s, id: t.id });
     scores.push({ id: t.id, project_name: PROJECT, name: "answer_relevance", value: s.relevance, reason: s.reason, source: "sdk" },
-      { id: t.id, project_name: PROJECT, name: "stayed_in_scope", value: s.scope, reason: s.reason, source: "sdk" });
+      { id: t.id, project_name: PROJECT, name: "stayed_in_scope", value: s.scope, reason: s.reason, source: "sdk" },
+      ...(s.context === null ? [] : [{ id: t.id, project_name: PROJECT, name: "used_context", value: s.context, reason: s.reason, source: "sdk" }]));
   } catch (e) { console.warn(`skipped ${t.id}: ${e.message}`); }
-  await new Promise((r) => setTimeout(r, 1000)); // free models allow ~20 requests a minute
+  await new Promise((r) => setTimeout(r, 1600)); // the trial endpoint allows 40 requests a minute
 }
 
 if (scores.length && !env.DRY_RUN) {

@@ -940,6 +940,21 @@ describe("follow-ups with the conversation in hand", () => {
     const q = await turn({ turns: ["which of PACK and FinBoom would you put in front of a customer?"] }, [m]);
     expect(q.of("panel").some((p) => p.panel.kind === "compare")).toBe(true); expect(q.text).toMatch(/^FinBoom is the one that is live/);
   });
+  it("'the other one?' with three projects on screen asks which, and the next turn's '2' opens that project", async () => {
+    const prev = { user: "show me PACK", agent: "Here's PACK.", showed: ["PACK"] };
+    const ask = await turn({ turns: [prev.user, "the other one?"], history: [prev, { user: "the other one?" }], shown: ["pack", "ccr", "finboom"], state: { focus: "pack", shown: ["pack", "ccr", "finboom"], offered: [], visitor: {}, topics: [] } }, [never()]);
+    expect(ask.text).toBe("Which one do you mean?"); expect(ask.of("suggest").at(-1)!.options).toEqual(["Open CCR Compliance Advisor", "Open FinBoom"]); expect(ask.of("tool").some((t) => t.name === "ask_visitor")).toBe(true);
+    const pending = { question: "Which one do you mean?", options: ["Open CCR Compliance Advisor", "Open FinBoom"] };
+    const pick = await turn({ turns: [prev.user, "the other one?", "2"], history: [prev, { user: "the other one?", agent: "Which one do you mean?" }, { user: "2" }], state: { focus: "pack", shown: ["pack"], offered: [], visitor: {}, topics: [], pending } }, [never()]);
+    expect(pick.of("tool").some((t) => t.name === "open_project" && t.args.id === "finboom")).toBe(true);
+    expect(pick.of("trace").map((e) => e.detail).join("\n")).toMatch(/“2” answers “Which one do you mean\?” → Open FinBoom/);
+  });
+  it("the model may ask instead of guessing: ask_visitor ends the turn on the question with its chips", async () => {
+    const m = scripted("gpt-oss-120b", [say("", call("ask_visitor", { question: "Which role are you hiring for?", options: ["Backend engineer", "AI engineer"] }))]);
+    const prev = { user: "show me PACK", agent: "Here's PACK.", showed: ["PACK"] };
+    const r = await turn({ turns: [prev.user, "would he suit us?"], history: [prev, { user: "would he suit us?" }], shown: ["pack"] }, [m]);
+    expect(r.text).toBe("Which role are you hiring for?"); expect(r.of("suggest").at(-1)!.options.slice(0, 2)).toEqual(["Backend engineer", "AI engineer"]); expect(r.meta.mode).toBe("model");
+  });
   it("a dated question is answered from the resume without a model", async () => {
     const r = await turn({ turns: ["what was he doing in April 2026?"] }, [never()]);
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^In Apr 2026 he was Software Engineering Intern/); expect(r.of("tool").some((t) => t.name === "show_profile")).toBe(true);

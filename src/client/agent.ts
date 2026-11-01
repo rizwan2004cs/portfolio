@@ -6,6 +6,7 @@ import { fitRows } from "@/agent/fit";
 import { compareTable } from "@/agent/compare";
 import type { Exchange } from "@/agent/types";
 import { trimHistory } from "./history";
+import { mountVoice } from "./voice";
 import { wireContactForms } from "./contact";
 import { answerHtml, CHEV, comparePanel, connectPanel, esc, fitPanel, harnessPanel, homeIntro, ICON, indexPanel, profilePart, projectPanel, resumePanel, shortlistPanel } from "@/render/html";
 import { fine, fmt, installImageHandling, paintClocks, readShortlist, reduce, runSim, startClock, wait, wireArch, writeShortlist } from "./shared";
@@ -33,6 +34,8 @@ export function mountAgent(shell: HTMLElement): () => void {
   const stopClock = startClock();
 
   const col = q("#col"), feed = q("#feed"), sugg = q("#sugg"), traceEl = q("#trace"), form = q<HTMLFormElement>("#form"), inp = q<HTMLInputElement>("#inp");
+  // the mic shows only where the browser can listen; a spoken question gets its reply read back once
+  const voice = mountVoice(document.querySelector<HTMLButtonElement>("#mic"), inp, (t) => void send(t));
   const RETURNING = store("rz_seen");
   let turns: string[] = [], said: string[] = [], convo: Exchange[] = [], turnSaid: string[] = [], turnShowed: string[] = [], focusId = "", shown = new Set<string>(), busy = false, down = false, turnNo = 0, tStart = 0, lastAgentRun = false;
   let target: HTMLElement | null = null, queued: string | null = null, focusTurn = -1, lastChips: string[] = [];
@@ -557,6 +560,7 @@ export function mountAgent(shell: HTMLElement): () => void {
       said.push(text);
       if (meta?.mode === "local" || meta?.mode === "tour") logEv("RUN_FINISHED", meta.mode, "run");
       if (meta) metaLine(meta);
+      voice.say(turnSaid.join(" "));
       th.lastElementChild!.textContent = fmt(performance.now() - tStart);
       chips(next ?? ["Everything he’s built", "Get resume"]);
       saveSession();

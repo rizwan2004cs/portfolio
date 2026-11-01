@@ -10,6 +10,7 @@ import { compareTable, compareText } from "./compare";
 export const TOOL_DEFS = [
   { name: "search_projects", description: "Find Rizwan's projects by topic. Returns ids, titles and one-liners.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
   { name: "open_project", description: "Show one project panel. view='card' for an overview, 'architecture' for engineers.", parameters: { type: "object", properties: { id: { type: "string", enum: PROJECTS.map((p) => p.id) }, view: { type: "string", enum: ["card", "architecture"] } }, required: ["id"] } },
+  { name: "ask_visitor", description: "When the message is ambiguous between two or three things on the site (which project, which role), ask one short question instead of guessing. options are the 2-3 answers as short chips (e.g. 'Open PACK'). Ends the turn: do not answer as well.", parameters: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 3 } }, required: ["question", "options"] } },
   { name: "compare_projects", description: "Show two or three of his projects side by side (year, team, stack, deployment, tests, failure handling, scale), each cell from the write-ups. Use for 'compare X and Y', 'which is more production-ready', 'X vs Y'.", parameters: { type: "object", properties: { ids: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 3 } }, required: ["ids"] } },
   { name: "match_role", description: "Map a job description or list of requirements to his work. Pass 3-8 short requirement phrases. Shows a fit report and returns the evidence per requirement.", parameters: { type: "object", properties: { requirements: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 8 } }, required: ["requirements"] } },
   { name: "list_projects", description: "Show Rizwan's projects as a list. Pass ids to list only the projects that fit the question (his AI projects, what he built with Supabase); omit ids for 'what has he built'.", parameters: { type: "object", properties: { ids: { type: "array", items: { type: "string", enum: PROJECTS.map((p) => p.id) } } } } },
@@ -61,6 +62,14 @@ export function runTool(name: ToolName, args: Record<string, unknown>, emit: Emi
       if (focus === "work") return { work: EXPERIENCE.map((x) => `${x.role} at ${x.title} (${x.when}): ${roleDetail(x)}`), resume: RESUME_FACTS.map((r) => r.text) };
       if (focus === "education") return { education: PROFILE.education, earlier: EDUCATION.earlier.map(([s, g]) => `${s}: ${g}`) };
       return { ...PROFILE, events: EVENT_LINES, resume: RESUME_FACTS.map((r) => r.text) };
+    }
+    case "ask_visitor": {
+      // the options are answers to this question, not chips that must map to a known intent: cleaned, not filtered
+      const question = String(args.question ?? "").trim().slice(0, 120);
+      const options = [...new Set((Array.isArray(args.options) ? args.options : []).map((o) => String(o).replace(/^["'\s]+|["'.\s]+$/g, "").replace(/\s+/g, " ").slice(0, 40)).filter((o) => o.length > 0 && !offScope(o)))].slice(0, 3);
+      if (!question || options.length < 2) return { error: "a question and two or three options the visitor can click" };
+      emit({ type: "text", text: question }); emit({ type: "suggest", options });
+      return { asked: question, options };
     }
     case "compare_projects": {
       const t = compareTable((Array.isArray(args.ids) ? args.ids : []).map(String));
@@ -127,6 +136,7 @@ export function tidyOptions(raw: unknown): string[] {
 export function toolContext(name: ToolName): string {
   switch (name) {
     case "match_role": return "requirements requirement role fit report match matches evidence toolkit public projects";
+    case "ask_visitor": return "which one do you mean";
     case "compare_projects": return `side by side year team stack deployed live tests failure handling scale ${PROJECTS.map((p) => `${p.title} ${p.team} ${p.stack.join(" ")} ${p.fallbacks.join(" ")} ${p.facts.join(" ")} ${p.links.live ?? ""}`).join(" ")}`;
     case "list_projects": return PROJECTS.map((p) => `${p.title} ${p.oneLiner} ${p.tags.join(" ")} ${p.stack.join(" ")}`).join(" ");
     case "show_harness": return `model models request requests visitor answer prompt guard llama-prompt-guard scope filter response cache cached scripted tours gpt-oss-120b gpt-oss-20b nemotron nvidia gemini openrouter free models fallback deterministic router outage offline grounding pgvector neon postgres retrieval embeddings meaning tokens panels tools approval routed ${HARNESS_FLOW.join(" ")}`;
