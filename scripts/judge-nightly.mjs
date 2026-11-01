@@ -78,7 +78,8 @@ const scores = [], rows = [];
 for (const t of picked) {
   try {
     const s = await judge(t);
-    rows.push({ q: t.input.question, a: t.output.answer, ...s, id: t.id });
+    const flat = (x) => String(x).replace(/[\r\n]+/g, " ").replace(/[[\]()]/g, " ").replace(/\|/g, "/");
+    rows.push({ q: flat(t.input.question), a: flat(t.output.answer), ...s, id: t.id });
     scores.push({ id: t.id, project_name: PROJECT, name: "answer_relevance", value: s.relevance, reason: s.reason, source: "sdk" },
       { id: t.id, project_name: PROJECT, name: "stayed_in_scope", value: s.scope, reason: s.reason, source: "sdk" },
       ...(s.context === null ? [] : [{ id: t.id, project_name: PROJECT, name: "used_context", value: s.context, reason: s.reason, source: "sdk" }]));

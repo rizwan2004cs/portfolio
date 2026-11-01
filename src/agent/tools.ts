@@ -65,9 +65,12 @@ export function runTool(name: ToolName, args: Record<string, unknown>, emit: Emi
     }
     case "ask_visitor": {
       // the options are answers to this question, not chips that must map to a known intent: cleaned, not filtered
-      const question = String(args.question ?? "").trim().slice(0, 120);
-      const options = [...new Set((Array.isArray(args.options) ? args.options : []).map((o) => String(o).replace(/^["'\s]+|["'.\s]+$/g, "").replace(/\s+/g, " ").slice(0, 40)).filter((o) => o.length > 0 && !offScope(o)))].slice(0, 3);
-      if (!question || options.length < 2) return { error: "a question and two or three options the visitor can click" };
+      // model-written text that reaches the visitor: the same output rules as an answer (no banned claims, no links)
+      const plain = (t: unknown, max: number) => String(t ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+      const clean = (t: string) => t.length > 0 && !BAD_OUTPUT.test(t) && !offScope(t) && !/https?:|www\.|\.[a-z]{2,4}\/|@/i.test(t);
+      const question = plain(args.question, 120);
+      const options = [...new Set((Array.isArray(args.options) ? args.options : []).map((o) => plain(o, 40).replace(/^["']+|["'.]+$/g, "")).filter(clean))].slice(0, 3);
+      if (!clean(question) || !/\?$/.test(question) || options.length < 2) return { error: "one short question ending in '?' and two or three plain options the visitor can click; no claims, no links" };
       emit({ type: "text", text: question }); emit({ type: "suggest", options });
       return { asked: question, options };
     }
