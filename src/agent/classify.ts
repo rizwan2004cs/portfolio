@@ -1,6 +1,7 @@
 import { BEHAVIOR, KINDS, ruleKind, SENSITIVE, type Kind } from "./behavior";
 import { NVIDIA_MODELS, OPENROUTER_MODELS } from "./models";
 import type { ChatMessage } from "./types";
+import PROMPT from "./classifier-prompt.json";
 
 /** The outer agent: one call to a decision model sorts each message into a Kind before anything else runs. */
 export interface Classification { kind: Kind; confidence: number; source: "model" | "rules"; note: string;
@@ -16,7 +17,7 @@ export type Classifier = (text: string, signal: AbortSignal, previous?: Previous
 
 /** Where the classifier runs: NVIDIA's fastest Nemotron first (no daily cap), the same model free on OpenRouter second. */
 export interface ClassifierEndpoint { name: string; url: string; model: string; key: string }
-export const CLASSIFIER_MODEL = NVIDIA_MODELS[0];
+export const CLASSIFIER_MODEL = process.env.CLASSIFIER_MODEL || NVIDIA_MODELS[0];
 export function classifierEndpoints(nvidiaKey?: string, openRouterKey?: string): ClassifierEndpoint[] {
   return [
     ...(nvidiaKey ? [{ name: "nvidia", url: "https://integrate.api.nvidia.com/v1/chat/completions", model: CLASSIFIER_MODEL, key: nvidiaKey }] : []),
@@ -39,11 +40,14 @@ export function decide(c: Classification): Kind {
   return sensitive.reduce((n, [, v]) => n + v, 0) > (p.work ?? 0) ? sensitive[0][0] : "work";
 }
 
-/** The classifier prompt: every kind's definition comes from the policy, so the model sorts by what production acts on.
- *  scripts/eval-intents.mjs mirrors this shape; change both together. */
+/** The classifier prompt: every kind's definition comes from the policy, so the model sorts by what production acts on;
+ *  the site-specific rules and labelled examples live in classifier-prompt.json, shared with scripts/eval-intents.mjs
+ *  (which mirrors this shape: change both together). */
 export function classifierMessages(text: string, previous?: Previous): ChatMessage[] {
   const kinds = KINDS.map((k) => `- ${k}: ${BEHAVIOR[k].describe}`).join("\n");
+  const examples = PROMPT.examples.map((e) => `"${e.text}" → ${e.kind}`).join("\n");
   const system = `${SITE}\nSort the visitor's newest message into exactly one kind. A short follow-up takes the kind of the exchange before it.\nKinds:\n${kinds}\n`
+    + `Rules:\n${PROMPT.guidance.map((g) => `- ${g}`).join("\n")}\nExamples:\n${examples}\n`
     + `Reply with JSON only: {"kind": <kind>, "confidence": <0 to 1>, "visitor": {"name", "company", "role", "hiringFor"}} where "visitor" appears only when the kind is visitor_intro, with only the fields the message states.`;
   const context = previous ? `Previous visitor message: ${previous.user.slice(0, 500)}\n${previous.agent ? `Agent's reply: ${previous.agent.slice(0, 500)}\n` : ""}` : "";
   return [{ role: "system", content: system }, { role: "user", content: `${context}Visitor message: ${text.slice(0, 1500)}` }];
