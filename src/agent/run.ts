@@ -335,7 +335,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       for (let step = messages.filter((m) => m.role === "assistant").length; step < MAX_STEPS; step++) {
         let answered = false;
         const s0 = Date.now();
-        const msg = await model.complete(messages, deps.signal);
+        // the visitor sees the agent reach for a tool the moment the model names it, before the reply is complete
+        const msg = await model.complete(messages, deps.signal, (name) => { if (name !== "suggest") emit({ type: "trace", step: "working", detail: `${model.name} is calling ${name}…`, level: "info" }); });
         // an empty reply with nothing said yet is a failure like any other: the next model in the chain gets the turn
         if (!msg.content?.trim() && !msg.tool_calls?.length && !texts.length && deps.models[mi + 1]) throw new ModelError("returned nothing");
         flushSkips(model.name); // this model answered: say which resting keys were passed over to reach it

@@ -56,7 +56,8 @@ export type ChatMessage =
 
 export interface ModelClient {
   name: string;
-  complete(messages: ChatMessage[], signal: AbortSignal): Promise<AssistantMessage>;
+  /** `onTool` fires as soon as a streamed reply names a tool, before the arguments or the text have finished */
+  complete(messages: ChatMessage[], signal: AbortSignal, onTool?: (name: string) => void): Promise<AssistantMessage>;
 }
 
 export class ModelError extends Error {
