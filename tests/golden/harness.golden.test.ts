@@ -978,6 +978,13 @@ describe("follow-ups with the conversation in hand", () => {
     const r = await turn({ turns: ["what makes his work hold up when things go wrong?"], retriever }, [m]);
     expect(system).toContain("Facts closest to this question"); expect(system).toContain("one citation per claim"); expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/1 facts by meaning and keywords \(ccr/);
   });
+  it("a reply that is only next-step chips is no answer: the next model gets the turn", async () => {
+    const chipsOnly = scripted("gpt-oss-20b", [say("", call("suggest", { options: ["Everything he’s built"] }))]);
+    const next = scripted("nemotron-3.5-lightning-30b-a3b", [say("He’d be a Swiss Army knife: PACK, CCR Compliance Advisor and FinBoom are different blades.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["What is he if he has some superpower"] }, [chipsOnly, next], passScreen, undefined, async () => ({ kind: "playful" as const, confidence: 0.95, source: "model" as const, note: "playful" }));
+    expect(r.meta.model).toBe("nemotron-3.5-lightning-30b-a3b"); expect(r.text).toMatch(/Swiss Army knife/);
+    expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/gpt-oss-20b returned nothing → (falling back to|switching provider: )nemotron/);
+  });
   it("a dated question is answered from the resume without a model", async () => {
     const r = await turn({ turns: ["what was he doing in April 2026?"] }, [never()]);
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^In Apr 2026 he was Software Engineering Intern/); expect(r.of("tool").some((t) => t.name === "show_profile")).toBe(true);

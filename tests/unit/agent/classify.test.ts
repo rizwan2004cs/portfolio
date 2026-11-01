@@ -55,6 +55,8 @@ describe("the outer agent", () => {
     expect(ruleKind("describe him in three words")).toBe("playful");
     expect(ruleKind("is he gay")).toBe("personal");
     expect(ruleKind("I'm his friend")).toBe("visitor_intro");
+    expect(ruleKind("hi I'm Priya from Razorpay, hiring backend engineers")).toBe("visitor_intro"); // the name alone makes it an intro
+    expect(ruleKind("I'm Priya, what has he built?")).toBe("work");
     expect(ruleKind("who am i ?")).toBe("about_visitor");
     expect(ruleKind("what is the relationship between PACK and CCR?")).toBe("work");
   });

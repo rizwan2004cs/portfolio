@@ -103,6 +103,15 @@ const ABOUT_VISITOR = /^\s*(who am i|who i am|do you know (me|who i am)|what(’
 
 const PLAYFUL = /\b(super ?powers?|super ?hero|spirit animal|secret (weapon|sauce|power)|in (three|3|one|1|five|5) words|three words|one word to describe|which (character|superhero|avenger|pokemon|animal|anime|marvel|dc|movie character|fictional)|if (he|rizwan) (were|was) (a|an) (super ?hero|character|animal|movie|robot|ai|superpower|tool|game|language|framework)|unlimited (time|money|budget)|magic wand|fun fact|describe him|(his|rizwan'?s) (vibe|personality|superpower|kryptonite|origin story|theme song|catchphrase|motto|nickname)|kryptonite|origin story|theme song|catchphrase|motto|roast (him|rizwan)|hype (him|rizwan) up|sell (me on )?(him|rizwan) in|pitch (him|rizwan)|elevator pitch|one[- ]liner (about|for) (him|rizwan)|tagline|what makes him (tick|different|special)|rate (him|rizwan)|(he|rizwan) as an? (ai|agent|robot|llm|model|function|api|framework|language))\b/i;
 
+/** The visitor's name from the introduction itself ("I'm Priya from Razorpay", "this is Arjun, a founder"), for when
+ *  the classifier placed the message but gave no fields: one capitalised word after the intro phrase, nothing else. */
+export function nameFrom(text: string): string | undefined {
+  const m = /\b(?:i\s*['’]?\s*a?m|i am|this is|my name is|it['’]s)\s+(\S+)/i.exec(text.trim());
+  const word = m?.[1].replace(/[,.!?]+$/, "");
+  // a name is one capitalised word, and never a role, a pronoun or a filler the phrase can be followed by
+  return word && /^[A-Z][a-z]{1,20}$/.test(word) && !/^(?:His|Her|Their|The|Just|Here|From|Also|Not|A|An|Another|Rizwan|Hiring|Recruiter|Founder|Friend|Manager|Student|Developer|Engineer)$/.test(word) ? word : undefined;
+}
+
 /** The kind a message is when no classifier answers: the word lists, kept only as the offline fallback. */
 export function ruleKind(text: string): Kind {
   if (SITE_AGE_Q.test(text)) return "work"; // "how old is this site" is about the site, not his age
@@ -112,6 +121,6 @@ export function ruleKind(text: string): Kind {
   if (PLAYFUL.test(text)) return "playful";
   if (SMALL_TALK.test(text.trim())) return "small_talk";
   if (ABOUT_VISITOR.test(text)) return "about_visitor";
-  if (VISITOR_INTRO.test(text) && text.trim().split(/\s+/).length <= 14) return "visitor_intro";
+  if ((VISITOR_INTRO.test(text) || (!!nameFrom(text) && !/\?/.test(text))) && text.trim().split(/\s+/).length <= 14) return "visitor_intro";
   return "work";
 }
