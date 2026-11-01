@@ -10,6 +10,7 @@ export type Decision =
 const ASKS: Partial<Record<ToolName, [RegExp, string]>> = {
   offer_resume: [/\b(resume|cv)\b/i, "resume"],
   offer_contact: [/\b(contact|email|hire|hiring|reach|mail|phone|call|available|availability|open to|notice period)\b/i, "contact"],
+  switch_mode: [/\b(classic|normal|regular|plain|scroll\w*|static|agent (site|view|mode|page)|chat (view|mode)|switch|go back to)\b/i, "switch"],
 };
 
 const SITE_Q = /\b(this (site|agent|portfolio|chat)|the site|how (do|does) you work|your (model|harness|guard))\b/i;
