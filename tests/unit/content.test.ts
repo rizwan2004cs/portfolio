@@ -81,3 +81,11 @@ describe("the conversation fixture", async () => {
     expect(new Set(convos.map((c) => c.name)).size).toBe(convos.length);
   });
 });
+
+describe("security headers", async () => {
+  const { readFileSync } = await import("node:fs");
+  it("allow the microphone on this origin only, so voice input can work, and keep camera and location off", () => {
+    const cfg = readFileSync(new URL("../../next.config.ts", import.meta.url), "utf8");
+    expect(cfg).toMatch(/Permissions-Policy", value: "camera=\(\), microphone=\(self\), geolocation=\(\)"/);
+  });
+});
