@@ -70,6 +70,16 @@ describe("route · input validation", () => {
     expect((await handleAgent(post({ turns: ["x"], threadId: "../evil" }), deps())).status).toBe(400);
   });
 
+  it("a replayed introduction still carries the visitor's name into the state snapshot", async () => {
+    const d = { ...deps(), models: () => [{ name: "m", complete: async () => ({ role: "assistant" as const, content: "Hi Arjun, what can I show you?" }) }] };
+    const body = { history: [{ user: "I'm Arjun, a founder" }] };
+    const first = await events(await handleAgent(post(body), d));
+    expect(first.find((e) => e.type === "STATE_SNAPSHOT").snapshot.visitor).toEqual({ name: "Arjun" });
+    const again = await events(await handleAgent(post(body), d));
+    expect(again.find((e) => e.type === "RUN_FINISHED").result.mode).toBe("cache");
+    expect(again.find((e) => e.type === "STATE_SNAPSHOT").snapshot.visitor).toEqual({ name: "Arjun" });
+  });
+
   it("413 for an oversized body", async () => {
     expect((await handleAgent(post({ turns: ["x".repeat(LIMITS.bodyBytes + 100)] }), deps())).status).toBe(413);
   });
