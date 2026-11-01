@@ -1,5 +1,6 @@
 import { isProjectId, projectById } from "@/content/data";
 import type { Visitor } from "./classify";
+import { fitRows } from "./fit";
 import type { AgentEvent } from "./types";
 
 /** What the conversation has established so far. The server computes it after every turn and sends it as an AG-UI
@@ -14,9 +15,16 @@ export interface SessionState {
   visitor: Visitor;
   /** what the visitor has searched for, oldest first */
   topics: string[];
+  /** the last fit check: its requirements, which of them his projects show, and the rest */
+  fit?: { requirements: string[]; matched: string[]; gaps: string[] };
 }
 
 export const EMPTY_STATE: SessionState = { focus: null, shown: [], offered: [], visitor: {}, topics: [] };
+/** A fit check from its requirements, as the match_role tool computes it. */
+export const fitFrom = (requirements: string[]): SessionState["fit"] => {
+  const rows = fitRows(requirements);
+  return { requirements: rows.map((r) => r.requirement), matched: rows.filter((r) => r.status === "match").map((r) => r.requirement), gaps: rows.filter((r) => r.status !== "match").map((r) => r.requirement) };
+};
 const PANELS = new Set(["profile", "index", "harness", "done:resume", "done:contact"]);
 const VISITOR_FIELDS = ["name", "company", "role", "hiringFor"] as const;
 const MAX = { list: 20, text: 80, topics: 10 } as const;
@@ -31,12 +39,15 @@ export function sanitizeState(s: unknown): SessionState {
   const list = (v: unknown) => (Array.isArray(v) ? v.map(str).filter(Boolean) : []);
   const visitor: Visitor = {};
   if (o.visitor && typeof o.visitor === "object") for (const f of VISITOR_FIELDS) { const v = str((o.visitor as Record<string, unknown>)[f]); if (v) visitor[f] = v; }
+  // a fit is recomputed from its requirements, never trusted as sent
+  const reqs = o.fit && typeof o.fit === "object" ? list((o.fit as Record<string, unknown>).requirements).slice(0, 8) : [];
   return {
     focus: isProjectId(str(o.focus)) ? str(o.focus) : null,
     shown: unique(list(o.shown).filter((x) => isProjectId(x) || PANELS.has(x))).slice(0, MAX.list),
     offered: unique(list(o.offered).filter((x): x is "resume" | "contact" => x === "resume" || x === "contact")),
     visitor,
     topics: unique(list(o.topics)).slice(-MAX.topics),
+    ...(reqs.length ? { fit: fitFrom(reqs) } : {}),
   };
 }
 
@@ -46,7 +57,9 @@ export function nextState(prev: SessionState, events: AgentEvent[], shown: strin
   const panels = events.flatMap((e) => (e.type === "panel" && e.panel.id && isProjectId(e.panel.id) ? [e.panel.id] : e.type === "panel" && PANELS.has(e.panel.kind) ? [e.panel.kind] : []));
   const offered = events.flatMap((e): ("resume" | "contact")[] => (e.type === "approval" ? [e.action] : e.type === "tool" && e.name === "offer_resume" ? ["resume"] : e.type === "tool" && e.name === "offer_contact" ? ["contact"] : []));
   const topics = events.flatMap((e) => (e.type === "tool" && e.name === "search_projects" ? [str(e.args.query)].filter(Boolean) : []));
+  const fitReqs = events.flatMap((e) => (e.type === "panel" && e.panel.kind === "fit" && e.panel.id ? [e.panel.id.split("|").map(str).filter(Boolean)] : [])).at(-1);
   return {
+    ...(fitReqs?.length ? { fit: fitFrom(fitReqs) } : prev.fit ? { fit: prev.fit } : {}),
     focus: opened.at(-1) ?? panels.filter(isProjectId).at(-1) ?? prev.focus,
     shown: unique([...prev.shown, ...shown.filter((x) => isProjectId(x) || PANELS.has(x)), ...opened, ...panels]).slice(-MAX.list),
     offered: unique([...prev.offered, ...offered]),
@@ -67,5 +80,6 @@ export function contextBlock(s: SessionState): string {
   const v = s.visitor, who = [v.name, v.company, v.role].filter(Boolean).join(", ");
   if (who || v.hiringFor) lines.push(`Visitor: ${who || "unnamed"}${v.hiringFor ? `, hiring for ${v.hiringFor}` : ""}.${v.name ? " Use their name once, not every turn." : ""}${v.hiringFor ? " Tailor answers to that role." : ""}`);
   if (s.topics.length) lines.push(`Asked about so far: ${s.topics.join(", ")}.`);
+  if (s.fit) lines.push(`Fit so far: ${s.fit.matched.length} of ${s.fit.requirements.length} requirements shown in his projects${s.fit.gaps.length ? `; not shown: ${s.fit.gaps.join(", ")}` : ""}.`);
   return lines.length ? `Conversation so far:\n${lines.join("\n")}` : "";
 }

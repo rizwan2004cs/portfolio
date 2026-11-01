@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { contextBlock, EMPTY_STATE, nextState, sanitizeState } from "@/agent/state";
+import { contextBlock, EMPTY_STATE, fitFrom, nextState, sanitizeState } from "@/agent/state";
+import { nextOffer } from "@/agent/offers";
 
 describe("session state", () => {
   it("a state from the client is a claim: unknown ids and fields are dropped, sizes capped, junk is empty", () => {
@@ -26,5 +27,24 @@ describe("session state", () => {
     expect(contextBlock({ focus: "pack", shown: ["pack", "finboom", "done:resume"], offered: ["resume"], visitor: { name: "Priya", company: "Razorpay", hiringFor: "backend engineer" }, topics: ["voice agents"] })).toBe(
       "Conversation so far:\nFocused project: PACK.\nAlready on screen: PACK, FinBoom, his resume.\nAlready offered: resume.\nVisitor: Priya, Razorpay, hiring for backend engineer. Use their name once, not every turn. Tailor answers to that role.\nAsked about so far: voice agents.");
     expect(contextBlock({ ...EMPTY_STATE, visitor: { hiringFor: "SDE" } })).toBe("Conversation so far:\nVisitor: unnamed, hiring for SDE. Tailor answers to that role.");
+  });
+});
+
+describe("fit memory and proactive offers", () => {
+  it("a fit panel in the turn's events becomes the fit in state; it is recomputed from its requirements, never trusted", () => {
+    const s = nextState(EMPTY_STATE, [{ type: "panel", panel: { kind: "fit", id: "LangGraph agents|Kubernetes" } }]);
+    expect(s.fit).toEqual({ requirements: ["LangGraph agents", "Kubernetes"], matched: ["LangGraph agents"], gaps: ["Kubernetes"] });
+    expect(nextState(s, [{ type: "text", text: "x" }]).fit).toEqual(s.fit); // carried forward
+    expect(sanitizeState({ fit: { requirements: ["Kubernetes"], matched: ["Kubernetes"], gaps: [] } }).fit).toEqual(fitFrom(["Kubernetes"]));
+    expect(contextBlock({ ...EMPTY_STATE, fit: s.fit })).toBe("Conversation so far:\nFit so far: 1 of 2 requirements shown in his projects; not shown: Kubernetes.");
+  });
+  it("offers the fit check to a visitor who said what they hire for, the resume after three projects, and otherwise nothing", () => {
+    expect(nextOffer(undefined)).toBeNull();
+    expect(nextOffer(EMPTY_STATE)).toBeNull();
+    expect(nextOffer({ ...EMPTY_STATE, visitor: { hiringFor: "backend engineer" } })?.chip).toBe("Is he a fit for your role?");
+    expect(nextOffer({ ...EMPTY_STATE, visitor: { hiringFor: "backend engineer" }, fit: fitFrom(["Python"]) })).toBeNull();
+    expect(nextOffer({ ...EMPTY_STATE, shown: ["pack", "ccr"] }, ["finboom"])?.chip).toBe("Get resume");
+    expect(nextOffer({ ...EMPTY_STATE, shown: ["pack", "ccr", "finboom"], offered: ["resume"] })).toBeNull();
+    expect(nextOffer({ ...EMPTY_STATE, shown: ["pack", "ccr", "profile"] })).toBeNull();
   });
 });
