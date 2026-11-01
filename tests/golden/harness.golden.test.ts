@@ -995,6 +995,12 @@ describe("follow-ups with the conversation in hand", () => {
     const h = await turn({ turns: ["uska python experience kitna hai"] }, [py], passScreen, undefined, small);
     expect(h.meta.mode).not.toBe("scope"); expect(h.text).toMatch(/Python/); expect(h.of("trace").map((e) => e.detail).join("\n")).toMatch(/read through a correction: treated as work/);
   });
+  it("the run walks the chain in order of availability and says so", async () => {
+    const slow = { ...scripted("gpt-oss-120b", [say("Late.", call("suggest", { options: ["x"] }))]), health: () => ({ resting: true, fails: 2, lastOk: 0 }) };
+    const quick = { ...scripted("nemotron-3.5-lightning-30b-a3b", [say("PACK is a seven-agent LangGraph game.", call("suggest", { options: ["x"] }))]), health: () => ({ resting: false, fails: 0, lastOk: Date.now() }) };
+    const r = await turn({ turns: ["what is PACK about?"] }, [slow, quick]);
+    expect(r.meta.model).toBe("nemotron-3.5-lightning-30b-a3b"); expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/chain ordered by availability: nemotron-3.5-lightning-30b-a3b → gpt-oss-120b/);
+  });
   it("a dated question is answered from the resume without a model", async () => {
     const r = await turn({ turns: ["what was he doing in April 2026?"] }, [never()]);
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^In Apr 2026 he was Software Engineering Intern/); expect(r.of("tool").some((t) => t.name === "show_profile")).toBe(true);
