@@ -17,6 +17,8 @@ export interface SessionState {
   topics: string[];
   /** the last fit check: its requirements, which of them his projects show, and the rest */
   fit?: { requirements: string[]; matched: string[]; gaps: string[] };
+  /** a question the agent asked this turn, with the answers it can act on; gone after the next turn */
+  pending?: { question: string; options: string[] };
 }
 
 export const EMPTY_STATE: SessionState = { focus: null, shown: [], offered: [], visitor: {}, topics: [] };
@@ -41,6 +43,7 @@ export function sanitizeState(s: unknown): SessionState {
   if (o.visitor && typeof o.visitor === "object") for (const f of VISITOR_FIELDS) { const v = str((o.visitor as Record<string, unknown>)[f]); if (v) visitor[f] = v; }
   // a fit is recomputed from its requirements, never trusted as sent
   const reqs = o.fit && typeof o.fit === "object" ? list((o.fit as Record<string, unknown>).requirements).slice(0, 8) : [];
+  const pq = o.pending && typeof o.pending === "object" ? str((o.pending as Record<string, unknown>).question) : "", po = o.pending && typeof o.pending === "object" ? list((o.pending as Record<string, unknown>).options).slice(0, 3) : [];
   return {
     focus: isProjectId(str(o.focus)) ? str(o.focus) : null,
     shown: unique(list(o.shown).filter((x) => isProjectId(x) || PANELS.has(x))).slice(0, MAX.list),
@@ -48,6 +51,7 @@ export function sanitizeState(s: unknown): SessionState {
     visitor,
     topics: unique(list(o.topics)).slice(-MAX.topics),
     ...(reqs.length ? { fit: fitFrom(reqs) } : {}),
+    ...(pq && po.length >= 2 ? { pending: { question: pq, options: po } } : {}),
   };
 }
 
@@ -58,8 +62,12 @@ export function nextState(prev: SessionState, events: AgentEvent[], shown: strin
   const offered = events.flatMap((e): ("resume" | "contact")[] => (e.type === "approval" ? [e.action] : e.type === "tool" && e.name === "offer_resume" ? ["resume"] : e.type === "tool" && e.name === "offer_contact" ? ["contact"] : []));
   const topics = events.flatMap((e) => (e.type === "tool" && e.name === "search_projects" ? [str(e.args.query)].filter(Boolean) : []));
   const fitReqs = events.flatMap((e) => (e.type === "panel" && e.panel.kind === "fit" && e.panel.id ? [e.panel.id.split("|").map(str).filter(Boolean)] : [])).at(-1);
+  // a question asked this turn is pending for exactly one turn: it is never carried from prev
+  const asked = events.flatMap((e) => (e.type === "tool" && e.name === "ask_visitor" ? [{ question: str(e.args.question), options: (Array.isArray(e.args.options) ? e.args.options : []).map(str).filter(Boolean).slice(0, 3) }] : [])).at(-1);
+  const { pending: _gone, ...rest } = prev; void _gone;
   return {
-    ...(fitReqs?.length ? { fit: fitFrom(fitReqs) } : prev.fit ? { fit: prev.fit } : {}),
+    ...(asked && asked.question && asked.options.length >= 2 ? { pending: asked } : {}),
+    ...(fitReqs?.length ? { fit: fitFrom(fitReqs) } : rest.fit ? { fit: rest.fit } : {}),
     focus: opened.at(-1) ?? panels.filter(isProjectId).at(-1) ?? prev.focus,
     shown: unique([...prev.shown, ...shown.filter((x) => isProjectId(x) || PANELS.has(x)), ...opened, ...panels]).slice(-MAX.list),
     offered: unique([...prev.offered, ...offered]),
@@ -80,6 +88,7 @@ export function contextBlock(s: SessionState): string {
   const v = s.visitor, who = [v.name, v.company, v.role].filter(Boolean).join(", ");
   if (who || v.hiringFor) lines.push(`Visitor: ${who || "unnamed"}${v.hiringFor ? `, hiring for ${v.hiringFor}` : ""}.${v.name ? " Use their name once, not every turn." : ""}${v.hiringFor ? " Tailor answers to that role." : ""}`);
   if (s.topics.length) lines.push(`Asked about so far: ${s.topics.join(", ")}.`);
+  if (s.pending) lines.push(`You just asked: "${s.pending.question}" with the options ${s.pending.options.join(" / ")}; the visitor's reply may be an answer to it.`);
   if (s.fit) lines.push(`Fit so far: ${s.fit.matched.length} of ${s.fit.requirements.length} requirements shown in his projects${s.fit.gaps.length ? `; not shown: ${s.fit.gaps.join(", ")}` : ""}.`);
   return lines.length ? `Conversation so far:\n${lines.join("\n")}` : "";
 }
