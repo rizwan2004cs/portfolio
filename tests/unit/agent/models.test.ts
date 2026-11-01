@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groqScreen, modelChain, readStream } from "@/agent/models";
+import { groqScreen, modelChain, orderByHealth, readStream } from "@/agent/models";
 import { defaultDeps } from "@/agent/handler";
 
 const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
@@ -134,5 +134,26 @@ describe("streamed replies", () => {
     expect((await m.complete([], new AbortController().signal, (n) => seen.push(n))).tool_calls?.[0].function.name).toBe("list_projects"); expect(seen).toEqual(["list_projects"]);
     expect((await modelChain(["k1"], undefined, (async () => reply("plain")) as typeof fetch)[0].complete([], new AbortController().signal)).content).toBe("plain");
     await expect(readStream(sse([]))).rejects.toThrow("empty choice");
+  });
+});
+
+describe("the chain follows availability", () => {
+  it("a throttled slot drops behind healthy ones, the slot that just answered goes first, resting slots go last", async () => {
+    let calls = 0;
+    const fake = (async (_u: string, init: RequestInit) => { calls++; const key = String((init.headers as Record<string, string>).Authorization); return key.endsWith("k1") ? new Response("busy", { status: 429, headers: { "retry-after": "30" } }) : reply("hi"); }) as unknown as typeof fetch;
+    const chain = modelChain(["k1", "k2"], "g", fake);
+    expect(orderByHealth(chain).map((m) => m.name)).toEqual(chain.map((m) => m.name)); // nothing known yet: configured order
+    await expect(chain[0].complete([], new AbortController().signal)).rejects.toThrow("HTTP 429");
+    await chain[1].complete([], new AbortController().signal);
+    const after = orderByHealth(chain).map((m) => m.name);
+    expect(after[0]).toBe("gpt-oss-120b · key 2"); expect(after.at(-1)).toBe("gpt-oss-120b · key 1"); // key 1 is resting after the 429
+    expect(chain[0].health!().resting).toBe(true); expect(chain[1].health!()).toMatchObject({ fails: 0, resting: false });
+    chain[1].mark!(false); expect(chain[1].health!().fails).toBe(1);
+    expect(calls).toBe(2);
+  });
+  it("an old failure is forgotten after ten minutes", () => {
+    const stale = { name: "a", complete: async () => ({ role: "assistant" as const, content: "x" }), health: () => ({ resting: false, fails: 3, lastOk: 1 }) };
+    const fresh = { name: "b", complete: async () => ({ role: "assistant" as const, content: "x" }), health: () => ({ resting: false, fails: 1, lastOk: 1_000_000 }) };
+    expect(orderByHealth([stale, fresh], 1_000_000 + 1).map((m) => m.name)).toEqual(["a", "b"]); // a's failures are stale: configured order wins
   });
 });

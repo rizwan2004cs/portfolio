@@ -1,5 +1,5 @@
 import { TOOL_DEFS } from "./tools";
-import { ModelError, type AssistantMessage, type ChatMessage, type ModelClient, type Screen } from "./types";
+import { ModelError, type AssistantMessage, type ChatMessage, type ModelClient, type Screen, type SlotHealth } from "./types";
 
 const GROQ = "https://api.groq.com/openai/v1/chat/completions";
 export const MODEL_IDS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"] as const;
@@ -13,12 +13,26 @@ const TOOLS = () => TOOL_DEFS.map((f) => ({ type: "function", function: f }));
 // Keyed per fetch implementation so tests with their own fake fetch never share state.
 const COOL = new WeakMap<typeof fetch, Map<string, number>>();
 const cooling = (f: typeof fetch) => COOL.get(f) ?? (COOL.set(f, new Map()), COOL.get(f)!);
+// recent outcomes per slot: the chain is walked in order of availability, not in configured order, so a key that was
+// throttled a moment ago is not asked again first while a healthy one waits behind it
+const HEALTH = new WeakMap<typeof fetch, Map<string, { fails: number; lastOk: number }>>();
+const healthOf = (f: typeof fetch, slot: string) => { const m = HEALTH.get(f) ?? (HEALTH.set(f, new Map()), HEALTH.get(f)!); return m.get(slot) ?? (m.set(slot, { fails: 0, lastOk: 0 }), m.get(slot)!); };
+
+/** The chain in order of availability: resting slots last; otherwise fewer recent failures first, then the slot that
+ *  answered most recently; ties keep the configured order (quality preference). A failure is forgotten after ten minutes. */
+export function orderByHealth<T extends ModelClient>(models: T[], now = Date.now()): T[] {
+  const score = (m: T) => { const h = m.health?.() ?? { resting: false, fails: 0, lastOk: 0 }; return { resting: h.resting ? 1 : 0, fails: now - h.lastOk > 600_000 && h.lastOk > 0 ? 0 : h.fails, lastOk: h.lastOk }; };
+  return models.map((m, i) => ({ m, i, s: score(m) })).sort((a, b) => a.s.resting - b.s.resting || a.s.fails - b.s.fails || b.s.lastOk - a.s.lastOk || a.i - b.i).map((x) => x.m);
+}
 
 /** Any OpenAI-compatible chat endpoint with our closed-world tools. */
 function chatModel(name: string, url: string, key: string, body: Record<string, unknown>, fetchImpl: typeof fetch): ModelClient {
   const slot = `${url}|${String(body.model)}|${key}`;
+  const h = () => healthOf(fetchImpl, slot);
   return {
     name,
+    health: (): SlotHealth => ({ resting: (cooling(fetchImpl).get(slot) ?? 0) > Date.now(), fails: h().fails, lastOk: h().lastOk }),
+    mark: (ok) => { if (ok) { h().fails = 0; h().lastOk = Date.now(); } else h().fails++; },
     async complete(messages: ChatMessage[], signal: AbortSignal, onTool?: (name: string) => void): Promise<AssistantMessage> {
       const until = cooling(fetchImpl).get(slot) ?? 0;
       if (until > Date.now()) throw new ModelError(`HTTP 429 · resting ${Math.ceil((until - Date.now()) / 1000)}s`, 429);
@@ -34,6 +48,7 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
       catch (e) {
         // a key that hangs is likely overloaded: rest it for a minute so the next visitor isn't stuck behind it
         if (e instanceof Error && e.name === "TimeoutError") cooling(fetchImpl).set(slot, Date.now() + 60_000);
+        h().fails++;
         throw e;
       }
       // a malformed tool call comes back as 400 tool_use_failed: a one-off generation glitch, so retry once
@@ -42,11 +57,10 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
         const wait = Number(r.headers.get("retry-after"));
         cooling(fetchImpl).set(slot, Date.now() + Math.min(Number.isFinite(wait) && wait > 0 ? wait : 20, 300) * 1000);
       }
-      if (!r.ok) throw new ModelError(`HTTP ${r.status}`, r.status);
-      if ((r.headers.get("content-type") ?? "").includes("text/event-stream")) return readStream(r, onTool);
-      const j = (await r.json()) as { choices?: { message?: AssistantMessage }[] };
-      const msg = j.choices?.[0]?.message;
-      if (!msg) throw new ModelError("empty choice");
+      if (!r.ok) { h().fails++; throw new ModelError(`HTTP ${r.status}`, r.status); }
+      const msg = (r.headers.get("content-type") ?? "").includes("text/event-stream") ? await readStream(r, onTool) : (await r.json() as { choices?: { message?: AssistantMessage }[] }).choices?.[0]?.message;
+      if (!msg) { h().fails++; throw new ModelError("empty choice"); }
+      h().fails = 0; h().lastOk = Date.now();
       return msg;
     },
   };

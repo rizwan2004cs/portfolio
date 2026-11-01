@@ -58,7 +58,12 @@ export interface ModelClient {
   name: string;
   /** `onTool` fires as soon as a streamed reply names a tool, before the arguments or the text have finished */
   complete(messages: ChatMessage[], signal: AbortSignal, onTool?: (name: string) => void): Promise<AssistantMessage>;
+  /** how this slot has been doing lately, so the chain can be ordered by availability */
+  health?: () => SlotHealth;
+  /** the run loop reports outcomes the client cannot see itself (an empty reply) */
+  mark?: (ok: boolean) => void;
 }
+export interface SlotHealth { resting: boolean; fails: number; lastOk: number }
 
 export class ModelError extends Error {
   constructor(message: string, readonly status?: number) {

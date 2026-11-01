@@ -15,6 +15,7 @@ import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
 import { contextBlock, EMPTY_STATE, nextState } from "./state";
+import { orderByHealth } from "./models";
 import { nextOffer } from "./offers";
 import { resolvePending, whichOne } from "./clarify";
 import { introFacts, nameFrom, type Visitor } from "./classify";
@@ -337,6 +338,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const opened = new Set<string>();
   const onScreen = [...new Set([...input.shown, ...(subjectProject ? [subjectProject.id] : [])])].map((id) => projectById(id)).filter((p): p is Project => !!p);
   let looked = false, tools = 0, drops = 0, lastTitle: string | null = subjectProject?.title ?? null, lastFacts: string[] = subjectProject?.facts ?? [], mi = 0;
+  // the chain in order of availability: a slot that just answered goes first, throttled or empty ones drop back
+  const chain = orderByHealth(deps.models);
+  if (chain.some((m, i) => m !== deps.models[i])) emit({ type: "trace", step: "model", detail: `chain ordered by availability: ${chain.map((m) => m.name).join(" → ")}`, level: "info" });
+  deps = { ...deps, models: chain };
   // facts of projects the visitor already has on screen are fair sources for follow-ups ("what vector DB does it use?")
   // the model was given every fact, so every fact is a fair source; number, prize and scope checks stay relational
   let source = `${ALL_FACTS_SOURCE} ${KNOWLEDGE} ${onScreen.map((p) => `${p.facts.join(" ")} ${p.stack.join(" ")}`).join(" ")}`;
@@ -363,7 +368,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         // an empty reply with nothing said yet is a failure like any other: the next model in the chain gets the turn
         // no text and no real tool call (a lone suggest is chips, not an answer): the next model gets the turn
         const realCall = (msg.tool_calls ?? []).some((c) => c.function.name !== "suggest");
-        if (!msg.content?.trim() && !realCall && !texts.length && deps.models[mi + 1]) throw new ModelError("returned nothing");
+        if (!msg.content?.trim() && !realCall && !texts.length && deps.models[mi + 1]) { model.mark?.(false); throw new ModelError("returned nothing"); }
         flushSkips(model.name); // this model answered: say which resting keys were passed over to reach it
         const leak = leakedCalls(msg.content ?? "");
         if (leak.calls.length) {
