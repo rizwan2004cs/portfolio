@@ -471,7 +471,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           const shownNow = `${asked ?? ""} ${lastKind} ${lastProject?.title ?? ""}`;
           const said = narrated(dedupeSentences(gr.text), shownNow);
           if (said.cut) emit({ type: "trace", step: "grounding", detail: `removed ${said.cut} sentence${said.cut > 1 ? "s" : ""} describing something that wasn’t shown`, level: "warn" });
-          if (said.text) out({ type: "text", text: said.text });
+          // a visitor who gave their name is greeted by it, whatever the model chose to say first
+          const name = kind === "visitor_intro" ? (sorted.visitor ?? input.state?.visitor)?.name : undefined;
+          const greeting = said.text && name && !said.text.includes(name) ? `Hi ${name}. ${said.text}` : said.text;
+          if (greeting) out({ type: "text", text: greeting });
         }
         if (spoke) openNamed(gr.text);
         if (spoke && !visible) showContext();
