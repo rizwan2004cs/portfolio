@@ -7,7 +7,8 @@ class FakeRecognition {
   static last: FakeRecognition | null = null;
   lang = ""; interimResults = true; maxAlternatives = 0; started = 0; stopped = 0;
   onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null = null;
-  onend: (() => void) | null = null; onerror: (() => void) | null = null;
+  onend: (() => void) | null = null; onerror: ((e?: { error?: string }) => void) | null = null;
+  fail(error: string) { this.onerror?.({ error }); this.onend?.(); }
   constructor() { FakeRecognition.last = this; }
   start() { this.started++; }
   stop() { this.stopped++; }
@@ -46,5 +47,18 @@ describe("voice input", () => {
     button.click(); FakeRecognition.last!.hear("show me PACK");
     voice.say("Here is PACK."); expect(speak).toHaveBeenCalledTimes(1); expect((speak.mock.calls[0][0] as { text: string }).text).toBe("Here is PACK.");
     voice.say("And more."); expect(speak).toHaveBeenCalledTimes(1); // one reply per spoken question
+  });
+});
+
+describe("voice input failures", () => {
+  it("a blocked microphone says so in the input instead of resetting silently", () => {
+    document.body.innerHTML = '<form id="form"><input id="inp"><button type="button" id="mic" hidden></button></form>';
+    (window as unknown as Record<string, unknown>).SpeechRecognition = FakeRecognition;
+    const button = document.querySelector<HTMLButtonElement>("#mic")!, input = document.querySelector<HTMLInputElement>("#inp")!;
+    mountVoice(button, input, () => {});
+    button.click(); FakeRecognition.last!.fail("not-allowed");
+    expect(button.getAttribute("aria-pressed")).toBe("false"); expect(input.placeholder).toMatch(/^Microphone blocked for this site/);
+    button.click(); FakeRecognition.last!.fail("no-speech");
+    expect(input.placeholder).toMatch(/^Didn’t catch that/);
   });
 });
