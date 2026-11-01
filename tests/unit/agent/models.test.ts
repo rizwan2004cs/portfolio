@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groqScreen, modelChain } from "@/agent/models";
+import { groqScreen, modelChain, readStream } from "@/agent/models";
 import { defaultDeps } from "@/agent/handler";
 
 const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
@@ -110,5 +110,29 @@ describe("openrouter fallback", () => {
     await chain.at(-1)!.complete([], new AbortController().signal);
     expect(body.models).toEqual(["nvidia/nemotron-3.5-lightning:free", "thinkingmachines/inkling-small:free", "google/gemma-4-31b-it:free"]);
     expect(modelChain(["k1"], "g", fake).map((m) => m.name)).not.toContain("openrouter · free models");
+  });
+});
+
+describe("streamed replies", () => {
+  const sse = (lines: string[]) => new Response(lines.map((l) => `data: ${l}\n`).join("\n") + "\ndata: [DONE]\n", { status: 200, headers: { "content-type": "text/event-stream" } });
+  it("assembles content and tool calls from deltas, and names a tool the moment it appears", async () => {
+    const named: string[] = [];
+    const msg = await readStream(sse([
+      JSON.stringify({ choices: [{ delta: { content: "Here" } }] }),
+      JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "open_", arguments: "" } }] } }] }),
+      JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { name: "project", arguments: "{\"id\":" } }] } }] }),
+      JSON.stringify({ choices: [{ delta: { content: "’s PACK." } }] }),
+      JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "\"pack\"}" } }, { index: 1, id: "c2", function: { name: "suggest", arguments: "{\"options\":[\"x\"]}" } }] } }] }),
+    ]), (n) => named.push(n));
+    expect(msg).toEqual({ role: "assistant", content: "Here’s PACK.", tool_calls: [{ id: "c1", function: { name: "open_project", arguments: '{"id":"pack"}' } }, { id: "c2", function: { name: "suggest", arguments: '{"options":["x"]}' } }] });
+    expect(named).toEqual(["open_", "suggest"]); // fires on the first fragment of the name
+  });
+  it("a model client streams when the server streams, and still reads a plain JSON reply", async () => {
+    const seen: string[] = [];
+    const fake = (async (_u: string, init: RequestInit) => { expect(JSON.parse(String(init.body)).stream).toBe(true); return sse([JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c", function: { name: "list_projects", arguments: "{}" } }] } }] })]); }) as unknown as typeof fetch;
+    const [m] = modelChain(["k1"], undefined, fake);
+    expect((await m.complete([], new AbortController().signal, (n) => seen.push(n))).tool_calls?.[0].function.name).toBe("list_projects"); expect(seen).toEqual(["list_projects"]);
+    expect((await modelChain(["k1"], undefined, (async () => reply("plain")) as typeof fetch)[0].complete([], new AbortController().signal)).content).toBe("plain");
+    await expect(readStream(sse([]))).rejects.toThrow("empty choice");
   });
 });

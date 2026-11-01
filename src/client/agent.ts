@@ -585,7 +585,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     const handle = async (e: Ev) => {
       if (e.type !== "trace") think.remove();
       if (e.type === "trace") tr(e.level, e.step, e.detail);
-      else if (e.type === "state") setState({ session: e.state, focus: (e.state.focus as string | null) ?? S.focus });
+      else if (e.type === "state") { setState({ session: e.state, focus: (e.state.focus as string | null) ?? S.focus }); rememberVisit(e.state); }
       else if (e.type === "text") await say(e.text);
       else if (e.type === "tool") {
         if (e.name === "suggest") return;
@@ -647,6 +647,18 @@ export function mountAgent(shell: HTMLElement): () => void {
   }
 
   /* ---------- home ---------- */
+  /** What the agent knows about this visitor, kept for 30 days so a returning visitor is greeted by name and picks up
+   *  where they left off; the server sanitises it on every request, so it can only ever remind, never open a panel. */
+  const VISIT_KEY = "rz_visit", VISIT_DAYS = 30;
+  function rememberVisit(state: Record<string, unknown>) { store(VISIT_KEY, JSON.stringify({ at: Date.now(), state })); }
+  function lastVisit(): { state: Record<string, unknown>; focus?: string; name?: string; offered: string[] } | null {
+    try {
+      const v = JSON.parse(store(VISIT_KEY) ?? "null") as { at?: number; state?: Record<string, unknown> } | null;
+      if (!v?.state || !v.at || Date.now() - v.at > VISIT_DAYS * 86_400_000) return null;
+      const visitor = (v.state.visitor ?? {}) as { name?: string }, focus = typeof v.state.focus === "string" && P.has(v.state.focus) ? v.state.focus : undefined;
+      return { state: v.state, focus, name: visitor.name, offered: Array.isArray(v.state.offered) ? (v.state.offered as string[]) : [] };
+    } catch { return null; }
+  }
   function renderHome() {
     const now = new Date(), h = now.getHours();
     const hello = h < 5 ? "Still up?" : h < 12 ? "Good morning." : h < 17 ? "Good afternoon." : "Good evening.";
@@ -662,10 +674,15 @@ export function mountAgent(shell: HTMLElement): () => void {
     ];
     if (fromGitHub) cards.unshift(cards.splice(1, 1)[0]);
     if (RETURNING && lastId && P.get(lastId)) cards[2] = { k: "resume:" + lastId, b: "Pick up where you left off", s: P.get(lastId)!.title };
+    // a visitor the agent got to know last time is greeted as such, and the next message carries what it knew
+    const visit = RETURNING ? lastVisit() : null;
+    if (visit && !S.session) setState({ session: visit.state });
+    const lookedAt = visit ? [visit.focus ? P.get(visit.focus)!.title : "", visit.offered.includes("resume") ? "his resume" : ""].filter(Boolean) : [];
+    const note = visit && lookedAt.length ? `Last time you looked at ${lookedAt.join(" and ")}.` : "";
     col.classList.add("home"); col.innerHTML = "";
     const home = add(`<div class="homeb" id="home">
       ${homeIntro({
-        greet: RETURNING ? "Welcome back." : hello, returning: !!RETURNING, role: ROLE,
+        greet: RETURNING ? (visit?.name ? `Welcome back, ${visit.name}.` : "Welcome back.") : hello, returning: !!RETURNING, role: ROLE, note,
         meta: `${sameTz ? `Bangalore · ${t(now)}` : `${t(now)} for you · ${t(blr)} in Bangalore`}${fromLinkedIn ? " · hello from LinkedIn" : fromGitHub ? " · hello from GitHub" : ""}`,
       })}
       <div class="hslot" id="hslot"></div>

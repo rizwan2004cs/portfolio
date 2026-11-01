@@ -207,8 +207,8 @@ export const harnessPanel = () => `<article class="panel harness"><div class="ar
     <ul class="facts"><li>Opening tours are scripted and run in your browser: zero requests.</li><li>Repeated questions are served from cache: zero tokens.</li><li>A throttled model retries on a second key, then a smaller model, then three Nemotron models on NVIDIA’s quota, then Gemini on Google’s, then free models on OpenRouter, then a deterministic router: an answer every time.</li><li>Every sentence the model writes is checked against the facts its tools returned, by words and then by meaning (his facts sit in Neon Postgres with pgvector; a small model reads the closest ones); unsupported sentences are dropped.</li><li>Every panel is real content selected by ID; the model can’t write what you see.</li></ul></div></article>`;
 
 /** Agent home: who Rizwan is, the agent greeting the visitor, and a two-line brief. Shared by SSR and the client. */
-export function homeIntro(o: { greet: string; returning?: boolean; meta: string; role: string }) {
-  const brief = `${PROFILE_BRIEF} ${o.returning ? "Pick up where you left off, or ask me anything." : "Ask me anything, or start below."}`;
+export function homeIntro(o: { greet: string; returning?: boolean; meta: string; role: string; note?: string }) {
+  const brief = `${PROFILE_BRIEF} ${o.note ? `${o.note} ` : ""}${o.returning ? "Pick up where you left off, or ask me anything." : "Ask me anything, or start below."}`;
   return `<div class="hwho"><img src="/img/portrait-320.jpg" alt="" width="48" height="48" class="ld"><div><b>Syed Mohammad Rizwan</b><span>AI engineer · ${esc(o.role)} · Bangalore</span></div></div>
     <h2 class="hello">${esc(o.greet)} <em>I’m Rizwan’s agent.</em></h2>
     <p class="hsub">${esc(brief)}</p>

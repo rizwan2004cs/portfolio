@@ -19,14 +19,15 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
   const slot = `${url}|${String(body.model)}|${key}`;
   return {
     name,
-    async complete(messages: ChatMessage[], signal: AbortSignal): Promise<AssistantMessage> {
+    async complete(messages: ChatMessage[], signal: AbortSignal, onTool?: (name: string) => void): Promise<AssistantMessage> {
       const until = cooling(fetchImpl).get(slot) ?? 0;
       if (until > Date.now()) throw new ModelError(`HTTP 429 · resting ${Math.ceil((until - Date.now()) / 1000)}s`, 429);
+      // streamed, so a tool call shows the moment the model names it; the reply is still assembled whole before use
       const call = () => fetchImpl(url, {
         method: "POST",
         signal: AbortSignal.any([signal, AbortSignal.timeout(8_000)]),
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ ...body, messages, tools: TOOLS(), tool_choice: "auto" }),
+        body: JSON.stringify({ ...body, messages, tools: TOOLS(), tool_choice: "auto", stream: true }),
       });
       let r: Response;
       try { r = await call(); }
@@ -42,12 +43,52 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
         cooling(fetchImpl).set(slot, Date.now() + Math.min(Number.isFinite(wait) && wait > 0 ? wait : 20, 300) * 1000);
       }
       if (!r.ok) throw new ModelError(`HTTP ${r.status}`, r.status);
+      if ((r.headers.get("content-type") ?? "").includes("text/event-stream")) return readStream(r, onTool);
       const j = (await r.json()) as { choices?: { message?: AssistantMessage }[] };
       const msg = j.choices?.[0]?.message;
       if (!msg) throw new ModelError("empty choice");
       return msg;
     },
   };
+}
+
+/** One assistant message out of an OpenAI-style SSE stream: content deltas joined, tool calls assembled by index. */
+export async function readStream(r: Response, onTool?: (name: string) => void): Promise<AssistantMessage> {
+  const calls = new Map<number, { id: string; name: string; args: string }>();
+  let content = "";
+  const named = new Set<string>();
+  const take = (chunk: { choices?: { delta?: { content?: string | null; tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[] } }[] }) => {
+    const d = chunk.choices?.[0]?.delta;
+    if (!d) return;
+    if (d.content) content += d.content;
+    for (const tc of d.tool_calls ?? []) {
+      const i = tc.index ?? 0, cur = calls.get(i) ?? { id: "", name: "", args: "" };
+      if (tc.id) cur.id = tc.id;
+      if (tc.function?.name) cur.name += tc.function.name;
+      if (tc.function?.arguments) cur.args += tc.function.arguments;
+      calls.set(i, cur);
+      if (cur.name && !named.has(`${i}`) && onTool) { named.add(`${i}`); onTool(cur.name); }
+    }
+  };
+  const reader = r.body?.getReader();
+  if (!reader) throw new ModelError("empty stream");
+  const dec = new TextDecoder(); let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i: number;
+    while ((i = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (data === "[DONE]") continue;
+      try { take(JSON.parse(data)); } catch { /* a partial or keep-alive line */ }
+    }
+  }
+  const tool_calls = [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([i, c]) => ({ id: c.id || `call_${i}`, function: { name: c.name, arguments: c.args || "{}" } }));
+  if (!content && !tool_calls.length) throw new ModelError("empty choice");
+  return { role: "assistant", content: content || null, ...(tool_calls.length ? { tool_calls } : {}) };
 }
 
 /** `slot` numbers the key when there are several, so the trace can tell "same model, next key" apart from a model change. */
