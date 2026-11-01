@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifierEndpoints, classifierMessages, decide, nameFrom, nemotronClassifier, parseAnswer } from "@/agent/classify";
+import { classifierEndpoints, classifierMessages, decide, introFacts, nameFrom, nemotronClassifier, parseAnswer } from "@/agent/classify";
 import { BEHAVIOR, KINDS, ruleKind } from "@/agent/behavior";
 
 const reply = (body: unknown, status = 200) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
@@ -94,5 +94,14 @@ describe("the name in an introduction", () => {
     expect(nameFrom("I'm his friend")).toBeUndefined();
     expect(nameFrom("I am a recruiter")).toBeUndefined();
     expect(nameFrom("i'm hiring")).toBeUndefined();
+  });
+});
+
+describe("what an introduction states", () => {
+  it("reads the name, the company and the role they hire for from the words", () => {
+    expect(introFacts("hi I'm Priya from Razorpay, hiring backend engineers")).toEqual({ name: "Priya", company: "Razorpay", hiringFor: "backend engineer" });
+    expect(introFacts("I'm Arjun, a founder")).toEqual({ name: "Arjun" });
+    expect(introFacts("This is Meera at Google Cloud, looking for an AI engineer for our team")).toEqual({ name: "Meera", company: "Google Cloud", hiringFor: "AI engineer" });
+    expect(introFacts("I am a recruiter")).toEqual({});
   });
 });

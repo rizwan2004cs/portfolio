@@ -112,6 +112,19 @@ export function nameFrom(text: string): string | undefined {
   return word && /^[A-Z][a-z]{1,20}$/.test(word) && !/^(?:His|Her|Their|The|Just|Here|From|Also|Not|A|An|Another|Rizwan|Hiring|Recruiter|Founder|Friend|Manager|Student|Developer|Engineer)$/.test(word) ? word : undefined;
 }
 
+/** Everything an introduction states in words the rules can read: the name, the company ("from Razorpay", "at Zerodha")
+ *  and what they hire for ("hiring backend engineers", "looking for an AI engineer"). Used when the classifier gave no
+ *  fields, or a cached answer is replayed, so a fit check can still run against the role. */
+export function introFacts(text: string): Visitor {
+  const out: Visitor = {};
+  const name = nameFrom(text); if (name) out.name = name;
+  const company = /\b(?:from|at|with)\s+([A-Z][\w.&-]*(?:\s+[A-Z][\w.&-]*){0,2})(?=[\s,.!]|$)/.exec(text)?.[1];
+  if (company && !/^(?:I|Hi|Hello|Hey)$/.test(company)) out.company = company.slice(0, 80);
+  const role = /\b(?:hiring|looking|recruiting|searching)\s+(?:for\s+)?(?:an?\s+|some\s+|our\s+)?([a-z][a-z\s/-]{2,40}?)(?=\s+(?:at|for|in|with)\b|[,.!?]|$)/i.exec(text)?.[1]?.trim();
+  if (role && !/^(?:you|him|rizwan|someone|people|talent)$/i.test(role)) out.hiringFor = role.replace(/s$/, "").slice(0, 80);
+  return out;
+}
+
 /** The kind a message is when no classifier answers: the word lists, kept only as the offline fallback. */
 export function ruleKind(text: string): Kind {
   if (SITE_AGE_Q.test(text)) return "work"; // "how old is this site" is about the site, not his age
