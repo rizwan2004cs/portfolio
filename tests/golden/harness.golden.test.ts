@@ -989,6 +989,7 @@ describe("follow-ups with the conversation in hand", () => {
     const work = async () => ({ kind: "work" as const, confidence: 0.9, source: "model" as const, note: "work · 0.90" });
     const r = await turn({ turns: ["hi I'm Priya from Razorpay, hiring backend engineers"] }, [{ name: "m", complete: async () => ({ role: "assistant" as const, content: "What can I help you with?" }) }], passScreen, undefined, work);
     expect(r.text).toMatch(/^Hi Priya\. What can I help/); expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/a named introduction: treated as visitor_intro/);
+    expect(r.meta.visitor).toEqual({ name: "Priya" }); // and the name reaches session state, so "who am I?" next turn knows
     const small = async () => ({ kind: "small_talk" as const, confidence: 0.95, source: "model" as const, note: "small_talk · 0.95" });
     const py = scripted("gpt-oss-120b", [say("Python shows in PACK, CCR Compliance Advisor and PULSEVO.", call("suggest", { options: ["x"] }))]);
     const h = await turn({ turns: ["uska python experience kitna hai"] }, [py], passScreen, undefined, small);
