@@ -7,6 +7,7 @@ import { isFilmQ, outsideAnswer, SITE_AGE_Q, siteAgeAnswer } from "./outside";
 import { lifestyle, personal } from "./scope";
 import type { AgentEvent, Emit } from "./types";
 import type { SessionState } from "./state";
+import { compareTable, namedProjects } from "./compare";
 import { bestFact } from "./grounding";
 import { fitLine, fitRows, roughRequirements } from "./fit";
 import { EVENT_LINES } from "./tools";
@@ -174,6 +175,14 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   // "what projects has he built?", "what has he made?": the index, no model
   if (re(/^\s*(what|which|list|show( me)?|see)( all)?( of)?( his| the)?( other)? projects?\b[^?]{0,24}$|\bwhat (has|did|does) (he|rizwan) (built?|made?|ship\w*|create\w*|work\w* on)\s*[?!.]*$|\beverything (he|rizwan)('s| has|’s)? (built|made|shipped)\b/) && best.s < 10 && !topicsIn(lastUser).length) {
     say("Everything he’s shipped."); call("list_projects"); call("suggest", { options: ["Why should we hire him?", "How does this site work?", "Get resume"] }); return true;
+  }
+  // "compare PACK and FinBoom", "PACK vs CCR", "which is more production-ready, PACK or FinBoom?": the table, no model
+  const sideBySide = namedProjects(lastUser);
+  if (sideBySide.length >= 2 && sideBySide.length <= 3 && re(/\b(compare|comparison|vs\.?|versus|difference|differ\w*|side by side|which (one )?is (more|better|bigger|older|newer)|better)\b/)) {
+    const t = compareTable(sideBySide), live = t.projects.filter((p) => p.links.live).map((p) => p.title);
+    const team = (p: { team: string }) => { const t = p.team.split(/[,:]/)[0].trim(); return t.charAt(0).toLowerCase() + t.slice(1); };
+    say(`${t.projects.map((p) => `${p.title} (${p.year}, ${team(p)})`).join(" and ")}, side by side.${live.length ? ` ${live.length === t.projects.length ? "Both" : live.join(" and ") + (live.length > 1 ? " are" : " is")} live${live.length === t.projects.length ? "" : "; the rest has no public demo"}.` : ""}`);
+    call("compare_projects", { ids: t.projects.map((p) => p.id) }); call("suggest", { options: [`Internals of ${t.projects[0].title}`, "Why should we hire him?", "Get resume"] }); return true;
   }
   // after a fit check: "what's missing?" lists its gaps, "show proof for the second one" opens the project behind it
   if (state?.fit && re(/\b(missing|gaps?|lack\w*|not (shown|covered)|fall\w* short|doesn.t (have|show))\b/) && !re(/\b(resume|cv)\b/)) {

@@ -1,6 +1,6 @@
 import type { Visitor } from "./classify";
 import type { SessionState } from "./state";
-export type PanelKind = "project" | "architecture" | "index" | "profile" | "harness" | "fit";
+export type PanelKind = "project" | "architecture" | "index" | "profile" | "harness" | "fit" | "compare";
 export type Level = "ok" | "info" | "warn" | "err";
 
 export type AgentEvent =

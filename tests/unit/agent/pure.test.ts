@@ -9,6 +9,8 @@ import { ALL_FACTS_SOURCE, BASE_SOURCE, EVENT_LINES, tidyOptions, toolContext } 
 import { projectById } from "@/content/data";
 import type { AgentEvent } from "@/agent/types";
 import { transcript } from "@/agent/run";
+import { compareTable, compareText, namedProjects } from "@/agent/compare";
+import { comparePanel } from "@/render/html";
 import { trimHistory } from "@/client/history";
 
 const ATTACKS = [
@@ -404,5 +406,23 @@ describe("grounding verdicts per sentence", () => {
     const pack = projectById("pack")!, src = pack.facts.join(" ");
     const g = groundAnswer("A LangGraph state machine runs the game. He has a knack for coordinating noisy agents. It handles 9,000 players a night. The LangGraph state machine is production-ready.", src, "how does PACK work?", pack.title, src, pack.facts);
     expect(g.parts.map((p) => [p.ok, p.why])).toEqual([[true, undefined], [false, "words"], [false, "claims"], [false, "puffery"]]);
+  });
+});
+
+describe("comparing projects", () => {
+  it("builds one row per aspect from the write-ups, drops unknown ids, needs two", () => {
+    const t = compareTable(["pack", "nope", "finboom", "pack"]);
+    expect(t.projects.map((p) => p.id)).toEqual(["pack", "finboom"]);
+    expect(t.rows.map((r) => r.aspect)).toEqual(["Year", "Team", "Stack", "Deployed", "Tests", "Failure handling", "Scale"]);
+    expect(t.rows.find((r) => r.aspect === "Deployed")!.cells).toMatchObject({ pack: "source on GitHub, no public demo", finboom: expect.stringMatching(/^live at finboom/) });
+    expect(t.rows.find((r) => r.aspect === "Failure handling")!.cells.pack).toMatch(/^3 handled failures: /);
+    expect(compareText(t)[0]).toMatch(/^Year: PACK: 2026 · FinBoom: 2026$/);
+    expect(compareTable(["pack"]).rows).toEqual([]);
+    expect(comparePanel(compareTable(["pack", "ccr"]))).toMatch(/<table class="cmp">.*data-openp="pack".*<th>Stack<\/th>/s);
+    expect(comparePanel(compareTable(["pack"]))).toBe("");
+  });
+  it("finds the projects a message names, in order", () => {
+    expect(namedProjects("which is more production-ready, FinBoom or PACK?")).toEqual(["finboom", "pack"]);
+    expect(namedProjects("how does he test?")).toEqual([]);
   });
 });

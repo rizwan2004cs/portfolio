@@ -259,6 +259,15 @@ export const contactForm = (source: "classic" | "agent") => `<form class="cform"
   </form>`;
 
 /** Role fit report: each requirement with the project and fact that show it, or an honest gap. */
+/** Two or three projects side by side: one row per aspect, cells straight from the write-ups. */
+export function comparePanel(t: { projects: { id: string; title: string }[]; rows: { aspect: string; cells: Record<string, string> }[] }) {
+  if (t.projects.length < 2) return "";
+  return `<article class="panel fit compare"><div class="ph fithd"><h3>Side by side</h3><small>${t.projects.map((p) => esc(p.title)).join(" · ")}</small></div>
+    <table class="cmp"><thead><tr><th></th>${t.projects.map((p) => `<th><button class="btn" data-openp="${esc(p.id)}">${esc(p.title)}</button></th>`).join("")}</tr></thead>
+    <tbody>${t.rows.map((r) => `<tr><th>${esc(r.aspect)}</th>${t.projects.map((p) => `<td>${esc(r.cells[p.id] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>
+    <p class="fitnote">Every cell is read off the project's own write-up. Click a title to open it.</p></article>`;
+}
+
 export function fitPanel(rows: FitRow[]) {
   const n = rows.filter((r) => r.status === "match").length;
   const STATUS = { match: ["ok", "shown"], toolkit: ["warn", "toolkit only"], none: ["muted", "no public evidence"] } as const;

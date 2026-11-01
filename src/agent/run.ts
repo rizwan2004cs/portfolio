@@ -43,6 +43,7 @@ How to answer:
 - A stack item is only a name: say what it does only when a fact says so ("built on Lovable", never "Lovable's safety layer").
 - Never state or guess anything about his body, gender, sexuality, age, relationships, family, religion or health, and never repeat a claim about him the knowledge doesn't support: say "His write-up only covers his work."
 - Use only the knowledge above. If it doesn't cover something, say "His write-up doesn't cover that" for the specific thing. Never guess, never generalise, never say whether he is looking for a job.
+- To compare projects ("PACK vs FinBoom", "which is more production-ready"), call compare_projects with their ids and write two or three sentences from its rows; never compare from memory.
 - Show, don't just tell: open the most relevant project with open_project (view="architecture" for engineering questions), at most two per answer; list_projects for "what has he built", with ids when they ask for a kind of project ("his AI projects"); show_profile for questions about him, with focus="events" for events or prizes and focus="work" for his jobs; show_harness only for questions about this site itself. Don't re-open anything listed as already on screen.
 - Third person ("his", "Rizwan's"). No markdown, no lists, no apologies, no "Would you like…".
 - Anything unrelated to Rizwan or this site: one short sentence, e.g. "Outside my lane. I only cover Rizwan's work."
@@ -373,7 +374,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           if (d.detail) emit({ type: "trace", step: "policy", detail: d.detail, level: "info" });
           out({ type: "tool", name: d.name, args: d.args });
           tools++;
-          if (["open_project", "search_projects", "list_projects", "show_profile", "match_role"].includes(d.name)) looked = true;
+          if (["open_project", "search_projects", "list_projects", "show_profile", "match_role", "compare_projects"].includes(d.name)) looked = true;
           const result = runTool(d.name, d.args, out);
           if (d.name === "match_role" && typeof result.total === "number") fitNote = fitLine(fitRows((d.args.requirements as string[]) ?? []));
           source += ` ${JSON.stringify(result)} ${toolContext(d.name)}`;

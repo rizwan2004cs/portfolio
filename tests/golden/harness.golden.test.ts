@@ -930,6 +930,14 @@ describe("follow-ups with the conversation in hand", () => {
     const three = await turn({ turns: ["show me PACK"], state: { focus: null, shown: ["ccr", "finboom"], offered: [], visitor: {}, topics: [] } }, [never()]);
     expect(three.of("suggest").at(-1)!.options[0]).toBe("Get resume"); expect(three.of("trace").map((e) => e.detail).join("\n")).toMatch(/offered “Get resume”/);
   });
+  it("'compare PACK and FinBoom' gets the side-by-side table without a model; the model may call the same tool", async () => {
+    const r = await turn({ turns: ["compare PACK and FinBoom"] }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^PACK \(2026, team of two with Mahesh Babu Kona\) and FinBoom \(2026, solo\), side by side\. FinBoom is live; the rest has no public demo\.$/);
+    expect(r.of("panel").some((p) => p.panel.kind === "compare" && p.panel.id === "pack|finboom")).toBe(true);
+    const m = scripted("gpt-oss-120b", [say("FinBoom is the one that is live: it runs Vitest in CI and keeps an offline queue, while PACK is a weekend hackathon build with a four-step model fallback chain.", call("compare_projects", { ids: ["pack", "finboom"] }), call("suggest", { options: ["x"] }))]);
+    const q = await turn({ turns: ["which of PACK and FinBoom would you put in front of a customer?"] }, [m]);
+    expect(q.of("panel").some((p) => p.panel.kind === "compare")).toBe(true); expect(q.text).toMatch(/^FinBoom is the one that is live/);
+  });
   it("a dated question is answered from the resume without a model", async () => {
     const r = await turn({ turns: ["what was he doing in April 2026?"] }, [never()]);
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^In Apr 2026 he was Software Engineering Intern/); expect(r.of("tool").some((t) => t.name === "show_profile")).toBe(true);

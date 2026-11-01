@@ -727,6 +727,10 @@
 
   /* ---------- role fit report ---------- */
   .fit .fithd { padding:var(--s4) var(--s4) 0; }
+  .cmp { width:100%; border-collapse:collapse; margin:var(--s3) 0 0; font-size:14px; line-height:20px; }
+  .cmp th, .cmp td { text-align:left; vertical-align:top; padding:var(--s2) var(--s4); border-bottom:1px solid var(--line); }
+  .cmp thead th { font:500 13px/18px var(--f-mono); color:var(--soft); } .cmp tbody th { font:500 13px/20px var(--f-mono); color:var(--soft); white-space:nowrap; width:1%; }
+  .cmp td { color:var(--ink); }
   .fitlist { list-style:none; padding:var(--s2) var(--s4) 0; }
   .fitlist li { padding:var(--s3) 0; border-bottom:1px solid var(--line); }
   .fq { display:flex; justify-content:space-between; gap:var(--s3); align-items:baseline; }
