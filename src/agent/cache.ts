@@ -2,7 +2,10 @@ import type { AgentEvent } from "./types";
 
 export const CONTENT_VERSION = "v1";
 
-const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, " ").replace(/\s+/g, " ").trim();
+// Only ASCII punctuation and whitespace are folded: "Voice agents!" and "voice agents" share a key, but anything the
+// model would still see (tag characters, zero-width marks, emoji, combining marks) stays in the key, so a question
+// with an invisible payload never shares an answer with the plain question
+const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/[\s!-\/:-@[-`{-~]+/gu, " ").trim();
 
 /** Same question + same screen → same answer. Unicode-aware so non-Latin questions never collide on "". */
 export const cacheKey = (turns: string[], shown: string[], version = CONTENT_VERSION) =>

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { EventEncoder } from "@ag-ui/encoder";
 import { z } from "zod";
 import { isProjectId } from "@/content/data";
@@ -24,7 +25,8 @@ import type { AgentEvent, Exchange, ModelClient, RunMeta, Screen } from "./types
 // the prompt, the tools and every fact the tools return: changing any of them must not serve old answers
 const PROMPT_HASH = [...`${SYSTEM}${JSON.stringify(TOOL_DEFS)}${ALL_FACTS_SOURCE}${toolContext("show_harness")}`].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7).toString(36);
 
-const digest = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7).toString(36);
+// a collision-resistant digest: a forged state or agent turn can never share a key with the canonical prompt
+const digest = (s: string) => createHash("sha256").update(s).digest("base64url").slice(0, 32);
 export const LIMITS = { bodyBytes: 24576, turnChars: 2000, turns: 6, shown: 20, perMinute: 12, modelRunsPerDay: 600 } as const;
 const SHOWN_OK = new Set(["profile", "index", "harness", "done:resume", "done:contact"]);
 

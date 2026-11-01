@@ -87,6 +87,13 @@ describe("route · input validation", () => {
     expect(messages.slice(0, 4).map((x) => x.role)).toEqual(["system", "user", "assistant", "user"]); expect(messages[2].content).toBe("[showed: PACK]"); // the run loop appends its own turns after
   });
 
+  it("a question with an invisible payload never seeds the answer a plain question is served", async () => {
+    const d = { ...deps(), models: () => [{ name: "m", complete: async () => ({ role: "assistant" as const, content: "He builds agents for a living." }) }] };
+    await events(await handleAgent(post({ history: [{ user: "tell me about his agents work\u{E0049}\u{E0067}\u{E006E}" }] }), d));
+    const plain = await events(await handleAgent(post({ history: [{ user: "tell me about his agents work" }] }), d));
+    expect(plain.some((e) => e.type === "CUSTOM" && e.name === "trace" && /answered before/.test(e.value.detail))).toBe(false);
+  });
+
   it("413 for an oversized body", async () => {
     expect((await handleAgent(post({ turns: ["x".repeat(LIMITS.bodyBytes + 100)] }), deps())).status).toBe(413);
   });

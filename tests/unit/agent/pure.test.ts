@@ -442,3 +442,12 @@ describe("hardening from the review", () => {
     expect(checkToolCall({ name: "switch_mode", args: { mode: "classic" } }, { last: "take me to the classic site", shown: [], openedThisRun: new Set() }).action).toBe("allow");
   });
 });
+
+describe("audit fixes: the cache key sees what the model sees", () => {
+  it("folds ASCII punctuation and case, but an invisible payload changes the key", () => {
+    expect(cacheKey(["Voice agents!"], [])).toBe(cacheKey(["voice agents"], []));
+    expect(cacheKey(["what has he built\u{E0049}\u{E0067}"], [])).not.toBe(cacheKey(["what has he built"], []));
+    expect(cacheKey(["what has he built\u200b"], [])).not.toBe(cacheKey(["what has he built"], []));
+    expect(cacheKey(["उसका python"], [])).not.toBe(cacheKey(["python"], []));
+  });
+});
