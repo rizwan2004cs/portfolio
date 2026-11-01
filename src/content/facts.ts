@@ -1,8 +1,9 @@
 import { EDUCATION, EVENTS, EXPERIENCE, GAPS, PROFILE, PROJECTS, SIDE, TOOLKIT, WHY_HIM } from "./data";
+import { RESUME_FACTS } from "./resume";
 
 /** One sentence the site stands behind, with where it comes from. The retrieval index (Neon pgvector) holds exactly
  *  these, so a model sentence can be checked against them by meaning as well as by words. */
-export interface Fact { id: string; kind: "project" | "stack" | "team" | "event" | "experience" | "education" | "side" | "toolkit" | "profile"; project?: string; text: string }
+export interface Fact { id: string; kind: "project" | "stack" | "team" | "event" | "experience" | "education" | "side" | "toolkit" | "profile" | "resume"; project?: string; text: string }
 
 /** A short stable id from the text itself: the index is upserted by id, so an unchanged fact is never re-embedded. */
 export const factId = (kind: string, text: string) => {
@@ -27,4 +28,5 @@ export const FACTS: Fact[] = [
   ...EDUCATION.earlier.map(([what, score]) => fact("education", `${what}: ${score}.`)),
   ...SIDE.map((s) => fact("side", `${s.title} (${s.year}): ${s.body} Built with ${s.stack.join(", ")}.`)),
   ...TOOLKIT.map(([group, items]) => fact("toolkit", `${group}: ${items.join(", ")}.`)),
+  ...RESUME_FACTS.map((r) => fact("resume", r.text)),
 ];

@@ -901,6 +901,17 @@ describe("follow-ups with the conversation in hand", () => {
     const none = await turn({ turns: ["how does PACK work?"], retriever: { ...retriever, verify: async () => null } }, [m]);
     expect(none.text).toBe("A LangGraph state machine runs the game."); expect(none.of("trace").map((e) => e.detail).join("\n")).toMatch(/check by meaning unavailable/);
   });
+  it("a question about the IEEE branch or the keylogger is answered from the resume without a model", async () => {
+    const r = await turn({ turns: ["what did he do at the IEEE student branch?"] }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^At the IEEE Student Branch at NBKRIST he was Treasurer/);
+    expect((await turn({ turns: ["what was the keylogger project?"] }, [never()])).text).toMatch(/^Keylogger: a security research project/);
+    const college = await turn({ turns: ["what did he do in his college projects?"] }, [never()]);
+    expect(college.text).toMatch(/^Health-care Application: .* Keylogger: .* Everything else he built in college is public:$/); expect(college.of("tool").some((t) => t.name === "list_projects")).toBe(true);
+  });
+  it("a dated question is answered from the resume without a model", async () => {
+    const r = await turn({ turns: ["what was he doing in April 2026?"] }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^In Apr 2026 he was Software Engineering Intern/); expect(r.of("tool").some((t) => t.name === "show_profile")).toBe(true);
+  });
   it("a one-word first turn still gets the 'not sure' reply without a model call", async () => {
     const r = await turn({ turns: ["count"], history: [{ user: "count" }] }, [never()]);
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/Not sure what you mean/);

@@ -1,4 +1,5 @@
 import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, mentionsTool, PROJECTS, projectById, roleDetail, TOOLKIT, WHY_HIM } from "@/content/data";
+import { RESUME_FACTS, resumeFactFor, WHEN_Q, whenAnswer } from "@/content/resume";
 import type { Project } from "@/content/types";
 import type { Experience } from "@/content/data";
 import RESUME from "@/content/resume.json";
@@ -197,6 +198,19 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   if (re(/\b(rate|score|grade|rank|out of (10|5|ten|five)|on a scale|how (good|strong|skilled|proficient) is (he|his)|his level (in|at|of)|how well does he know)\b/) && best.s < 10) {
     const named = toolNamed(lastUser), ans = named ? answerSkill(named) : undefined;
     say(`No scores here, only evidence. ${ans ? ans.text : WHY_HIM}`); call("open_project", { id: ans?.open ?? "pack" }); call("suggest", { options: ans?.chips ?? ["Everything he’s built", "What are his gaps?", "Get resume"] }); return true;
+  }
+  // "what did he do at the IEEE student branch?", "the keylogger project?": a fact only the resume carries
+  // "his college projects": the two the resume lists without a repo, then everything public
+  if (re(/\b(college|university|academic|classroom) projects?\b/) && best.s < 10) {
+    say(`${RESUME_FACTS.filter((f) => f.where === "college").map((f) => f.text).join(" ")} Everything else he built in college is public:`); call("list_projects"); call("suggest", { options: ["Why should we hire him?", "Has he won anything?", "Get resume"] }); return true;
+  }
+  const rf = best.s < 10 ? resumeFactFor(lastUser) : undefined;
+  if (rf) {
+    say(rf.text); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Can he lead a team?", "Get resume"] }); return true;
+  }
+  // "what was he doing in April 2026?": the roles whose dates cover that month, from the resume
+  if (WHEN_Q.test(lastUser) && re(/\b(doing|do|did|work\w*|role|job|where|intern\w*|employed|position)\b/) && best.s < 10) {
+    say(whenAnswer(lastUser)!); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Why did he leave?", "Get resume"] }); return true;
   }
   // "can he lead a team?": what the record shows, team by team, and the leadership line on his resume
   if (re(/\b(lead|leads|leader|leadership|led|manage|managed|managing|mentor\w*|people management|team lead|head of)\b/) && !re(/\b(team lead at|led by)\b/) && best.s < 10) {

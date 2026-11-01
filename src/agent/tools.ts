@@ -4,6 +4,7 @@ import { scoreProjects } from "./router";
 import { BAD_OUTPUT, offScope } from "./scope";
 import { fitRows, fitSummary } from "./fit";
 import type { Emit } from "./types";
+import { RESUME_FACTS } from "@/content/resume";
 
 export const TOOL_DEFS = [
   { name: "search_projects", description: "Find Rizwan's projects by topic. Returns ids, titles and one-liners.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
@@ -55,9 +56,9 @@ export function runTool(name: ToolName, args: Record<string, unknown>, emit: Emi
       const focus = isFocus(args.focus) ? args.focus : undefined;
       emit({ type: "panel", panel: { kind: "profile", ...(focus ? { id: focus } : {}) } });
       if (focus === "events") return { events: EVENT_LINES };
-      if (focus === "work") return { work: EXPERIENCE.map((x) => `${x.role} at ${x.title} (${x.when}): ${roleDetail(x)}`) };
+      if (focus === "work") return { work: EXPERIENCE.map((x) => `${x.role} at ${x.title} (${x.when}): ${roleDetail(x)}`), resume: RESUME_FACTS.map((r) => r.text) };
       if (focus === "education") return { education: PROFILE.education, earlier: EDUCATION.earlier.map(([s, g]) => `${s}: ${g}`) };
-      return { ...PROFILE, events: EVENT_LINES };
+      return { ...PROFILE, events: EVENT_LINES, resume: RESUME_FACTS.map((r) => r.text) };
     }
     case "match_role": {
       const reqs = (Array.isArray(args.requirements) ? args.requirements : []).map((r) => String(r).replace(/\|/g, "/").trim().slice(0, 80)).filter(Boolean).slice(0, 8);
@@ -122,7 +123,7 @@ export function toolContext(name: ToolName): string {
     case "show_harness": return `model models request requests visitor answer prompt guard llama-prompt-guard scope filter response cache cached scripted tours gpt-oss-120b gpt-oss-20b nemotron nvidia gemini openrouter free models fallback deterministic router outage offline grounding pgvector neon postgres retrieval embeddings meaning tokens panels tools approval routed ${HARNESS_FLOW.join(" ")}`;
     case "offer_resume": return "resume pdf approval approve open tab new";
     case "offer_contact": return "email contact approval approve address mail";
-    case "show_profile": return `${JSON.stringify(PROFILE)} ${EVENT_LINES.join(" ")}`;
+    case "show_profile": return `${JSON.stringify(PROFILE)} ${EVENT_LINES.join(" ")} ${RESUME_FACTS.map((r) => r.text).join(" ")}`;
     default: return "";
   }
 }
@@ -135,4 +136,4 @@ const EVENT_DETAIL = EVENTS.map((e) => `${e.title}, ${e.where} (${e.when}): ${e.
 export const BASE_SOURCE = `${JSON.stringify(PROFILE)} ${EVENT_LINES.join(" ")} ${EVENT_DETAIL} ${PROJECTS.map((p) => `${p.title} ${p.oneLiner} ${(p.keywords ?? []).join(" ")}`).join(" ")}`;
 
 /** Everything the content model says, for checking "closest thing" pointers after a refusal. */
-export const ALL_FACTS_SOURCE = `${BASE_SOURCE} ${PROJECTS.map((p) => `${p.facts.join(" ")} ${p.stack.join(" ")}`).join(" ")}`;
+export const ALL_FACTS_SOURCE = `${BASE_SOURCE} ${PROJECTS.map((p) => `${p.facts.join(" ")} ${p.stack.join(" ")}`).join(" ")} ${RESUME_FACTS.map((r) => r.text).join(" ")}`;
