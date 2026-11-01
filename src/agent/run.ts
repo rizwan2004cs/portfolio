@@ -179,7 +179,6 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // "unclear" is a first-turn verdict: two words after a reply ("Not animal") are a follow-up, and the model has the transcript
   // an introduction with no fields from the classifier still yields the name written in it
   if (sorted.kind === "visitor_intro" && !sorted.visitor?.name) { const name = nameFrom(last); if (name) sorted.visitor = { ...sorted.visitor, name }; }
-  deps.onClassified?.(sorted);
   // the classifier's verdict yields to the facts: a message that names a project or asks something the facts answer
   // ("show me PACK", "resume") is work however it is phrased, and two words after a reply ("Not animal") are a follow-up
   const decided0 = decide(sorted);
@@ -188,6 +187,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const certain = sorted.source === "model" && ruleKind(last) === "visitor_intro" && nameFrom(last) && decided0 !== "visitor_intro" ? "visitor_intro" as const
     : sorted.source === "model" && last !== raw && BEHAVIOR[decided0].fallback ? "work" as const : null;
   if (certain === "visitor_intro") sorted.visitor = { ...sorted.visitor, name: nameFrom(last)! };
+  // the handler carries the visitor into session state from here: after every correction above, never before
+  deps.onClassified?.(sorted);
   const decided = certain ?? decided0;
   const overruled = certain ? (certain === "visitor_intro" ? "a named introduction" : "read through a correction") : (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : null;
   const kind = overruled && !certain ? "work" : decided;
