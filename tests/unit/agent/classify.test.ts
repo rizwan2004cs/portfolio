@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifierEndpoints, classifierMessages, decide, nemotronClassifier, parseAnswer } from "@/agent/classify";
+import { classifierEndpoints, classifierMessages, decide, nameFrom, nemotronClassifier, parseAnswer } from "@/agent/classify";
 import { BEHAVIOR, KINDS, ruleKind } from "@/agent/behavior";
 
 const reply = (body: unknown, status = 200) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
@@ -81,5 +81,16 @@ describe("the curator's fixes", () => {
     const [, user] = classifierMessages("Not animal", { user: "what's his superpower", agent: "If he were a superhero, he'd be an owl." });
     expect(user.content).toBe("Previous visitor message: what's his superpower\nAgent's reply: If he were a superhero, he'd be an owl.\nVisitor message: Not animal");
     expect(classifierMessages("count")[1].content).toBe("Visitor message: count");
+  });
+});
+
+describe("the name in an introduction", () => {
+  it("is the capitalised word after the intro phrase, never a role or a pronoun", () => {
+    expect(nameFrom("I'm Arjun, a founder")).toBe("Arjun");
+    expect(nameFrom("hi I am Priya from Razorpay, hiring backend engineers")).toBe("Priya");
+    expect(nameFrom("this is Meera")).toBe("Meera");
+    expect(nameFrom("I'm his friend")).toBeUndefined();
+    expect(nameFrom("I am a recruiter")).toBeUndefined();
+    expect(nameFrom("i'm hiring")).toBeUndefined();
   });
 });

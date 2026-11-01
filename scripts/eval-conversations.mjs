@@ -30,7 +30,8 @@ for (const c of convos) {
   let history = [], shown = [], state = null, failed = null;
   for (const t of c.turns) {
     let r;
-    try { r = await ask([...history, { user: t.user }], shown, state); } catch (e) { failed = `${t.user} → ${e.message}`; break; }
+    // one retry: a dropped connection on the way is not a wrong answer
+    try { r = await ask([...history, { user: t.user }], shown, state).catch(async () => { await new Promise((res) => setTimeout(res, gap)); return ask([...history, { user: t.user }], shown, state); }); } catch (e) { failed = `${t.user} → ${e.message}`; break; }
     const mode = r.meta?.mode ?? "none";
     // a cached answer replays the events of an earlier run, so it counts as whatever mode produced them
     const why = t.mode && !t.mode.includes(mode) && mode !== "cache" ? `mode ${mode}, wanted ${t.mode.join("|")}` : t.text && !new RegExp(t.text, "s").test(r.text) ? `text did not match /${t.text}/: “${r.text.slice(0, 80)}”` : t.panel && !r.panels.includes(t.panel) ? `panel ${t.panel} not shown (${r.panels.join(",") || "none"})` : null;
