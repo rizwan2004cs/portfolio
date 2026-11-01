@@ -38,3 +38,33 @@ describe("content model", () => {
     for (const s of ["Azure App Service", "Azure Functions", "Azure OpenAI", "Azure DevOps", "Power Platform"]) expect(cloud).toContain(s);
   });
 });
+
+describe("resume facts", async () => {
+  const { RESUME_FACTS, span, whenAnswer } = await import("@/content/resume");
+  const { FACTS } = await import("@/content/facts");
+  it("date ranges parse, including open-ended and same-year ones", () => {
+    expect(span("Mar – May 2026")).toEqual([2026 * 12 + 2, 2026 * 12 + 4]);
+    expect(span("Jun 2026 – now")).toEqual([2026 * 12 + 5, 9999 * 12 + 11]);
+    expect(span("Jun – Sep 2025")).toEqual([2025 * 12 + 5, 2025 * 12 + 8]);
+    expect(span("2024")).toBeNull();
+  });
+  it("'what was he doing in April 2026' names the role whose dates cover it; a month with no role says so", () => {
+    expect(whenAnswer("what was he doing in April 2026?")).toMatch(/^In Apr 2026 he was Software Engineering Intern \(R&D\) at Novulis Consulting \(Mar – May 2026\)\./);
+    expect(whenAnswer("where did he work in 2025?")).toMatch(/^In 2025 he was Cyber Security Intern/);
+    expect(whenAnswer("what was his job in Jan 2024?")).toMatch(/^His resume lists no role for Jan 2024\./);
+    expect(whenAnswer("how does PACK work?")).toBeNull();
+  });
+  it("a question naming something only the resume carries finds that fact", async () => {
+    const { resumeFactFor } = await import("@/content/resume");
+    expect(resumeFactFor("what did he do at the IEEE student branch?")?.text).toMatch(/^At the IEEE Student Branch/);
+    expect(resumeFactFor("tell me about the keylogger")?.text).toMatch(/^Keylogger/);
+    expect(resumeFactFor("does he have a hackerrank cert")?.text).toMatch(/HackerRank/);
+    expect(resumeFactFor("how does PACK work?")).toBeUndefined();
+  });
+  it("leadership, certifications and the two college projects are facts the index can hold", () => {
+    expect(RESUME_FACTS.some((f) => /IEEE Student Branch/.test(f.text) && f.when === "Feb 2024 – Jan 2026")).toBe(true);
+    expect(RESUME_FACTS.filter((f) => f.text.startsWith("Certification:")).length).toBeGreaterThan(0);
+    expect(FACTS.filter((f) => f.kind === "resume").length).toBe(RESUME_FACTS.length);
+    expect(new Set(FACTS.map((f) => f.id)).size).toBe(FACTS.length); // ids stay unique
+  });
+});

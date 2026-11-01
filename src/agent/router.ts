@@ -1,10 +1,12 @@
 import { EDUCATION, EVENTS, EXPERIENCE, experienceLine, GAPS, mentionsTool, PROJECTS, projectById, roleDetail, TOOLKIT, WHY_HIM } from "@/content/data";
+import { RESUME_FACTS, resumeFactFor, WHEN_Q, whenAnswer } from "@/content/resume";
 import type { Project } from "@/content/types";
 import type { Experience } from "@/content/data";
 import RESUME from "@/content/resume.json";
 import { isFilmQ, outsideAnswer, SITE_AGE_Q, siteAgeAnswer } from "./outside";
 import { lifestyle, personal } from "./scope";
 import type { AgentEvent, Emit } from "./types";
+import type { SessionState } from "./state";
 import { bestFact } from "./grounding";
 import { fitLine, fitRows, roughRequirements } from "./fit";
 import { EVENT_LINES } from "./tools";
@@ -124,13 +126,13 @@ export function questionParts(text: string): string[] {
   return parts.length >= 2 && parts.length <= 3 ? parts : [text];
 }
 
-export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: readonly string[] = []): boolean {
+export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: readonly string[] = [], state?: SessionState): boolean {
   // a pasted job description mentions "years of experience" too, but it wants a fit report, not one line
   if (isJobDescription(lastUser)) return false;
   // two questions in one message: answer each, in order, when each has a one-line answer of its own
   const parts = questionParts(lastUser);
   if (parts.length > 1) {
-    const buffers = parts.map((part) => { const evs: AgentEvent[] = []; const ok = factAnswer(part, (e) => evs.push(e), loose, shown); return ok ? evs : undefined; });
+    const buffers = parts.map((part) => { const evs: AgentEvent[] = []; const ok = factAnswer(part, (e) => evs.push(e), loose, shown, state); return ok ? evs : undefined; });
     const answered = buffers.filter((b): b is AgentEvent[] => !!b);
     if (answered.length >= 2) {
       const texts = answered.flatMap((b) => b.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : ""))).filter((t) => !/^Not sure what you mean/.test(t));
@@ -173,6 +175,20 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   if (re(/^\s*(what|which|list|show( me)?|see)( all)?( of)?( his| the)?( other)? projects?\b[^?]{0,24}$|\bwhat (has|did|does) (he|rizwan) (built?|made?|ship\w*|create\w*|work\w* on)\s*[?!.]*$|\beverything (he|rizwan)('s| has|’s)? (built|made|shipped)\b/) && best.s < 10 && !topicsIn(lastUser).length) {
     say("Everything he’s shipped."); call("list_projects"); call("suggest", { options: ["Why should we hire him?", "How does this site work?", "Get resume"] }); return true;
   }
+  // after a fit check: "what's missing?" lists its gaps, "show proof for the second one" opens the project behind it
+  if (state?.fit && re(/\b(missing|gaps?|lack\w*|not (shown|covered)|fall\w* short|doesn.t (have|show))\b/) && !re(/\b(resume|cv)\b/)) {
+    const f = state.fit;
+    say(f.gaps.length ? `Of the ${f.requirements.length} requirements, his public projects don’t show ${f.gaps.join(", ")}. ${GAPS}` : `All ${f.requirements.length} requirements show up in his public projects. ${GAPS}`);
+    call("match_role", { requirements: f.requirements }); call("suggest", { options: ["Why should we hire him?", "Everything he’s built", "Get resume"] }); return true;
+  }
+  const nth = state?.fit && /\b(proof|evidence|show|which project)\b.*\b(first|second|third|fourth|fifth|sixth|seventh|eighth|1st|2nd|3rd|4th|5th|6th|7th|8th|#?\d)\b/i.exec(lastUser);
+  if (nth && state?.fit) {
+    const n = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"].indexOf(nth[2].toLowerCase()) + 1 || parseInt(nth[2].replace(/\D/g, ""), 10);
+    const req = state.fit.requirements[n - 1];
+    const row = req ? fitRows([req])[0] : undefined;
+    if (row?.status === "match") { say(`${req}: ${row.projects.map((p) => `${p.title} (${p.evidence})`).join("; ")}.`); call("open_project", { id: row.projects[0].id }); call("suggest", { options: ["What’s missing?", "Everything he’s built", "Get resume"] }); return true; }
+    if (req) { say(`${req}: ${row?.status === "toolkit" ? "it is in his toolkit, but no public project shows it" : "no public project or toolkit item shows it"}. ${GAPS}`); call("suggest", { options: ["What’s missing?", "Everything he’s built", "Get resume"] }); return true; }
+  }
   // one or two words that name nothing on the site ("count", "body"): ask what they mean instead of letting a model guess
   if (lastUser.trim().split(/\s+/).length <= 2 && best.s === 0 && kind !== "playful" && !topicsIn(lastUser).length && !profileFocus(lastUser)
     && !re(/\b(resume|cv|contact|email|phone|hire|hiring|classic|site|agent|model|models|harness|guard\w*|fallback|router|trace|profile|about|who|projects?|work|built|skills?|stack|toolkit|experience|education|degree|cgpa|events?|prizes?|hackathons?|intern\w*|novulis|supraja|help|menu|start|internals?|architecture|failures?|shortlist|everything|certif\w*|courses?|badges?|interview|lately|latest|guard\w*|security|hack\w*|tools?|tech\w*|languages?|frameworks?|tests?|testing|databases?|learn\w*)\b/)) {
@@ -198,6 +214,19 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
     const named = toolNamed(lastUser), ans = named ? answerSkill(named) : undefined;
     say(`No scores here, only evidence. ${ans ? ans.text : WHY_HIM}`); call("open_project", { id: ans?.open ?? "pack" }); call("suggest", { options: ans?.chips ?? ["Everything he’s built", "What are his gaps?", "Get resume"] }); return true;
   }
+  // "what did he do at the IEEE student branch?", "the keylogger project?": a fact only the resume carries
+  // "his college projects": the two the resume lists without a repo, then everything public
+  if (re(/\b(college|university|academic|classroom) projects?\b/) && best.s < 10) {
+    say(`${RESUME_FACTS.filter((f) => f.where === "college").map((f) => f.text).join(" ")} Everything else he built in college is public:`); call("list_projects"); call("suggest", { options: ["Why should we hire him?", "Has he won anything?", "Get resume"] }); return true;
+  }
+  const rf = best.s < 10 ? resumeFactFor(lastUser) : undefined;
+  if (rf) {
+    say(rf.text); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Can he lead a team?", "Get resume"] }); return true;
+  }
+  // "what was he doing in April 2026?": the roles whose dates cover that month, from the resume
+  if (WHEN_Q.test(lastUser) && re(/\b(doing|do|did|work\w*|role|job|where|intern\w*|employed|position)\b/) && best.s < 10) {
+    say(whenAnswer(lastUser)!); call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Why did he leave?", "Get resume"] }); return true;
+  }
   // "can he lead a team?": what the record shows, team by team, and the leadership line on his resume
   if (re(/\b(lead|leads|leader|leadership|led|manage|managed|managing|mentor\w*|people management|team lead|head of)\b/) && !re(/\b(team lead at|led by)\b/) && best.s < 10) {
     const ieee = RESUME.text.match(/IEEE Student Branch[^\n]*?(?=\s{2,}|\n)/)?.[0].replace(/\s+/g, " ").trim();
@@ -210,6 +239,11 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
     const cos = [...new Set(EXPERIENCE.map((x) => x.title))];
     say(`His employers so far: ${cos.join(" and ")}. His write-up describes his roles there, not what kind of companies they are, so I can’t call either a startup or not.`);
     call("show_profile", { focus: "work" }); call("suggest", { options: ["Everything he’s built", "Why should we hire him?", "Get resume"] }); return true;
+  }
+  // "is he a fit for the role you told me about?": the visitor said what they are hiring for, so that is the requirement
+  if (state?.visitor.hiringFor && re(/\b(fit|fits|suited|suitable|match(es)?|good for|right for)\b/) && !re(/,.*,/) && lastUser.length < 140 && !isJobDescription(lastUser)) {
+    const reqs = roughRequirements(state.visitor.hiringFor).length ? roughRequirements(state.visitor.hiringFor) : [state.visitor.hiringFor];
+    say(`Against ${state.visitor.hiringFor}: ${fitLine(fitRows(reqs))}`); call("match_role", { requirements: reqs }); call("suggest", { options: ["What’s missing?", "Why should we hire him?", "Get resume"] }); return true;
   }
   // "is he a fit for a data scientist role?" with no requirements pasted: ask for them, and say where his work sits
   if (re(/\b(fit|fits|suited|suitable|right|good|match|matches|hire\w*|consider\w*)( for| as| in| into)? (a |an |the )?[\w\s-]{2,30}?(role|position|job|team|opening|engineer|developer)\b/) && !re(/,.*,/) && lastUser.length < 140 && !re(/\b(hire him|hiring him|why)\b/)) {

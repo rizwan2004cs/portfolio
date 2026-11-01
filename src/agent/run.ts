@@ -15,6 +15,7 @@ import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
 import { contextBlock, EMPTY_STATE, nextState } from "./state";
+import { nextOffer } from "./offers";
 import type { Visitor } from "./classify";
 import type { Retriever } from "@/server/retrieval";
 
@@ -193,7 +194,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const factual: AgentEvent[] = [];
   // the deterministic "not sure what you mean" is only ever a first-turn answer: after a reply, a short message the facts
   // can't place is a follow-up, and the model reads it with the conversation
-  const isFact = !natural && factAnswer(subject, (e) => factual.push(e), false, input.shown) && !(history.length > 1 && isUnclearReply(factual));
+  const isFact = !natural && factAnswer(subject, (e) => factual.push(e), false, input.shown, input.state) && !(history.length > 1 && isUnclearReply(factual));
   const g = input.killModel ? { ok: true, note: "skipped · model offline, router can't be injected" }
     : isFact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await guarding!;
   emit({ type: "trace", step: "guard", detail: g.note, level: g.ok ? "ok" : "warn" });
@@ -204,12 +205,13 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   }
 
   let spoke = false, visible = false, offered: string[] = [], fitNote: string | null = null;
-  let lastProject: Project | undefined, asked: "resume" | "contact" | undefined, lastKind = "", shownFacts: string[] = subjectProject?.facts ?? [];
+  let lastProject: Project | undefined, asked: "resume" | "contact" | undefined, lastKind = "", shownFacts: string[] = subjectProject?.facts ?? [], fitRan = false;
   const out: Emit = (ev) => {
     if (ev.type === "suggest") { offered = ev.options; return; } // merged with context-aware chips in finish()
     if (ev.type === "text") spoke = true;
     if (ev.type === "panel" && ev.panel.id) lastProject = projectById(ev.panel.id);
     if (ev.type === "approval") asked = ev.action;
+    if (ev.type === "panel" && ev.panel.kind === "fit") fitRan = true;
     if (ev.type === "panel") lastKind = ev.panel.kind;
     if (ev.type === "panel" || ev.type === "approval" || ev.type === "frontend") visible = true;
     emit(ev);
@@ -256,11 +258,14 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       out({ type: "text", text: fact ?? SAY_FOR[asked ?? lastKind] ?? (lastProject ? `Here’s ${lastProject.title}.` : "Here’s what I found.") });
       if (fact) openNamed(fact); else meta.stock = true;
     }
-    // chips: the model's valid ones first, topped up with next steps that fit what is on screen
+    // chips: one proactive offer from the conversation so far, then the model's valid ones, topped up with next steps
+    // that fit what is on screen
+    const offer = nextOffer(input.state, [...input.shown, ...(lastProject ? [lastProject.id] : [])], { fitRan, resumeOffered: asked === "resume" });
     const context = lastProject ? ctxNext(lastProject) : NEXT_FOR[lastKind] ?? DEFAULT_NEXT;
     const seen = new Set<string>();
-    const options = [...offered, ...context].filter((o) => !seen.has(o.toLowerCase()) && seen.add(o.toLowerCase())).slice(0, 3);
-    if (options.length > offered.length) emit({ type: "trace", step: "harness", detail: offered.length ? "topped up the next-step chips" : "added next-step chips", level: "info" });
+    const options = [...(offer ? [offer.chip] : []), ...offered, ...context].filter((o) => !seen.has(o.toLowerCase()) && seen.add(o.toLowerCase())).slice(0, 3);
+    if (offer) emit({ type: "trace", step: "harness", detail: `offered “${offer.chip}”: ${offer.why}`, level: "info" });
+    else if (options.length > offered.length) emit({ type: "trace", step: "harness", detail: offered.length ? "topped up the next-step chips" : "added next-step chips", level: "info" });
     emit({ type: "suggest", options });
     return meta;
   };

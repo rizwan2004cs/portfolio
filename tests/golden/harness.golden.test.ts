@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ABUSE_REPLY, ACCUSE_REPLY, ATTACK_REPLY, GUARD_REFUSAL, PERSONAL_REPLY, REFUSAL } from "@/agent/scope";
 import { ModelError } from "@/agent/types";
 import { assertHealthy, blockScreen, call, http, passScreen, say, scripted, tools, turn } from "./helpers";
+import { fitFrom } from "@/agent/state";
 
 const never = () => scripted("never", [new Error("must not be called")]);
 
@@ -900,6 +901,38 @@ describe("follow-ups with the conversation in hand", () => {
     expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/1 sentence kept by meaning/);
     const none = await turn({ turns: ["how does PACK work?"], retriever: { ...retriever, verify: async () => null } }, [m]);
     expect(none.text).toBe("A LangGraph state machine runs the game."); expect(none.of("trace").map((e) => e.detail).join("\n")).toMatch(/check by meaning unavailable/);
+  });
+  it("a question about the IEEE branch or the keylogger is answered from the resume without a model", async () => {
+    const r = await turn({ turns: ["what did he do at the IEEE student branch?"] }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^At the IEEE Student Branch at NBKRIST he was Treasurer/);
+    expect((await turn({ turns: ["what was the keylogger project?"] }, [never()])).text).toMatch(/^Keylogger: a security research project/);
+    const college = await turn({ turns: ["what did he do in his college projects?"] }, [never()]);
+    expect(college.text).toMatch(/^Health-care Application: .* Keylogger: .* Everything else he built in college is public:$/); expect(college.of("tool").some((t) => t.name === "list_projects")).toBe(true);
+  });
+  it("after a fit check, 'what's missing?' lists its gaps and 'proof for the first one' opens the project behind it", async () => {
+    const state = { focus: null, shown: ["profile"], offered: [], visitor: { name: "Priya", hiringFor: "backend engineer" }, topics: [], fit: fitFrom(["LangGraph agents", "Kubernetes"]) };
+    const gaps = await turn({ turns: ["what's missing?"], state }, [never()]);
+    expect(gaps.meta.mode).toBe("facts"); expect(gaps.text).toMatch(/^Of the 2 requirements, his public projects don’t show Kubernetes\./); expect(gaps.of("tool").some((t) => t.name === "match_role")).toBe(true);
+    const proof = await turn({ turns: ["show me proof for the first one"], state }, [never()]);
+    expect(proof.text).toMatch(/^LangGraph agents: PACK/); expect(proof.of("tool").some((t) => t.name === "open_project" && t.args.id === "pack")).toBe(true);
+    const second = await turn({ turns: ["and the second?", "evidence for the 2nd"], state }, [never()]);
+    expect(second.text).toMatch(/^Kubernetes: it is in his toolkit, but no public project shows it|^Kubernetes: no public project/);
+  });
+  it("'is he a fit?' from a visitor who said what they hire for runs the fit check against that role, no job description needed", async () => {
+    const state = { focus: null, shown: [], offered: [], visitor: { name: "Priya", hiringFor: "backend engineer" }, topics: [] };
+    const r = await turn({ turns: ["is he a fit?"], state }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^Against backend engineer: \d of \d requirements show up/); expect(r.of("tool").some((t) => t.name === "match_role")).toBe(true);
+    expect(r.of("suggest").at(-1)!.options[0]).toBe("What’s missing?");
+  });
+  it("the next-step row leads with a proactive offer: the fit check for a hiring visitor, the resume after three projects", async () => {
+    const hiring = await turn({ turns: ["what has he built?"], state: { focus: null, shown: [], offered: [], visitor: { hiringFor: "backend engineer" }, topics: [] } }, [never()]);
+    expect(hiring.of("suggest").at(-1)!.options[0]).toBe("Is he a fit for your role?");
+    const three = await turn({ turns: ["show me PACK"], state: { focus: null, shown: ["ccr", "finboom"], offered: [], visitor: {}, topics: [] } }, [never()]);
+    expect(three.of("suggest").at(-1)!.options[0]).toBe("Get resume"); expect(three.of("trace").map((e) => e.detail).join("\n")).toMatch(/offered “Get resume”/);
+  });
+  it("a dated question is answered from the resume without a model", async () => {
+    const r = await turn({ turns: ["what was he doing in April 2026?"] }, [never()]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/^In Apr 2026 he was Software Engineering Intern/); expect(r.of("tool").some((t) => t.name === "show_profile")).toBe(true);
   });
   it("a one-word first turn still gets the 'not sure' reply without a model call", async () => {
     const r = await turn({ turns: ["count"], history: [{ user: "count" }] }, [never()]);
