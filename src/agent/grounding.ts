@@ -59,7 +59,10 @@ export function misattributedTech(sentence: string): string[] {
   if (!named.length) return [];
   // "both use X" / "each uses X" claims X for every named project, not just one of them
   const every = named.length > 1 && /\b(both|each|all of them|all three|alike)\b/.test(low);
-  const in1 = (n: { text: string }, t: string) => n.text.includes(t) || mentionsTool(n.text, t);
+  // a term that names a toolkit item ("rag" → "RAG and vector search (Pinecone)") counts when the item's own
+  // pattern matches the project: CCR "retrieves" sections from Pinecone, so "RAG" is not a misattribution
+  const items = TOOLKIT.flatMap(([, l]) => l);
+  const in1 = (n: { text: string }, t: string) => n.text.includes(t) || mentionsTool(n.text, t) || items.some((item) => new RegExp(`\\b${esc(t)}\\b`).test(item.toLowerCase()) && mentionsTool(n.text, item));
   const has = (t: string) => (every ? named.every((n) => in1(n, t)) : named.some((n) => in1(n, t)));
   const mentioned: string[] = [];
   let rest = low;
