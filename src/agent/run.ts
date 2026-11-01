@@ -16,6 +16,7 @@ import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type 
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
 import { contextBlock, EMPTY_STATE, nextState } from "./state";
 import type { Visitor } from "./classify";
+import type { Retriever } from "@/server/retrieval";
 
 /** Everything the site says about him, compact: the model reasons over this directly instead of looking it up. */
 export const KNOWLEDGE = [
@@ -53,6 +54,8 @@ export interface RunDeps {
   signal: AbortSignal;
   /** sorts each message into a kind first; without it the word rules decide */
   classify?: Classifier;
+  /** his facts by meaning (Neon pgvector + a small judge): a sentence the word check drops gets a second reading */
+  retriever?: Retriever;
 }
 
 const MAX_STEPS = 4;
@@ -170,6 +173,9 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // ("show me PACK", "resume") is work however it is phrased, and two words after a reply ("Not animal") are a follow-up
   const decided = decide(sorted), overruled = (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : null;
   const kind = overruled ? "work" : decided;
+  // greetings, intros and "who am I" are conversation: the model answers them in its own words with the transcript,
+  // and the policy's line is only the fallback when no model can
+  const natural = !!BEHAVIOR[kind].fallback, naturalLine = () => BEHAVIOR[kind].fallback!(last, sorted.visitor ?? input.state?.visitor);
   // the prompt's "conversation so far": the state the client echoed plus whatever is on screen this turn
   const context = contextBlock(nextState(input.state ?? EMPTY_STATE, [], input.shown));
   emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : overruled ? `${sorted.note} · ${overruled}: treated as work` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
@@ -187,7 +193,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const factual: AgentEvent[] = [];
   // the deterministic "not sure what you mean" is only ever a first-turn answer: after a reply, a short message the facts
   // can't place is a follow-up, and the model reads it with the conversation
-  const isFact = factAnswer(subject, (e) => factual.push(e), false, input.shown) && !(history.length > 1 && isUnclearReply(factual));
+  const isFact = !natural && factAnswer(subject, (e) => factual.push(e), false, input.shown) && !(history.length > 1 && isUnclearReply(factual));
   const g = input.killModel ? { ok: true, note: "skipped · model offline, router can't be injected" }
     : isFact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await guarding!;
   emit({ type: "trace", step: "guard", detail: g.note, level: g.ok ? "ok" : "warn" });
@@ -260,6 +266,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   };
   const fallbackToRouter = (detail: string): RunMeta => {
     emit({ type: "trace", step: "fallback", detail, level: "warn" });
+    if (natural) { emit({ type: "text", text: naturalLine() }); emit({ type: "suggest", options: BEHAVIOR[kind].chips }); spoke = true; return finish({ mode: "scope" }); }
     router(subject, out);
     return finish({ mode: "router" });
   };
@@ -378,7 +385,23 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       // verify before the visitor sees it: every claim must come from this turn's sources
       const answer = texts.join(" ").trim();
       if (answer) {
-        const gr = groundAnswer(answer, source, last, lastTitle, `${source} ${ALL_FACTS_SOURCE}`, lastFacts, { playful: kind === "playful" });
+        const gr = groundAnswer(answer, source, last, lastTitle, `${source} ${ALL_FACTS_SOURCE}`, lastFacts, { loose: kind === "playful" || natural });
+        // a sentence dropped for its wording alone gets a second reading: the closest facts are retrieved by meaning and
+        // a small model says whether they support it; a sentence dropped for a number, a name or puffery stays dropped
+        const byWords = gr.parts.filter((p) => !p.ok && p.why === "words");
+        if (byWords.length && deps.retriever && !deps.signal.aborted) {
+          const t0 = Date.now();
+          const verdicts = await Promise.all(byWords.map((p) => deps.retriever!.verify(p.s, deps.signal)));
+          const took = `${((Date.now() - t0) / 1000).toFixed(1)}s`;
+          const rescued = new Set(byWords.filter((_, i) => verdicts[i]?.ok).map((p) => p.s));
+          if (rescued.size) {
+            const text = gr.parts.filter((p) => p.ok || rescued.has(p.s)).map((p) => p.s).join(" ");
+            const best = verdicts.find((v) => v?.ok)!;
+            emit({ type: "trace", step: "grounding", detail: `${rescued.size} sentence${rescued.size > 1 ? "s" : ""} kept by meaning: his facts support ${rescued.size > 1 ? "them" : "it"} (closest: “${best.fact.slice(0, 60)}” · ${took})`, level: "ok" });
+            gr.text = text; gr.dropped = gr.dropped.slice(0, gr.dropped.length - rescued.size); gr.extracted = false;
+          } else if (verdicts.every((v) => v === null)) emit({ type: "trace", step: "grounding", detail: `check by meaning unavailable (${took}) · word check stands`, level: "info" });
+          else { const v = verdicts.find((x) => x && !x.ok)!; emit({ type: "trace", step: "grounding", detail: `read against his facts by meaning: not supported (${v.why} · ${took})`, level: "info" }); }
+        }
         if (gr.dropped.length) emit({ type: "trace", step: "grounding", detail: `removed ${gr.dropped.length} of ${gr.total} sentence${gr.total > 1 ? "s" : ""}: not in his facts (${gr.dropped.flat().slice(0, 4).map((w) => `“${w}”`).join(", ")})`, level: "warn" });
         else emit({ type: "trace", step: "grounding", detail: gr.total > 1 ? `all ${gr.total} sentences checked against his facts · verified` : "the sentence was checked against his facts · verified", level: "ok" });
         // an answer that was entirely invented, with nothing on screen, is better replaced by the router

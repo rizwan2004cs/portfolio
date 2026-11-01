@@ -1,0 +1,26 @@
+# Rebuilds the facts index in Neon (pgvector) whenever the content changes on main, so retrieval and the grounding check
+# by meaning read what the site says. Needs repository secrets DATABASE_URL and NVIDIA_API_KEY.
+name: Facts index
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/content/**", "scripts/index-facts.ts", "src/server/retrieval.ts"]
+  workflow_dispatch:
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Embed and upsert the facts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: npx tsx scripts/index-facts.ts
