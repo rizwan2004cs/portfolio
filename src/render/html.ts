@@ -108,7 +108,7 @@ export function projectPanel(p: Project, opts: { compact?: boolean; arch?: boole
 export function profilePanel(pr: Profile) {
   return `<article class="panel"><div class="profile"><img src="/img/portrait-320.jpg" alt="${esc(pr.name)}" width="96" height="96">
     <div><h3>${esc(pr.name)}</h3><p class="one">${esc(pr.role)} · ${esc(pr.location)}</p>
-    <div class="links"><a class="btn" href="${esc(pr.links.github)}" target="_blank" rel="noopener me">GitHub <span class="arr">↗</span></a><a class="btn" href="${esc(pr.links.linkedin)}" target="_blank" rel="noopener me">LinkedIn <span class="arr">↗</span></a></div>
+    <div class="links"><a class="btn" href="${esc(safeUrl(pr.links.github))}" target="_blank" rel="noopener me">GitHub <span class="arr">↗</span></a><a class="btn" href="${esc(safeUrl(pr.links.linkedin))}" target="_blank" rel="noopener me">LinkedIn <span class="arr">↗</span></a></div>
     <ul class="also"><li>${esc(pr.education)}</li>${pr.also.map((a) => `<li>${esc(a)}</li>`).join("")}</ul></div></div></article>`;
 }
 

@@ -6,6 +6,9 @@ name: Facts index
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   index:
     runs-on: ubuntu-latest

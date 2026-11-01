@@ -1,4 +1,5 @@
 import { BEHAVIOR, KINDS, ruleKind, SENSITIVE, type Kind } from "./behavior";
+import { isAttack, offScope } from "./scope";
 export { introFacts, nameFrom } from "./behavior";
 import { NVIDIA_MODELS, OPENROUTER_MODELS } from "./models";
 import type { ChatMessage } from "./types";
@@ -103,7 +104,12 @@ export function parseAnswer(content: string): { kind: Kind; confidence: number; 
     const confidence = Math.min(1, Math.max(0, Number(j.confidence ?? 0))) || 0;
     const visitor: Visitor = {};
     // who the visitor is comes only from an introduction: on any other kind the field is the model guessing
-    if (j.kind === "visitor_intro" && j.visitor && typeof j.visitor === "object") for (const f of VISITOR_FIELDS) { const v = j.visitor[f]; if (typeof v === "string" && v.trim()) visitor[f] = v.trim().slice(0, 80); }
+    // the same screen the echoed state gets: one line of plain text, never an instruction
+    if (j.kind === "visitor_intro" && j.visitor && typeof j.visitor === "object") for (const f of VISITOR_FIELDS) {
+      const v = j.visitor[f];
+      const t = typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) : "";
+      if (t && !isAttack(t) && !offScope(t)) visitor[f] = t;
+    }
     return { kind: j.kind as Kind, confidence, ...(Object.keys(visitor).length ? { visitor } : {}) };
   } catch { return null; }
 }
