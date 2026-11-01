@@ -891,6 +891,16 @@ describe("follow-ups with the conversation in hand", () => {
     expect((await turn({ turns: ["resume"], history: [{ user: "resume" }] }, [never()], passScreen, undefined, small)).of("approval").length).toBe(1);
     expect((await turn({ turns: ["hello"], history: [{ user: "hello" }] }, [never()], passScreen, undefined, small)).meta.mode).toBe("scope"); // a real greeting still gets the fixed line
   });
+  it("a sentence dropped for its wording alone is kept when his facts support it in meaning; a wrong number stays dropped", async () => {
+    const m = scripted("gpt-oss-120b", [say("A LangGraph state machine runs the game. He has a knack for coordinating noisy agents into one match. It handles 9,000 players a night.", call("open_project", { id: "pack" }), call("suggest", { options: ["x"] }))]);
+    const verify = async (s: string) => (/knack/.test(s) ? { ok: true, fact: "Seven AI agents play Werewolf", cosine: 0.45, why: "paraphrase" } : { ok: false, fact: "", cosine: 0.2, why: "no fact is about this" });
+    const retriever = { search: async () => [], support: async () => null, verify };
+    const r = await turn({ turns: ["how does PACK work?"], retriever }, [m]);
+    expect(r.text).toBe("A LangGraph state machine runs the game. He has a knack for coordinating noisy agents into one match.");
+    expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/1 sentence kept by meaning/);
+    const none = await turn({ turns: ["how does PACK work?"], retriever: { ...retriever, verify: async () => null } }, [m]);
+    expect(none.text).toBe("A LangGraph state machine runs the game."); expect(none.of("trace").map((e) => e.detail).join("\n")).toMatch(/check by meaning unavailable/);
+  });
   it("a one-word first turn still gets the 'not sure' reply without a model call", async () => {
     const r = await turn({ turns: ["count"], history: [{ user: "count" }] }, [never()]);
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/Not sure what you mean/);

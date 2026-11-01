@@ -398,3 +398,11 @@ describe("grounding a playful answer", () => {
     expect(groundAnswer("He’d be a compiler: a knack for coordinating seven noisy agents into one game.", src, "Not animal", pack.title, src, pack.facts).dropped).toHaveLength(1); // the same sentence fails the ordinary check
   });
 });
+
+describe("grounding verdicts per sentence", () => {
+  it("names why each sentence was dropped: only a wording miss may be overturned by a reader of the facts", () => {
+    const pack = projectById("pack")!, src = pack.facts.join(" ");
+    const g = groundAnswer("A LangGraph state machine runs the game. He has a knack for coordinating noisy agents. It handles 9,000 players a night. The LangGraph state machine is production-ready.", src, "how does PACK work?", pack.title, src, pack.facts);
+    expect(g.parts.map((p) => [p.ok, p.why])).toEqual([[true, undefined], [false, "words"], [false, "claims"], [false, "puffery"]]);
+  });
+});

@@ -134,25 +134,29 @@ export function groundAnswer(answer: string, source: string, question: string, t
   const src = source.toLowerCase(), wide = wideSource.toLowerCase();
   const kept: string[] = [];
   const dropped: string[][] = [];
+  /** every sentence with its verdict, in order: "words" is the only drop a reader of the facts may overturn */
+  const parts: { s: string; ok: boolean; why?: "words" | "claims" | "puffery" | "refusal"; miss?: string[] }[] = [];
   const sentences = splitSentences(answer);
   let afterRefusal = false;
   for (const s of sentences) {
     if (isRefusal(s)) {
       // a refusal tacked onto a real answer ("…fallback routers. Outside my lane.") contradicts it: drop it
-      if (kept.some((k) => !isRefusal(k))) { dropped.push(["refusal after an answer"]); continue; }
-      kept.push(s); afterRefusal = true; continue;
+      if (kept.some((k) => !isRefusal(k))) { dropped.push(["refusal after an answer"]); parts.push({ s, ok: false, why: "refusal" }); continue; }
+      kept.push(s); parts.push({ s, ok: true }); afterRefusal = true; continue;
     }
     // "Closest thing: …" after a refusal may point at any real project, but still only with real facts
     // a playful answer ("he'd be a compiler: …") or a greeting is the model's own words over the facts: its wording is
     // free, its numbers, names, tech and roles are not
     const base = afterRefusal ? wide : src, miss = opts.loose ? [] : unsupported(s, base);
+    const words = miss.length > 0;
     if (!miss.length) miss.push(...misanchored(s, base), ...misattributed(s, base), ...misattributedTech(s), ...roleBleed(s));
     // puffery ("routinely", "extensive experience") is never in the write-ups
     const puff = s.match(/\b(routinely|extensive(ly)?|expert(ise)?|years of|seasoned|mastery|deep experience|similar stacks|proven track record|battle.tested|production.(ready|grade)|in production|at scale|enterprise.grade|several production|deep (prompt|knowledge|expertise|understanding)|most (freshers|candidates|engineers|graduates|people)|unlike (most|other)|few (freshers|candidates|engineers))\b/i);
-    if (!miss.length && puff) miss.push(puff[0].toLowerCase());
-    if (miss.length) dropped.push(miss); else kept.push(s);
+    const puffed = !miss.length && !!puff;
+    if (puffed) miss.push(puff![0].toLowerCase());
+    if (miss.length) { dropped.push(miss); parts.push({ s, ok: false, why: words ? "words" : puffed ? "puffery" : "claims", miss }); } else { kept.push(s); parts.push({ s, ok: true }); }
   }
   const extracted = kept.length ? null : bestFact(facts, question, title ?? "");
   const text = kept.length ? kept.join(" ") : extracted ?? `His write-up doesn’t cover ${topicOf(question)}${title ? ` for ${title}` : ""}.`;
-  return { text, dropped, total: sentences.length, extracted: !!extracted };
+  return { text, dropped, total: sentences.length, extracted: !!extracted, parts };
 }
