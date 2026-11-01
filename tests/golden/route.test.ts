@@ -72,12 +72,12 @@ describe("route · input validation", () => {
 
   it("a replayed introduction still carries the visitor's name into the state snapshot", async () => {
     const d = { ...deps(), models: () => [{ name: "m", complete: async () => ({ role: "assistant" as const, content: "Hi Arjun, what can I show you?" }) }] };
-    const body = { history: [{ user: "I'm Arjun, a founder" }] };
+    const body = { history: [{ user: "I'm Arjun from Acme, hiring backend engineers" }] };
     const first = await events(await handleAgent(post(body), d));
-    expect(first.find((e) => e.type === "STATE_SNAPSHOT").snapshot.visitor).toEqual({ name: "Arjun" });
+    expect(first.find((e) => e.type === "STATE_SNAPSHOT").snapshot.visitor).toEqual({ name: "Arjun", company: "Acme", hiringFor: "backend engineer" });
     const again = await events(await handleAgent(post(body), d));
     expect(again.find((e) => e.type === "RUN_FINISHED").result.mode).toBe("cache");
-    expect(again.find((e) => e.type === "STATE_SNAPSHOT").snapshot.visitor).toEqual({ name: "Arjun" });
+    expect(again.find((e) => e.type === "STATE_SNAPSHOT").snapshot.visitor).toEqual({ name: "Arjun", company: "Acme", hiringFor: "backend engineer" });
   });
 
   it("413 for an oversized body", async () => {

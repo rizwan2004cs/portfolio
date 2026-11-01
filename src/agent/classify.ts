@@ -1,5 +1,5 @@
 import { BEHAVIOR, KINDS, ruleKind, SENSITIVE, type Kind } from "./behavior";
-export { nameFrom } from "./behavior";
+export { introFacts, nameFrom } from "./behavior";
 import { NVIDIA_MODELS, OPENROUTER_MODELS } from "./models";
 import type { ChatMessage } from "./types";
 import PROMPT from "./classifier-prompt.json";

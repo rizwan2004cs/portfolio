@@ -17,7 +17,7 @@ import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange
 import { contextBlock, EMPTY_STATE, nextState } from "./state";
 import { nextOffer } from "./offers";
 import { resolvePending, whichOne } from "./clarify";
-import { nameFrom, type Visitor } from "./classify";
+import { introFacts, nameFrom, type Visitor } from "./classify";
 import type { Retriever } from "@/server/retrieval";
 import type { SelfCheck } from "./check";
 
@@ -178,7 +178,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal, before ? { user: before.user, agent: before.agent } : undefined));
   // "unclear" is a first-turn verdict: two words after a reply ("Not animal") are a follow-up, and the model has the transcript
   // an introduction with no fields from the classifier still yields the name written in it
-  if (sorted.kind === "visitor_intro" && !sorted.visitor?.name) { const name = nameFrom(last); if (name) sorted.visitor = { ...sorted.visitor, name }; }
+  if (sorted.kind === "visitor_intro") sorted.visitor = { ...introFacts(last), ...sorted.visitor }; // the words fill what the classifier left out
   // the classifier's verdict yields to the facts: a message that names a project or asks something the facts answer
   // ("show me PACK", "resume") is work however it is phrased, and two words after a reply ("Not animal") are a follow-up
   const decided0 = decide(sorted);
@@ -186,7 +186,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // is an introduction, and a message that was corrected (a typo, Hinglish) is the work question its correction reads as
   const certain = sorted.source === "model" && ruleKind(last) === "visitor_intro" && nameFrom(last) && decided0 !== "visitor_intro" ? "visitor_intro" as const
     : sorted.source === "model" && last !== raw && BEHAVIOR[decided0].fallback ? "work" as const : null;
-  if (certain === "visitor_intro") sorted.visitor = { ...sorted.visitor, name: nameFrom(last)! };
+  if (certain === "visitor_intro") sorted.visitor = { ...introFacts(last), ...sorted.visitor, name: nameFrom(last)! };
   // the handler carries the visitor into session state from here: after every correction above, never before
   deps.onClassified?.(sorted);
   const decided = certain ?? decided0;

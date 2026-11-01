@@ -7,7 +7,7 @@ import { groqScreen, modelChain } from "./models";
 import { nextState, sanitizeState } from "./state";
 import { neonRetriever, type Retriever } from "@/server/retrieval";
 import { nemotronSelfCheck, type SelfCheck } from "./check";
-import { nameFrom, ruleKind } from "./behavior";
+import { introFacts, ruleKind } from "./behavior";
 import { classifierEndpoints, nemotronClassifier, type Classifier } from "./classify";
 import { router } from "./router";
 import { waitUntil } from "@vercel/functions";
@@ -131,8 +131,8 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           emit({ type: "trace", step: "cache", detail: "same question answered before · replayed, 0 tokens", level: "ok" });
           hit.forEach(emit);
           // a replayed introduction still tells the state who the visitor is: the name is in the message itself
-          const name = ruleKind(turns.at(-1)!) === "visitor_intro" ? nameFrom(turns.at(-1)!) : undefined;
-          meta = { mode: "cache", ...(name ? { visitor: { name } } : {}) };
+          const facts = ruleKind(turns.at(-1)!) === "visitor_intro" ? introFacts(turns.at(-1)!) : {};
+          meta = { mode: "cache", ...(Object.keys(facts).length ? { visitor: facts } : {}) };
         } else {
           const recorded: AgentEvent[] = [];
           const record = (ev: AgentEvent) => { if (ev.type !== "trace" && ev.type !== "state") recorded.push(ev); emit(ev); };
