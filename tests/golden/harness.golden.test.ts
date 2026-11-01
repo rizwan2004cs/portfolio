@@ -433,7 +433,9 @@ describe("golden · panels only for questions about him or his work", () => {
     const f = await turn({ turns: ["hi I'm Priya from Razorpay, hiring backend engineers"] }, [never()], passScreen, undefined, intro);
     expect(f.text).toBe("Welcome, Priya. Paste the role’s requirements and I’ll map them to his work, or start with his strongest projects.");
     const who = await turn({ turns: ["I'm Priya", "who am i?"], history: [{ user: "I'm Priya", agent: "Hi Priya." }, { user: "who am i?" }], state: { focus: null, shown: [], offered: [], visitor: { name: "Priya", company: "Razorpay" }, topics: [] } }, [never()]);
-    expect(who.text).toBe("You told me you’re Priya from Razorpay. I can show you what Rizwan has built.");
+    expect(who.text).toBe("You told me you’re Priya from Razorpay. I can show you what Rizwan has built."); expect(who.meta.mode).toBe("facts"); // on record: no model, even when one is there
+    const known = await turn({ turns: ["who am i?"], state: { focus: null, shown: [], offered: [], visitor: { name: "Arjun" }, topics: [] } }, [scripted("m", [say("No idea.", call("suggest", { options: ["x"] }))])]);
+    expect(known.text).toBe("You told me you’re Arjun. I can show you what Rizwan has built.");
   });
   it("the model's project list and profile are dropped when the message isn't about his work or him", async () => {
     const m = scripted("a", [say("I can hear you fine.", call("list_projects"), call("show_profile"), call("suggest", { options: ["x"] }))]);

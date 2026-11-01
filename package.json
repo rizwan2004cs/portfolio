@@ -14,6 +14,7 @@
     "test:e2e": "NEXT_DIST_DIR=.next-e2e next build && NEXT_DIST_DIR=.next-e2e playwright test",
     "eval:live": "node scripts/eval-live.mjs",
     "eval:intents": "node --env-file-if-exists=.env.local scripts/eval-intents.mjs",
+    "eval:conversations": "node scripts/eval-conversations.mjs",
     "diagrams": "node scripts/render-diagrams.mjs",
     "resume": "node scripts/render-resume.mjs",
     "eval:deepeval": "cd evals && DEEPEVAL_TELEMETRY_OPT_OUT=YES .venv/bin/deepeval test run . && .venv/bin/python summarize.py"

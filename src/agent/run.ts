@@ -178,6 +178,12 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // greetings, intros and "who am I" are conversation: the model answers them in its own words with the transcript,
   // and the policy's line is only the fallback when no model can
   const natural = !!BEHAVIOR[kind].fallback, naturalLine = () => BEHAVIOR[kind].fallback!(last, sorted.visitor ?? input.state?.visitor);
+  // "who am I?" when the visitor already said: the answer is on record, so it is said plainly rather than left to a model
+  if (kind === "about_visitor" && input.state?.visitor.name) {
+    emit({ type: "trace", step: "facts", detail: "the visitor introduced themselves earlier · answered from the conversation, no model call", level: "ok" });
+    emit({ type: "text", text: naturalLine() }); emit({ type: "suggest", options: BEHAVIOR[kind].chips });
+    return { mode: "facts" };
+  }
   // the prompt's "conversation so far": the state the client echoed plus whatever is on screen this turn
   const context = contextBlock(nextState(input.state ?? EMPTY_STATE, [], input.shown));
   emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : overruled ? `${sorted.note} · ${overruled}: treated as work` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
