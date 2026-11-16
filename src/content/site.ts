@@ -6,6 +6,6 @@ export const SITE = {
   description:
     "Mohammad Rizwan (Syed Mohammad Rizwan) is an AI engineer in Bengaluru building reliable AI agents, RAG and full-stack apps. Projects, resume and an AI agent.",
   /** when the content last changed: the sitemap's lastmod (a build date on every entry teaches Google to ignore it) */
-  updated: "2026-10-27",
+  updated: "2026-11-16",
   location: "Bangalore, Karnataka",
 } as const;

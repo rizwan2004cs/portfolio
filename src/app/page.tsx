@@ -10,7 +10,7 @@ import { classicRows, esc, STAR, contactForm } from "@/render/html";
 import { ldJson, profilePage } from "@/seo/jsonld";
 
 export const metadata: Metadata = {
-  title: { absolute: "Syed Mohammad Rizwan — AI Engineer in Bengaluru · Portfolio" },
+  title: { absolute: "Syed Mohammad Rizwan — AI Engineer in Bengaluru · AI Agents" },
   description: SITE.description,
   alternates: { canonical: "/" },
 };
