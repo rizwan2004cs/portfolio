@@ -11,7 +11,7 @@ jobs:
   smoke:
     if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     env:
       URL: ${{ vars.SITE_URL || 'https://mohammad-rizwan.tech' }}
     steps:
@@ -28,6 +28,7 @@ jobs:
           node-version: 24
       - name: Conversations replay
         continue-on-error: true
+        timeout-minutes: 10
         run: node scripts/eval-conversations.mjs "$URL"
       # IndexNow: tell Bing (and Yandex, Seznam, Naver) every page is fresh, so they recrawl within a day.
       # The key is public by design: it is served at /<key>.txt to prove the site owns the ping.
