@@ -1,11 +1,13 @@
-# Every night (03:30 IST), 162 realistic visitor messages go to the live agent and every reply is checked: stock
-# non-answers, replies with no model behind them, the agent speaking as its vendor or as Rizwan, and slow turns. The
-# report lands on the run summary; the job fails on more than three dead ends or any leak. No secrets needed.
-name: Nightly battery
+# Every Sunday (06:00 IST, just after the daily model budget resets at midnight UTC), 162 realistic visitor messages go
+# to the live agent and every reply is checked: stock non-answers, replies with no model behind them, the agent speaking
+# as its vendor or as Rizwan, and slow turns. The report lands on the run summary; the job fails on more than three
+# dead ends or any leak. No secrets needed. A run spends 162 of the day's 600 model-backed turns: weekly, not nightly,
+# so visitors keep most of the budget.
+name: Weekly battery
 
 on:
   schedule:
-    - cron: "0 22 * * *"
+    - cron: "30 0 * * 0"
   workflow_dispatch:
     inputs:
       only:
