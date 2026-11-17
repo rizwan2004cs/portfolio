@@ -25,6 +25,9 @@ export function unsupported(sentence: string, src: string): string[] {
   return miss.length >= 3 && miss.length / words.length > 0.5 ? miss : [];
 }
 
+// months and weekdays are dates, not names; the facts write months short ("Mar – May 2026")
+const MONTH = /^(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)$/;
+const DAY = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Today|Tomorrow|Yesterday)$/;
 const NOT_NAMES = new Set("He His Him The A An It Its This That These Those At In On For With And But So Yes No Also Rizwan Rizwan’s Rizwan's Syed Mohammad".split(" "));
 
 /** Numbers and amounts must come from the same fact as the claim around them: "$115 at Monad Blitz" fails
@@ -168,9 +171,12 @@ export function groundAnswer(answer: string, source: string, question: string, t
     // takes: "for Shopify" fails here even when the rest of the sentence reads like his facts
     if (!miss.length && !opts.loose) {
       const lowWide = wide.toLowerCase();
-      const names = [...new Set((s.match(/(?<=\s)[A-Z][a-zA-Z0-9]{2,}(?:[-.][A-Za-z0-9]+)*/g) ?? []).filter((w) => !NOT_NAMES.has(w) && !lowWide.includes(w.toLowerCase())))];
+      const known = (w: string) => { const l = w.toLowerCase(); return lowWide.includes(l) || lowWide.includes(l.replace(/(es|s)$/, "")) || lowWide.includes(l.slice(0, 3) + " ") && MONTH.test(w); };
+      const names = [...new Set((s.match(/(?<=\s)[A-Z][a-zA-Z0-9]{2,}(?:[-.][A-Za-z0-9]+)*/g) ?? []).filter((w) => !NOT_NAMES.has(w) && !MONTH.test(w) && !DAY.test(w) && !/^[A-Z]{2,5}s?$/.test(w) && !known(w)))];
       if (names.length) miss.push(...names.map((n) => n.toLowerCase()));
     }
+    // a rating ("8/10", "9 out of 10") is a score no one gave him
+    if (!miss.length && /\b\d+(\.\d+)?\s*(\/|out of)\s*(5|10|100)\b/i.test(s)) miss.push("invented score");
     // the tools his public work does not show are named in his gaps: claiming them without a negation is false
     if (!miss.length && /\b(kubernetes|k8s|aws|amazon web services|eks|terraform)\b/i.test(s) && !/\b(no|not|never|doesn(’|')t|does not|isn(’|')t|without|lacks?|gaps?|missing|yet)\b/i.test(s)) miss.push("gap tool claimed");
     let check = words ? "words" : "";

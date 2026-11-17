@@ -63,3 +63,11 @@ describe("golden · a tool several projects share is a filter, not a pick", () =
     expect(listed?.panel.id?.split(",").sort()).toEqual(["cpl", "finboom", "verseyou"]);
   });
 });
+
+describe("golden · a judgement about him with every model down", () => {
+  it("'is he any good' gets his strongest evidence, not 'outside my lane'", async () => {
+    const { scripted } = await import("./helpers");
+    const r = await turn({ turns: ["is this guy legit"] }, [scripted("a", [new Error("down")])], undefined, undefined, work);
+    expect(r.text).toMatch(/doesn’t fall over/); expect(r.text).not.toMatch(/Outside my lane/);
+  });
+});
