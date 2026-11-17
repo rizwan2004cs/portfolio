@@ -29,7 +29,7 @@ const PROMPT_HASH = [...`${SYSTEM}${JSON.stringify(TOOL_DEFS)}${ALL_FACTS_SOURCE
 // a collision-resistant digest: a forged state or agent turn can never share a key with the canonical prompt
 const digest = (s: string) => createHash("sha256").update(s).digest("base64url").slice(0, 32);
 export const LIMITS = { bodyBytes: 24576, turnChars: 2000, turns: 6, shown: 20, perMinute: 12, modelRunsPerDay: 600 } as const;
-const SHOWN_OK = new Set(["profile", "index", "harness", "done:resume", "done:contact"]);
+const SHOWN_OK = new Set(["profile", "work", "events", "education", "index", "harness", "done:resume", "done:contact"]);
 
 const ExchangeBody = z.object({ user: z.string(), agent: z.string().optional(), showed: z.array(z.string()).max(5).optional() });
 const Body = z.object({
@@ -38,6 +38,8 @@ const Body = z.object({
   history: z.array(ExchangeBody).optional(),
   shown: z.array(z.string()).optional().default([]),
   killModel: z.boolean().optional().default(false),
+  /** the reply style chosen in the composer; part of the cache key, so a short answer is never replayed as a detailed one */
+  style: z.enum(["short", "friendly", "formal", "detailed"]).optional(),
   /** the session state from the last snapshot; a claim, sanitised before use */
   state: z.unknown().optional(),
   threadId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(),
@@ -146,7 +148,7 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
       try {
         // everything that shapes the prompt is in the key: the conversation as sent (its agent turns too), the whole
         // sanitised state (focus, visitor, fit, a pending question that rewrites the message), and the prompt itself
-        const key = `${cacheKey(turns, shown)}:${digest(JSON.stringify([history.map((h) => [h.agent ?? "", h.showed ?? []]), state]))}:${PROMPT_HASH}`;
+        const key = `${cacheKey(turns, shown)}:${digest(JSON.stringify([history.map((h) => [h.agent ?? "", h.showed ?? []]), state, parsed.style ?? ""]))}:${PROMPT_HASH}`;
         const hit = !parsed.killModel ? deps.cache.get(key) : undefined;
         if (hit) {
           emit({ type: "trace", step: "cache", detail: "same question answered before · replayed, 0 tokens", level: "ok" });
@@ -159,7 +161,7 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           const record = (ev: AgentEvent) => { if (ev.type !== "trace" && ev.type !== "state") recorded.push(ev); emit(ev); };
           const budgetOut = spent.budgetOut;
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
-          meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, retriever: deps.retriever, selfCheck: deps.selfCheck, signal: ctl.signal });
+          meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut, style: parsed.style }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, retriever: deps.retriever, selfCheck: deps.selfCheck, signal: ctl.signal });
           if (!spent.shared && !budgetOut && meta.mode !== "model" && meta.mode !== "partial") budget.runs--; // local fallback only: a turn that touched no model is given back
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
         }

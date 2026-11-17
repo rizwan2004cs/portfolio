@@ -59,6 +59,14 @@ export default function AgentPage() {
             <div className="row2">
               <div className="sugg" id="sugg" />
               <button type="button" className="btn sltray" id="sltray" hidden>Shortlist</button>
+              {/* how the visitor wants answers written; sent with every message, remembered on this device */}
+              <select className="style" id="style" aria-label="Reply style" defaultValue="">
+                <option value="">Default style</option>
+                <option value="short">Short</option>
+                <option value="friendly">Friendly</option>
+                <option value="formal">Formal</option>
+                <option value="detailed">Detailed</option>
+              </select>
               <button type="button" className="btn trbtn" id="trbtn">Trace</button>
               <button type="button" className="breaker" id="kill" role="switch" aria-checked="false"><span className="led" /><span id="killLbl">Kill the model</span></button>
             </div>

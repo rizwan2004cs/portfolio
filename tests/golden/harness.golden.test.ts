@@ -553,9 +553,9 @@ describe("golden · empty replies and the hiring question", () => {
     expect(r.text).toMatch(/strongest evidence/); expect(r.meta.model).toBe("openrouter · free models");
     expect(r.of("trace").some((t) => /returned nothing/.test(t.detail))).toBe(true);
   });
-  it("'why should we hire him?' is answered from his facts at once", async () => {
-    const r = await turn({ turns: ["Why should we hire him?"] }, [never()]);
-    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/strongest evidence is PACK/);
+  it("'why should we hire him?' with every model down still gets the written evidence line from the router", async () => {
+    const r = await turn({ turns: ["Why should we hire him?"] }, [scripted("a", [new Error("down")])]);
+    expect(r.meta.mode).toBe("router"); expect(r.text).toMatch(/strongest evidence is PACK/);
   });
 });
 

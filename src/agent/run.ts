@@ -6,11 +6,11 @@ import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
 import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router, scoreProjects } from "./router";
-import { ATTACK_REPLY, BAD_OUTPUT, CODEY, GUARD_REFUSAL, isAttack, isRefusal, offScope, REFUSAL, stripCode } from "./scope";
+import { abusive, accusation, ATTACK_REPLY, BAD_OUTPUT, CODEY, GUARD_REFUSAL, isAttack, isRefusal, lifestyle, offScope, personal, REFUSAL, stripCode } from "./scope";
 import { fixTypos, hinglish } from "./typos";
 import { skillAsked } from "./skills";
 import { topicsIn } from "./intent";
-import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind } from "./behavior";
+import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind, STYLE_TONE } from "./behavior";
 import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
@@ -28,6 +28,7 @@ export const KNOWLEDGE = [
   `Work: ${EXPERIENCE.map((x) => `${x.title}: ${x.body} (${x.when})`).join("; ")}.`,
   `Experience: ${experienceLine()}`,
   `Why him: ${WHY_HIM}`,
+  `Role changes: both internships were fixed-term. The Supraja Technologies internship (Jun – Sep 2025) ended with its project; the Novulis Consulting internship (Mar – May 2026) converted to the full-time Associate Software Engineer (R&D) role in June 2026. No role ended early, and he has not left Novulis.`,
   `Gaps: ${GAPS}`,
   `Availability: this site does not say whether he is looking for a role; for hiring questions, offer his contact details (offer_contact).`,
   `Events: ${EVENTS.map((e) => e.say).join(" ")}`,
@@ -42,7 +43,8 @@ How to answer:
 - Answer the visitor's latest message directly and specifically, in up to four short plain sentences. Earlier messages are context; never re-answer them. Reason across his work: compare projects, explain trade-offs, say which project best shows a skill.
 - If the visitor pastes a job description or lists requirements, call match_role with the 3-8 key requirements as short phrases, then summarise its report in two or three sentences: what matches (with project names) and what shows no public evidence. Use only the report.
 - The toolkit lists skills (call it "his toolkit", never "his resume"); "used in" names where a tool shows. A tool with no "used in" is toolkit only: say so plainly. Never tie a tool to a project or job unless the toolkit or a project fact says so, and never describe his job at Novulis Consulting beyond its Work line. Each Work line describes only its own role: never carry one role's duties to another.
-- Recruiter questions get real answers from the lines above: "why hire him" from Why him, "weaknesses" from Gaps, "years of experience" from Experience, "did he build it alone" from the project's team, "is he open to work" with the Availability line. Never call anything "production-ready", "at scale" or "in production" unless a fact says so.
+- "Why hire him" is a case you make, not a line you quote: in your own words, give two or three reasons, each one a thing a project proves about how he works (keeps agents running when a model fails, cites a source for every claim, waits for the user's confirmation before acting) and what a team gets from that. Never recite the Why him line and never cite commit counts. "Why did he leave" is answered from Role changes.
+- Recruiter questions get real answers from the lines above: "weaknesses" from Gaps, "years of experience" from Experience, "did he build it alone" from the project's team, "is he open to work" with the Availability line. Never call anything "production-ready", "at scale" or "in production" unless a fact says so.
 - A stack item is only a name: say what it does only when a fact says so ("built on Lovable", never "Lovable's safety layer").
 - Never state or guess anything about his body, gender, sexuality, age, relationships, family, religion or health, and never repeat a claim about him the knowledge doesn't support: say "His write-up only covers his work."
 - Use only the knowledge above. If it doesn't cover something, say "His write-up doesn't cover that" for the specific thing. Never guess, never generalise, never say whether he is looking for a job.
@@ -110,7 +112,7 @@ export function narrated(text: string, shownNow: string): { text: string; cut: n
 /** Whether the router has something to say for a message as it stands: a fact answer, a project it names, or a skill. */
 /** Does the message name a project, a skill, a topic or a thing the site offers? A greeting or "not animal" does not. */
 function namesSomething(text: string): boolean {
-  return clearPick(text) !== undefined || skillAsked(text) !== undefined || topicsIn(text).length > 0 || /\b(resume|cv|projects?|built|everything|shipped|work|hire|hiring|contact|email)\b/i.test(text);
+  return clearPick(text) !== undefined || skillAsked(text) !== undefined || topicsIn(text).length > 0 || /\b(resume|cv|projects?|built|everything|shipped|work\w*|hire|hiring|contact|email|student|professional|fresher|employ\w*|job|intern\w*|engineer\w*|developer|experience[ds]?)\b/i.test(text);
 }
 function answerable(text: string): boolean {
   let any = false; factAnswer(text, () => { any = true; });
@@ -191,7 +193,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // the handler carries the visitor into session state from here: after every correction above, never before
   deps.onClassified?.(sorted);
   const decided = certain ?? decided0;
-  const overruled = certain ? (certain === "visitor_intro" ? "a named introduction" : "read through a correction") : (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : null;
+  // "who is he?", "who the hell is he?", "a student or a working professional?" ask about him: the classifier's
+  // about_visitor, accusation or unclear yields unless the word rules find a real accusation, abuse or a private topic
+  const aboutHimQ = /\b(he|him|his|he's|rizwan|syed|this guy|that guy)\b/i.test(last) && !accusation(last) && !abusive(last) && !personal(last) && !lifestyle(last);
+  const overruled = certain ? (certain === "visitor_intro" ? "a named introduction" : "read through a correction") : (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : (decided === "about_visitor" || decided === "accusation" || decided === "unclear") && aboutHimQ ? "asks about him" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : null;
   const kind = overruled && !certain ? "work" : decided;
   // greetings, intros and "who am I" are conversation: the model answers them in its own words with the transcript,
   // and the policy's line is only the fallback when no model can
@@ -213,9 +218,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   let context = contextBlock(nextState(input.state ?? EMPTY_STATE, [], input.shown));
   // a question the word scoring cannot place ("something with retrieval and citations?") still reaches the model with
   // the facts closest to it in meaning, from the index; the tools remain the only way to show anything
+  let hits: Awaited<ReturnType<Retriever["search"]>> = [];
   if (deps.retriever && !input.killModel && !scoreProjects(last).some((x) => x.s > 0) && !clearPick(subject)) {
     const t0 = Date.now();
-    const hits = await deps.retriever.search(last, 4, deps.signal).catch(() => []);
+    hits = await deps.retriever.search(last, 4, deps.signal).catch(() => []);
     if (hits.length) {
       context += `${context ? "\n" : ""}Facts closest to this question (from his write-ups; cite them, don't add to them):\n${hits.map((h) => `- ${h.text}`).join("\n")}`;
       emit({ type: "trace", step: "retrieval", detail: `${hits.length} facts by meaning and keywords (${hits.map((h) => h.project ?? h.kind).join(", ")} · ${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "info" });
@@ -248,7 +254,20 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
 
   let spoke = false, visible = false, offered: string[] = [], fitNote: string | null = null;
   let lastProject: Project | undefined, asked: "resume" | "contact" | undefined, lastKind = "", shownFacts: string[] = subjectProject?.facts ?? [], fitRan = false;
+  // his profile, or the part of it asked for, goes on screen once: a second show_profile for something already there
+  // is swallowed (tool call and panel) unless the message asked to see it again
+  let skipPanel: string | null = null;
+  const askedProfile = /\b(show|open|see|pull up|display|bring up|again)\b/i.test(last) && /\b(profile|work|history|jobs?|experience|education|degree|events?|prizes?|about him)\b/i.test(last);
   const out: Emit = (ev) => {
+    if (ev.type === "tool" && ev.name === "show_profile") {
+      const focus = typeof ev.args.focus === "string" ? ev.args.focus : undefined, key = focus ?? "profile";
+      if ((input.shown.includes(key) || input.shown.includes("profile")) && !askedProfile && !(focus && profileFocus(last) === focus)) {
+        skipPanel = "profile";
+        emit({ type: "trace", step: "harness", detail: `his ${focus ?? "profile"} is already on screen · not shown again`, level: "info" });
+        return;
+      }
+    }
+    if (ev.type === "panel" && skipPanel && ev.panel.kind === skipPanel) { skipPanel = null; return; }
     if (ev.type === "suggest") { offered = ev.options; return; } // merged with context-aware chips in finish()
     if (ev.type === "text") spoke = true;
     if (ev.type === "panel" && ev.panel.id) lastProject = projectById(ev.panel.id);
@@ -314,7 +333,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const fallbackToRouter = (detail: string): RunMeta => {
     emit({ type: "trace", step: "fallback", detail, level: "warn" });
     if (natural) { emit({ type: "text", text: naturalLine() }); emit({ type: "suggest", options: BEHAVIOR[kind].chips }); spoke = true; return finish({ mode: "scope" }); }
-    router(subject, out);
+    router(subject, out, { facts: hits.map((h) => h.text), shown: input.shown });
     return finish({ mode: "router" });
   };
 
@@ -328,13 +347,15 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   if (!deps.models.length) { emit({ type: "trace", step: "model", detail: "no model configured", level: "err" }); return fallbackToRouter(ROUTER); }
 
   const base: ChatMessage[] = [
-    { role: "system", content: SYSTEM + (context ? `\n${context}` : "") + (BEHAVIOR[kind].tone ? `\n${BEHAVIOR[kind].tone}` : "") },
+    { role: "system", content: SYSTEM + (context ? `\n${context}` : "") + (BEHAVIOR[kind].tone ? `\n${BEHAVIOR[kind].tone}` : "") + (input.style && STYLE_TONE[input.style] ? `\n${STYLE_TONE[input.style]}` : "") },
     ...transcript(history),
   ];
 
   // One run, one conversation: if a model fails mid-run, the next model picks up the same messages
   // (tool results included), so the visitor never gets a restarted or second answer.
   const messages = base.map((m) => ({ ...m })) as ChatMessage[];
+  // the transcript already holds the agent's earlier replies: only the steps of this run count toward the limit
+  const priorSteps = base.filter((m) => m.role === "assistant").length;
   const opened = new Set<string>();
   const onScreen = [...new Set([...input.shown, ...(subjectProject ? [subjectProject.id] : [])])].map((id) => projectById(id)).filter((p): p is Project => !!p);
   let looked = false, tools = 0, drops = 0, lastTitle: string | null = subjectProject?.title ?? null, lastFacts: string[] = subjectProject?.facts ?? [], mi = 0;
@@ -360,7 +381,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   for (;;) {
     const model = deps.models[mi];
     try {
-      for (let step = messages.filter((m) => m.role === "assistant").length; step < MAX_STEPS; step++) {
+      for (let step = messages.filter((m) => m.role === "assistant").length - priorSteps; step < MAX_STEPS; step++) {
         let answered = false;
         const s0 = Date.now();
         // the visitor sees the agent reach for a tool the moment the model names it, before the reply is complete
@@ -447,7 +468,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         // facts the tools returned; a sentence it rejects is dropped even when the word check let it through
         if (deps.selfCheck && !natural && kind !== "playful" && gr.parts.filter((p) => p.ok).length >= 3 && !deps.signal.aborted) {
           const t0 = Date.now();
-          const verdicts = await deps.selfCheck(gr.parts.filter((p) => p.ok).map((p) => p.s).join(" "), `${source} ${lastFacts.join(" ")}`, deps.signal);
+          const verdicts = await deps.selfCheck(gr.parts.filter((p) => p.ok).map((p) => p.s).join(" "), `${lastFacts.join(" ")}\n${KNOWLEDGE}\n${source}`, deps.signal);
           const bad = verdicts?.filter((v) => !v.ok) ?? [];
           if (verdicts === null) emit({ type: "trace", step: "self-check", detail: `second reader unavailable (${((Date.now() - t0) / 1000).toFixed(1)}s) · word check stands`, level: "info" });
           // a reader that rejects every sentence of an answer the word check passed is the one being wrong: not trusted
@@ -509,7 +530,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       }
       if (!spoke && !visible) {
         emit({ type: "trace", step: "harness", detail: "model gave no answer → deterministic router (no AI)", level: "warn" });
-        router(subject, out);
+        router(subject, out, { facts: hits.map((h) => h.text), shown: input.shown });
         return finish({ mode: "router" });
       }
       return finish({ mode: "model", model: model.name, ms: Date.now() - t0, tools, fallback: mi > 0 });

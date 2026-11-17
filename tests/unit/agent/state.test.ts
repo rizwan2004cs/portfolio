@@ -48,3 +48,12 @@ describe("fit memory and proactive offers", () => {
     expect(nextOffer({ ...EMPTY_STATE, shown: ["pack", "ccr", "profile"] })).toBeNull();
   });
 });
+
+describe("state · focused profile panels", () => {
+  it("a work-focused profile counts as 'work' on screen, and 'work' survives the sanitiser", async () => {
+    const { nextState, sanitizeState, EMPTY_STATE } = await import("@/agent/state");
+    const n = nextState(EMPTY_STATE, [{ type: "panel", panel: { kind: "profile", id: "work" } }], []);
+    expect(n.shown).toContain("work"); expect(n.shown).not.toContain("profile");
+    expect(sanitizeState({ ...EMPTY_STATE, shown: ["work", "events", "bogus"] }).shown).toEqual(["work", "events"]);
+  });
+});

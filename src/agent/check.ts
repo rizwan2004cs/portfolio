@@ -18,7 +18,7 @@ export function nemotronSelfCheck(key: string | undefined, fetchImpl: typeof fet
         headers: { "content-type": "application/json", Authorization: `Bearer ${key}` },
         body: JSON.stringify({ model: CHECK_MODEL, temperature: 0, max_tokens: 200, chat_template_kwargs: { enable_thinking: false }, messages: [
           { role: "system", content: "You check sentences written about a software engineer against facts from his portfolio. A sentence is supported only if every claim in it (names, numbers, technologies, roles, dates, outcomes) follows from the facts; paraphrase and figures of speech are fine, an added or contradicted detail is not. Reply with JSON only: {\"verdicts\": [{\"i\": <sentence number>, \"supported\": true|false, \"why\": \"<six words>\"}]} with one entry per sentence." },
-          { role: "user", content: `Facts:\n${facts.slice(0, 6000)}\n\nSentences:\n${sentences.map((s, i) => `${i + 1}. ${s}`).join("\n")}` },
+          { role: "user", content: `Facts:\n${facts.slice(0, 14000)}\n\nSentences:\n${sentences.map((s, i) => `${i + 1}. ${s}`).join("\n")}` },
         ] }),
       });
       if (!r.ok) return null;

@@ -28,7 +28,7 @@ export const fitFrom = (requirements: string[]): SessionState["fit"] => {
   const rows = fitRows(requirements);
   return { requirements: rows.map((r) => r.requirement), matched: rows.filter((r) => r.status === "match").map((r) => r.requirement), gaps: rows.filter((r) => r.status !== "match").map((r) => r.requirement) };
 };
-const PANELS = new Set(["profile", "index", "harness", "done:resume", "done:contact"]);
+const PANELS = new Set(["profile", "work", "events", "education", "index", "harness", "done:resume", "done:contact"]);
 const VISITOR_FIELDS = ["name", "company", "role", "hiringFor"] as const;
 const MAX = { list: 20, text: 80, topics: 10 } as const;
 
@@ -64,7 +64,8 @@ export function sanitizeState(s: unknown): SessionState {
 /** The state after a turn: what the turn's events opened, offered and searched, on top of what was there. */
 export function nextState(prev: SessionState, events: AgentEvent[], shown: string[] = [], visitor?: Visitor): SessionState {
   const opened = events.flatMap((e) => (e.type === "tool" && e.name === "open_project" && isProjectId(str(e.args.id)) ? [str(e.args.id)] : []));
-  const panels = events.flatMap((e) => (e.type === "panel" && e.panel.id && isProjectId(e.panel.id) ? [e.panel.id] : e.type === "panel" && PANELS.has(e.panel.kind) ? [e.panel.kind] : []));
+  // a focused profile (work, events, education) counts as shown only for what it shows
+  const panels = events.flatMap((e) => (e.type === "panel" && e.panel.id && isProjectId(e.panel.id) ? [e.panel.id] : e.type === "panel" && e.panel.kind === "profile" ? [e.panel.id && PANELS.has(e.panel.id) ? e.panel.id : "profile"] : e.type === "panel" && PANELS.has(e.panel.kind) ? [e.panel.kind] : []));
   const offered = events.flatMap((e): ("resume" | "contact")[] => (e.type === "approval" ? [e.action] : e.type === "tool" && e.name === "offer_resume" ? ["resume"] : e.type === "tool" && e.name === "offer_contact" ? ["contact"] : []));
   const topics = events.flatMap((e) => (e.type === "tool" && e.name === "search_projects" ? [str(e.args.query)].filter(Boolean) : []));
   const fitReqs = events.flatMap((e) => (e.type === "panel" && e.panel.kind === "fit" && e.panel.id ? [e.panel.id.split("|").map(str).filter(Boolean)] : [])).at(-1);

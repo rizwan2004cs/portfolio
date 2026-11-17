@@ -2,6 +2,7 @@ import { ABUSE_REPLY, ACCUSE_REPLY, abusive, accusation, lifestyle, personal, PE
 import type { Visitor } from "./classify";
 import { outsideAnswer, SITE_AGE_Q, siteAgeAnswer } from "./outside";
 import { toolMentioned } from "./skills";
+import type { Style } from "./types";
 
 /** Images a playful answer may use, so "what's his spirit animal?" gets an answer and the fact check knows the
  *  word is play, not a claim. Each fits something real in his work. */
@@ -93,6 +94,15 @@ export const BEHAVIOR: Record<Kind, Behavior> = {
   unclear: { describe: "A word or two, a symbol, emoji or gibberish that names no project, skill, hiring topic or person, so its intent can't be told", reply: (t) => toolMentioned(t) ?? "Not sure what you mean. Ask about a project, his experience, or paste a job description.", chips: WORK_CHIPS },
 };
 export const KINDS = Object.keys(BEHAVIOR) as Kind[];
+
+/** The reply style the visitor picked in the composer, as one line added to the model's instructions. The sentence
+ *  budget in the system prompt is the default; a chosen style replaces it. Facts, tools and refusals are unchanged. */
+export const STYLE_TONE: Record<Style, string> = {
+  short: "Reply style the visitor chose: SHORT. One or two sentences, the single most useful fact first, no preamble and no closing line. This replaces the sentence budget above.",
+  friendly: "Reply style the visitor chose: FRIENDLY. Warm and conversational, as if talking to a colleague: contractions, a light touch, two to four sentences. Every claim still comes from the facts above.",
+  formal: "Reply style the visitor chose: FORMAL. Measured and precise: no contractions, no exclamation marks, no jokes, complete sentences, three or four of them, written for a hiring committee.",
+  detailed: "Reply style the visitor chose: DETAILED. Up to seven sentences: the direct answer first, then the specifics (names, numbers, dates, stack, team) and which project shows it best. Still plain prose: no lists, no markdown. This replaces the sentence budget above.",
+};
 /** Kinds where a wrong "work" guess lets the model talk about him: on doubt, these win. */
 export const SENSITIVE: Kind[] = ["personal", "abusive", "accusation"];
 

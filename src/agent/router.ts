@@ -64,7 +64,7 @@ export function linksLine(p: Project): string {
 export const DEFAULT_NEXT = ["Everything he’s built", "How does this site work?", "Get resume"];
 
 /** Deterministic answer for any message. Used when models are down, killed, or answer nothing. Never silent. */
-export function router(lastUser: string, emit: Emit): void {
+export function router(lastUser: string, emit: Emit, opts: { facts?: string[]; shown?: readonly string[] } = {}): void {
   const last = lastUser.toLowerCase();
   const re = (r: RegExp) => r.test(last);
   const say = (text: string) => emit({ type: "text", text });
@@ -113,6 +113,13 @@ export function router(lastUser: string, emit: Emit): void {
       : "His superpower: building AI agents that don’t fall over. PACK keeps a seven-agent game running through a four-step model fallback, and CCR cites a source for every claim.");
     call("open_project", { id: "pack" }); call("suggest", { options: ["Internals of PACK", "Why should we hire him?", "Everything he’s built"] }); return;
   }
+  // an in-scope question no rule covers, with no model to reason: the facts closest to it by meaning, said as they are
+  if (opts.facts?.length) {
+    say(`The closest facts on record: ${opts.facts.slice(0, 2).map((f) => f.trim().replace(/\.$/, "")).join(". ")}.`);
+    if (/\b(he|him|his|rizwan)\b/i.test(lastUser) && !opts.shown?.includes("profile")) call("show_profile");
+    call("suggest", { options: DEFAULT_NEXT });
+    return;
+  }
   say("Outside my lane. Closest thing I can show you is everything he’s built.");
   call("suggest", { options: DEFAULT_NEXT });
 }
@@ -127,6 +134,7 @@ export function questionParts(text: string): string[] {
   return parts.length >= 2 && parts.length <= 3 ? parts : [text];
 }
 
+const OPINION = /\bwhy (should|would|do|to) (i|we|you|anyone) (hire|pick|choose)|\bwhy (hire )?him\b|what makes him|stand(s)? out|over other (freshers|candidates|engineers)|\bweak(est|ness(es)?)?\b|\bgaps?\b|\black(s|ing)?\b|improve on|not good at|red flags?/i;
 export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: readonly string[] = [], state?: SessionState): boolean {
   // a pasted job description mentions "years of experience" too, but it wants a fit report, not one line
   if (isJobDescription(lastUser)) return false;
@@ -151,6 +159,9 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
     }
   }
   const last = lastUser.toLowerCase(), re = (r: RegExp) => r.test(last), say = (text: string) => emit({ type: "text", text });
+  // "why hire him", "his weaknesses", "rate his Python": opinions a model argues from the facts in its own words when
+  // one is available; the written lines below are what the router says when none is (loose)
+  if (!loose && OPINION.test(lastUser) && !state?.fit) return false;
   const call = (name: tools.ToolName, args: Record<string, unknown> = {}) => { emit({ type: "tool", name, args }); tools.runTool(name, args, emit); };
   const ranked = scoreProjects(last), best = ranked[0], clear = best.s >= 4 || (best.s >= 2 && ranked[1].s < best.s);
   // greetings, "who am I?", "I'm his friend": the kinds that never need his facts, answered from the one policy table

@@ -140,7 +140,7 @@ export function experienceLine(now = new Date()): string {
   return `He has been full-time at Novulis Consulting since June 2026 (about ${months} month${months === 1 ? "" : "s"}), after a Novulis internship (Mar–May 2026) and a cyber security internship at Supraja Technologies (Jun–Sep 2025).`;
 }
 /** What a recruiter should hear about fit and gaps: strongest evidence first, then what his public work does not show. */
-export const WHY_HIM = "His strongest evidence is PACK (seven LangGraph agents with a four-step model fallback, built in a weekend with one teammate), CCR Compliance Advisor (a crawl of 74,975 regulation sections behind cited answers) and FinBoom (an assistant whose actions wait for the user's confirmation, 129 commits).";
+export const WHY_HIM = "His strongest evidence is PACK (seven LangGraph agents with a four-step model fallback, built in a weekend with one teammate), CCR Compliance Advisor (a crawl of 74,975 regulation sections behind cited answers) and FinBoom (an assistant whose actions wait for the user's confirmation).";
 export const GAPS = "His public work does not show Kubernetes, AWS or systems serving large production traffic; his Azure and Power Platform work is at Novulis, not in public projects.";
 
 /** Roles grouped by organisation, newest first, the way LinkedIn shows them: Novulis is one block with two roles. */

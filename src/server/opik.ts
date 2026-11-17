@@ -35,12 +35,14 @@ export function traceTurn(c: Opik, t: { question: string; turns: string[]; sessi
   const trace = c.trace({ name: "agent-turn", startTime: new Date(), input: { question: t.question, turns: t.turns }, threadId: t.session, metadata: { killed: t.killed, country: t.country }, tags: ["portfolio", ENV] });
   return {
     // each model in the chain gets its own llm span, so a 429 on key 1 and the fallback that answered both show
+    // the wrapper keeps everything else on the client (health, mark): the chain is ordered by them before every turn
     models: (list) => list.map((m) => ({
+      ...m,
       name: m.name,
-      complete: async (messages, signal) => {
+      complete: async (messages, signal, onTool) => {
         const span = trace.span({ name: m.name, type: "llm", input: { messages }, model: m.name.split(" · ")[0], provider: PROVIDER(m.name) });
         try {
-          const out = await m.complete(messages, signal);
+          const out = await m.complete(messages, signal, onTool);
           span.update({ output: { content: out.content ?? null, tool_calls: out.tool_calls ?? [] } }).end();
           return out;
         } catch (e) {

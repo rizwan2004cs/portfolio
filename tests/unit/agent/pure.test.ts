@@ -458,3 +458,12 @@ describe("a toolkit term is attributed through its own pattern", () => {
     expect(misattributedTech("PACK stores its game state in Pinecone.")).toContain("pinecone");
   });
 });
+
+describe("grounding · hyphenated words and temporal glue", () => {
+  it("'mar-may' and 'web-app' are in the facts when their parts are; 'prior' carries no claim", async () => {
+    const { unsupported } = await import("@/agent/grounding");
+    const src = "software engineering intern (r&d) at novulis consulting, mar – may 2026. cyber security intern (web application vapt) at supraja technologies, jun – sep 2025: web application vulnerability assessment";
+    expect(unsupported("Prior to that he interned at Novulis (Mar-May 2026) and at Supraja Technologies (Jun-Sep 2025) doing web-app vulnerability assessment.", src)).toEqual([]);
+    expect(unsupported("He interned at Novulis building Kubernetes-operators and Terraform-modules for Shopify.", src).length).toBeGreaterThan(0);
+  });
+});
