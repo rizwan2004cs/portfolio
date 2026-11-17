@@ -120,10 +120,7 @@ export function mountAgent(shell: HTMLElement): () => void {
   /* ---------- shared state + AG-UI event log ---------- */
   // `session` is the server's snapshot of the conversation (focus, what was shown and offered, who the visitor is):
   // it goes back with every message, so the agent remembers across turns and reloads
-  const S: Record<string, unknown> = { visitor: null, focus: null, model: "online", mode: "agent", style: "default", onScreen: [], shortlist: [], approvals: {}, session: null };
-  // the reply style: a composer control, remembered on this device, sent with every message
-  const STYLES = ["short", "friendly", "formal", "detailed"];
-  let style = STYLES.includes(store("rz_style") ?? "") ? (store("rz_style") as string) : "";
+  const S: Record<string, unknown> = { visitor: null, focus: null, model: "online", mode: "agent", onScreen: [], shortlist: [], approvals: {}, session: null };
   function renderState(changed: string[] = []) {
     const lines = Object.entries(S).map(([k, v]) => `  <span class="k">"${k}"</span>: <span${changed.includes(k) ? ' class="flash"' : ""}>${esc(JSON.stringify(v))}</span>`);
     q("#state").innerHTML = `{\n${lines.join(",\n")}\n}`;
@@ -582,7 +579,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     try { return await stream(text, setNext, think); } finally { think.remove(); } // never leave "working" behind, even on a dropped connection
   }
   async function stream(text: string, setNext: (o: string[]) => void, think: HTMLElement): Promise<Meta> {
-    const res = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ history: trimHistory([...convo, { user: text }].slice(-6)), shown: [...shown], state: S.session, killModel: down, ...(style ? { style } : {}) }) });
+    const res = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ history: trimHistory([...convo, { user: text }].slice(-6)), shown: [...shown], state: S.session, killModel: down }) });
     if (res.status === 429) { think.remove(); await say("You’re going fast. Give it a minute; the buttons below still work."); return { mode: "local" }; }
     if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
     let meta: Meta | null = null, plan: ReturnType<typeof planCard> | null = null, pending: number | null = null, compactNext = false;
@@ -792,15 +789,8 @@ export function mountAgent(shell: HTMLElement): () => void {
   function openMenu(on: boolean) {
     const m = q("#menu"), b = q("#plus"); m.classList.toggle("on", on); b.setAttribute("aria-expanded", String(on));
     if (!on) return;
-    // how answers are written: one row of choices at the top of the menu, the current one marked
-    const styles = `<div class="mlabel">Reply style</div><div class="mstyles" role="group" aria-label="Reply style">${["", ...STYLES].map((v) => `<button type="button" data-style="${v}" aria-pressed="${String(style === v)}">${v ? v[0].toUpperCase() + v.slice(1) : "Default"}</button>`).join("")}</div>`;
-    m.innerHTML = MENU.map((x, i) => (x === "sep" ? '<div class="sep"></div>' : `<button role="menuitem" class="${x[3] || ""}" data-i="${i}">${x[1]}${x[0] === "Kill the model" && down ? "Restore the model" : x[0]}</button>`)).join("") + '<div class="sep"></div>' + styles;
+    m.innerHTML = MENU.map((x, i) => (x === "sep" ? '<div class="sep"></div>' : `<button role="menuitem" class="${x[3] || ""}" data-i="${i}">${x[1]}${x[0] === "Kill the model" && down ? "Restore the model" : x[0]}</button>`)).join("");
     m.querySelectorAll<HTMLButtonElement>("button[data-i]").forEach((x) => (x.onclick = () => { openMenu(false); (MENU[Number(x.dataset.i)] as [string, string, () => void])[2](); }));
-    m.querySelectorAll<HTMLButtonElement>("button[data-style]").forEach((x) => (x.onclick = (e) => {
-      e.stopPropagation();
-      style = x.dataset.style ?? ""; store("rz_style", style); setState({ style: style || "default" }); tr("", "ui", `reply style · ${style || "default"}`);
-      m.querySelectorAll("button[data-style]").forEach((y) => y.setAttribute("aria-pressed", String(y === x)));
-    }));
     q<HTMLButtonElement>("button[data-i]", m).focus();
   }
   const ac = new AbortController(), sig = { signal: ac.signal };
@@ -809,7 +799,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     document.querySelectorAll(".tabpane").forEach((p) => p.classList.toggle("on", p.id === "tp-" + b.dataset.tab));
   }));
   q<HTMLButtonElement>("#plus").onclick = (e) => { e.stopPropagation(); openMenu(!q("#menu").classList.contains("on")); };
-  if (style) setState({ style });
+
   addEventListener("click", (e) => { if (!(e.target as Element).closest?.("#menu")) openMenu(false); }, sig);
   addEventListener("keydown", (e) => {
     if (e.key === "Escape") { openMenu(false); shell.classList.remove("trace-open"); }
