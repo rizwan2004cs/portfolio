@@ -55,7 +55,7 @@ How to answer:
 - To compare projects ("PACK vs FinBoom", "which is more production-ready"), call compare_projects with their ids and write two or three sentences from its rows; never compare from memory.
 - Show, don't just tell: open the most relevant project with open_project (view="architecture" for engineering questions), at most two per answer; list_projects for "what has he built", with ids when they ask for a kind of project ("his AI projects"); show_profile for questions about him, with focus="events" for events or prizes and focus="work" for his jobs; show_harness only for questions about this site itself. Don't re-open anything listed as already on screen.
 - Answer the question that was asked, first. Only a yes/no question ("is he currently working?", "does he know Python?", "is PACK live?") starts with Yes or No, then one sentence of the fact behind it; "how many", "where", "what" questions start with the answer itself. Do not recite his whole record, and add nothing they did not ask about.
-- "His write-up doesn't cover that" is a last resort, and it is wrong whenever a line above answers the question: check Experience, Seniority, Role changes, Gaps, Training models, This agent, the Toolkit and each project's Links first. When the visitor complains ("you are wrong", "this is useless", "that's not what I asked"), own it in one short sentence that starts with "Fair," and ask which answer was off. A dare ("can I break you?") is not a complaint.
+- "His write-up doesn't cover that" is a last resort, and it is wrong whenever a line above answers the question: check Experience, Seniority, Role changes, Gaps, Training models, This agent, the Toolkit and each project's Links first. Only when the visitor says an answer was wrong or useless ("you are wrong", "this is useless", "that's not what I asked") do you own it in one short sentence that starts with "Fair," and ask which answer was off. "hmm", "lol", "so what", "prove it" are not complaints: answer them (for "prove it" or "so what", give the single most concrete fact behind what you last said, or his strongest project). If they turn down a playful image ("not an animal"), give a different kind from the playful list (a chess player, a detective, an orchestra conductor, a circuit breaker) and tie it to a project; never say the write-up doesn't cover it. Ranking questions ("best project", "is he a good fit for a backend role", "rate his Python") get a pick with its reason, or the evidence for and against; never a refusal.
 - Never end a sentence with a colon and never promise a list: say the two or three things in the sentence itself.
 - Sound like a person talking, not a spec sheet: plain words, short sentences, one idea each. No parentheses stuffed with details, no strings of numbers; pick the one detail that makes the point and say it the way you would across a table.
 - Third person ("his", "Rizwan's"). No markdown, no lists, no apologies, no "Would you like…".
@@ -456,7 +456,12 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           if (/\b(my name is nemotron|i(’|')?m nemotron|created by nvidia|nvidia researchers|trained by (openai|google|nvidia|meta)|i am chatgpt|developed by (openai|google|nvidia))\b/i.test(c)) { emit({ type: "trace", step: "output guard", detail: "the model spoke as its vendor · replaced with who built this agent", level: "warn" }); c = "Rizwan built me. I’m the agent on his portfolio, here to answer questions about his work."; }
           if (BAD_OUTPUT.test(msg.content)) { emit({ type: "trace", step: "output guard", detail: "blocked unsafe model output (a secret, the prompt, or a job-seeking claim)", level: "warn" }); c = REFUSAL; }
           // generic model refusals ("I can't comply.") speak in the site's own voice
-          else if (/^(sorry|i(’|')?m sorry|i can(’|')?t|i cannot|i won(’|')?t|i(’|')?m unable)\b/i.test(c) && !isRefusal(c)) { emit({ type: "trace", step: "harness", detail: "normalised a generic refusal", level: "info" }); c = REFUSAL; }
+          // a generic refusal ("I can't rank his projects") to a work question: the next model gets the turn once; a
+          // long one is an answer that merely opens that way and is kept; only a short one becomes the site's line
+          else if (/^(sorry|i(’|')?m sorry|i can(’|')?t|i cannot|i won(’|')?t|i(’|')?m unable)\b/i.test(c) && !isRefusal(c)) {
+            if (kind === "work" && !shrugged && !texts.length && deps.models[mi + 1]) { shrugged = true; throw new ModelError("gave a non-answer"); }
+            if (c.length < 40) { emit({ type: "trace", step: "harness", detail: "normalised a generic refusal", level: "info" }); c = REFUSAL; }
+          }
           if (c) { texts.push(c); answered = true; }
         }
         const calls = msg.tool_calls ?? [];
@@ -557,7 +562,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           if (said.cut) emit({ type: "trace", step: "grounding", detail: `removed ${said.cut} sentence${said.cut > 1 ? "s" : ""} describing something that wasn’t shown`, level: "warn" });
           // a visitor who gave their name is greeted by it, whatever the model chose to say first
           const name = kind === "visitor_intro" ? (sorted.visitor ?? input.state?.visitor)?.name : undefined;
-          const greeting = said.text && name && !said.text.includes(name) ? `Hi ${name}. ${said.text}` : said.text;
+          const greeting = said.text && name && /^[A-Z][a-z]{1,20}$/.test(name) && !/^(Recruiter|Founder|Manager|Hiring|Engineer|Developer|Student|Friend)$/.test(name) && !said.text.includes(name) ? `Hi ${name}. ${said.text.replace(/^(hi|hello|hey)( there)?[,.!]\s*/i, "")}` : said.text;
           if (greeting) out({ type: "text", text: greeting });
         }
         if (spoke) openNamed(gr.text);

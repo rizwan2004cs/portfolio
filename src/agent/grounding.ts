@@ -54,9 +54,10 @@ const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  *  real technologies that don't belong together. When a sentence names projects, every technology it mentions
  *  must appear in at least one of those projects. Returns the misattributed technologies. */
 export function misattributedTech(sentence: string): string[] {
-  const low = sentence.toLowerCase();
+  // a link is where something lives, not a technology claim ("live at finboom-cyan.vercel.app")
+  const low = sentence.toLowerCase().replace(/\b[\w-]+(\.[\w-]+)+(\/\S*)?/g, " ");
   const named = [
-    ...PROJECTS.filter((p) => new RegExp(`\\b${esc(p.title.toLowerCase())}\\b`).test(low) || new RegExp(`\\b${esc(p.id)}\\b`).test(low))
+    ...PROJECTS.filter((p) => new RegExp(`\\b${esc(p.title.toLowerCase())}\\b`).test(low) || (!/^(voice|ngo|kerala|site)$/.test(p.id) && new RegExp(`\\b${esc(p.id)}\\b`).test(low)))
       .map((p) => ({ title: p.title, text: `${p.facts.join(" ")} ${p.stack.join(" ")} ${(p.keywords ?? []).join(" ")} ${p.oneLiner}`.toLowerCase() })),
     // his jobs say nothing about tools, so "Azure at Novulis" can't be grounded
     ...EXPERIENCE.filter((x) => low.includes(x.title.toLowerCase())).map((x) => ({ title: x.title, text: x.body.toLowerCase() })),
@@ -89,7 +90,7 @@ export function roleBleed(sentence: string): string[] {
   const words = [...new Set((low.match(/[a-z][a-z0-9-]{4,}/g) ?? []).filter((w) => !STOP.has(w)))];
   // one borrowed word ("completed", "remote") is ordinary language; two or more is another role's duties
   const borrowed = words.filter((w) => !own.includes(stem(w)) && others.includes(stem(w)));
-  return borrowed.length >= 2 ? borrowed : [];
+  return borrowed.length >= 3 ? borrowed : [];
 }
 
 // an achievement claim: "won", "prize", "award", "placed second". "wins", "winning" and a bare "placed" are ordinary words
