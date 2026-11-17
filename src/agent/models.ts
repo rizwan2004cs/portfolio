@@ -137,9 +137,11 @@ export function openRouterModel(key: string, fetchImpl: typeof fetch = fetch): M
 export function modelChain(groqKeys: string[], geminiKey: string | undefined, fetchImpl: typeof fetch = fetch, openRouterKey?: string, nvidiaKey?: string): ModelClient[] {
   return [
     ...MODEL_IDS.flatMap((id) => groqKeys.map((k, i) => groqModel(id, k, fetchImpl, i + 1, groqKeys.length))),
-    ...(nvidiaKey ? NVIDIA_MODELS.map((id) => nvidiaModel(id, nvidiaKey, fetchImpl)) : []),
+    // the 550B model answers in 8 to 15 seconds: it is the last model tried, after the fast ones on every provider
+    ...(nvidiaKey ? NVIDIA_MODELS.slice(0, 2).map((id) => nvidiaModel(id, nvidiaKey, fetchImpl)) : []),
     ...(geminiKey ? [geminiModel(geminiKey, fetchImpl)] : []),
     ...(openRouterKey ? [openRouterModel(openRouterKey, fetchImpl)] : []),
+    ...(nvidiaKey ? NVIDIA_MODELS.slice(2).map((id) => nvidiaModel(id, nvidiaKey, fetchImpl)) : []),
   ];
 }
 

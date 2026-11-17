@@ -467,3 +467,12 @@ describe("grounding · hyphenated words and temporal glue", () => {
     expect(unsupported("He interned at Novulis building Kubernetes-operators and Terraform-modules for Shopify.", src).length).toBeGreaterThan(0);
   });
 });
+
+describe("grounding · paraphrase is not a lie", () => {
+  it("a true sentence in the model's own words survives two unfamiliar words", async () => {
+    const { unsupported } = await import("@/agent/grounding");
+    const src = "associate software engineer (r&d) at novulis consulting since june 2026, after an r&d internship (mar – may 2026). cyber security intern at supraja technologies, jun – sep 2025.";
+    expect(unsupported("He is a working professional who completed two internships before joining Novulis Consulting.", src)).toEqual([]);
+    expect(unsupported("He architected Kubernetes clusters, Terraform pipelines and Kafka streams for Shopify.", src).length).toBeGreaterThan(0);
+  });
+});
