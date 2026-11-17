@@ -460,7 +460,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
 
   // keys still resting from an earlier rate limit are skipped without a call: one quiet line, not a red row each;
   // a mid-answer handoff is announced for the model that actually takes over
-  let resting: string[] = [], handoff = false, shrugged = false;
+  let resting: string[] = [], handoff = false;
   const flushSkips = (next: string) => {
     if (resting.length) emit({ type: "trace", step: "model", detail: `${resting.join(", ")} still resting after rate limits · skipped → ${next}`, level: "info" });
     if (handoff && next !== "deterministic router") emit({ type: "trace", step: "handoff", detail: `${next} picks up mid-answer, with the tool results so far`, level: "warn" });
@@ -484,7 +484,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         const shrug = /^(his write-?up (only covers his work|doesn(’|')t cover that)( directly)?\.?|outside my lane\.?( i only (cover|show) rizwan(’|')s work\.?)?|my name is nemotron\b.*|i am (a large language model|created by|trained by)\b.*)$/i.test((msg.content ?? "").trim())
           // the agent is not Rizwan: "I built this agent myself", "my projects", "my resume" is the model speaking as him
           || /\bI (built|made|created) (this|the) (agent|site|portfolio)|\bmy (projects?|resume|portfolio site|facts|work at|internship|cgpa|degree)\b/i.test(msg.content ?? "");
-        if (shrug && !realCall && !texts.length && deps.models[mi + 1] && kind === "work" && Date.now() - t0 < 9_000) { shrugged = true; throw new ModelError("gave a non-answer"); }
+        if (shrug && !realCall && !texts.length && deps.models[mi + 1] && kind === "work" && Date.now() - t0 < 9_000) { throw new ModelError("gave a non-answer"); }
         // out of time with only shrugs: the written answer from his record says more than another shrug
         if (shrug && !realCall && !texts.length && kind === "work" && notes && factual.length && /^(his write-?up|outside my lane)/i.test((msg.content ?? "").trim())) { emit({ type: "trace", step: "harness", detail: "every model shrugged · the written answer from his record", level: "warn" }); factual.forEach(out); return finish({ mode: "facts" }); }
         flushSkips(model.name); // this model answered: say which resting keys were passed over to reach it
@@ -519,7 +519,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           // long one is an answer that merely opens that way and is kept; only a short one becomes the site's line
           else if (/^(sorry|i(’|')?m sorry|i can(’|')?t|i cannot|i won(’|')?t|i(’|')?m unable)\b/i.test(c) && !isRefusal(c)) {
             // an apology instead of an answer goes to the next model, again and again, until the time budget says stop
-            if (kind === "work" && !texts.length && c.length < 140 && deps.models[mi + 1] && Date.now() - t0 < 9_000) { shrugged = true; throw new ModelError("gave a non-answer"); }
+            if (kind === "work" && !texts.length && c.length < 140 && deps.models[mi + 1] && Date.now() - t0 < 9_000) { throw new ModelError("gave a non-answer"); }
             if (c.length < 40) { emit({ type: "trace", step: "harness", detail: "normalised a generic refusal", level: "info" }); c = REFUSAL; }
           }
           if (kind === "small_talk" && c) { const two = c.split(/(?<=[.!?])\s+/).slice(0, 2).join(" "); if (two.length < c.length) { emit({ type: "trace", step: "harness", detail: "small talk kept to two sentences", level: "info" }); c = two; } }
