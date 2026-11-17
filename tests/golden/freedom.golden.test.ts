@@ -116,3 +116,11 @@ describe("golden · written facts are the model's notes, not the reply", () => {
     expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/Novulis/);
   });
 });
+
+describe("golden · two words that name his employer are a question, not noise", () => {
+  it("'before novulis' called unclear by the classifier still reaches the model", async () => {
+    const m = scripted("a", [say("Before Novulis he was a Cyber Security intern at Supraja Technologies, June to September 2025.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["before novulis"] }, [m], undefined, undefined, kindIs("unclear", 0.9));
+    expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/Supraja/);
+  });
+});

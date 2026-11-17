@@ -114,7 +114,7 @@ export function narrated(text: string, shownNow: string): { text: string; cut: n
 /** Whether the router has something to say for a message as it stands: a fact answer, a project it names, or a skill. */
 /** Does the message name a project, a skill, a topic or a thing the site offers? A greeting or "not animal" does not. */
 function namesSomething(text: string): boolean {
-  return clearPick(text) !== undefined || skillAsked(text) !== undefined || topicsIn(text).length > 0 || /\b(resume|cv|projects?|built|everything|shipped|work\w*|hire|hiring|contact|email|student|professional|fresher|employ\w*|job|intern\w*|engineer\w*|developer|experience[ds]?)\b/i.test(text);
+  return clearPick(text) !== undefined || skillAsked(text) !== undefined || topicsIn(text).length > 0 || /\b(resume|cv|projects?|built|everything|shipped|work\w*|hire|hiring|contact|email|student|professional|fresher|employ\w*|job|intern\w*|engineer\w*|developer|experience[ds]?|novulis|supraja|nbkrist|college|degree|before|earlier|previous\w*)\b/i.test(text);
 }
 function answerable(text: string): boolean {
   let any = false; factAnswer(text, () => { any = true; });
