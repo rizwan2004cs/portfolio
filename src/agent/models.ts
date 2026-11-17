@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { TOOL_DEFS } from "./tools";
 import { ModelError, type AssistantMessage, type ChatMessage, type ModelClient, type Screen, type SlotHealth } from "./types";
 
@@ -18,6 +19,29 @@ const cooling = (f: typeof fetch) => COOL.get(f) ?? (COOL.set(f, new Map()), COO
 const HEALTH = new WeakMap<typeof fetch, Map<string, { fails: number; lastOk: number }>>();
 const healthOf = (f: typeof fetch, slot: string) => { const m = HEALTH.get(f) ?? (HEALTH.set(f, new Map()), HEALTH.get(f)!); return m.get(slot) ?? (m.set(slot, { fails: 0, lastOk: 0 }), m.get(slot)!); };
 
+/** A slot's health as other instances need it: resting until when, recent failures, last success (epoch ms). */
+export interface SlotState { restUntil: number; fails: number; lastOk: number }
+// every slot this instance has built, by a hash of its endpoint, model and key (the key itself never leaves memory)
+const SLOTS = new Map<string, { slot: string; f: typeof fetch }>();
+let sink: ((id: string, s: SlotState) => void) | null = null;
+/** Where health changes go (the shared board in production); null in tests. */
+export const setHealthSink = (f: ((id: string, s: SlotState) => void) | null) => { sink = f; };
+const slotId = (slot: string) => createHash("sha256").update(slot).digest("base64url").slice(0, 22);
+const stateOf = (f: typeof fetch, slot: string): SlotState => ({ restUntil: cooling(f).get(slot) ?? 0, fails: healthOf(f, slot).fails, lastOk: healthOf(f, slot).lastOk });
+/** Folds what other instances saw into this one: the later rest wins, and the side that succeeded more recently
+ *  decides the failure count. Unknown slots are ignored. */
+export function applyHealth(rows: Record<string, SlotState>): number {
+  let n = 0;
+  for (const [id, r] of Object.entries(rows)) {
+    const known = SLOTS.get(id); if (!known) continue;
+    const { slot, f } = known, h = healthOf(f, slot);
+    if (r.restUntil > (cooling(f).get(slot) ?? 0)) cooling(f).set(slot, r.restUntil);
+    if (r.lastOk > h.lastOk) { h.lastOk = r.lastOk; h.fails = r.fails; } else h.fails = Math.max(h.fails, r.fails);
+    n++;
+  }
+  return n;
+}
+
 /** The chain in order of availability: resting slots last; otherwise fewer recent failures first, then the slot that
  *  answered most recently; ties keep the configured order (quality preference). A failure is forgotten after ten minutes. */
 export function orderByHealth<T extends ModelClient>(models: T[], now = Date.now()): T[] {
@@ -28,11 +52,14 @@ export function orderByHealth<T extends ModelClient>(models: T[], now = Date.now
 /** Any OpenAI-compatible chat endpoint with our closed-world tools. */
 function chatModel(name: string, url: string, key: string, body: Record<string, unknown>, fetchImpl: typeof fetch): ModelClient {
   const slot = `${url}|${String(body.model)}|${key}`;
+  const id = slotId(slot);
+  SLOTS.set(id, { slot, f: fetchImpl });
   const h = () => healthOf(fetchImpl, slot);
+  const told = () => sink?.(id, stateOf(fetchImpl, slot));
   return {
     name,
     health: (): SlotHealth => ({ resting: (cooling(fetchImpl).get(slot) ?? 0) > Date.now(), fails: h().fails, lastOk: h().lastOk }),
-    mark: (ok) => { if (ok) { h().fails = 0; h().lastOk = Date.now(); } else h().fails++; },
+    mark: (ok) => { if (ok) { h().fails = 0; h().lastOk = Date.now(); } else h().fails++; told(); },
     async complete(messages: ChatMessage[], signal: AbortSignal, onTool?: (name: string) => void): Promise<AssistantMessage> {
       const until = cooling(fetchImpl).get(slot) ?? 0;
       if (until > Date.now()) throw new ModelError(`HTTP 429 · resting ${Math.ceil((until - Date.now()) / 1000)}s`, 429);
@@ -48,7 +75,7 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
       catch (e) {
         // a key that hangs is likely overloaded: rest it for a minute so the next visitor isn't stuck behind it
         if (e instanceof Error && e.name === "TimeoutError") cooling(fetchImpl).set(slot, Date.now() + 60_000);
-        h().fails++;
+        h().fails++; told();
         throw e;
       }
       // a malformed tool call comes back as 400 tool_use_failed: a one-off generation glitch, so retry once
@@ -57,10 +84,13 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
         const wait = Number(r.headers.get("retry-after"));
         cooling(fetchImpl).set(slot, Date.now() + Math.min(Number.isFinite(wait) && wait > 0 ? wait : 20, 300) * 1000);
       }
-      if (!r.ok) { h().fails++; throw new ModelError(`HTTP ${r.status}`, r.status); }
+      if (!r.ok) { h().fails++; told(); throw new ModelError(`HTTP ${r.status}`, r.status); }
       const msg = (r.headers.get("content-type") ?? "").includes("text/event-stream") ? await readStream(r, onTool) : (await r.json() as { choices?: { message?: AssistantMessage }[] }).choices?.[0]?.message;
-      if (!msg) { h().fails++; throw new ModelError("empty choice"); }
+      if (!msg) { h().fails++; told(); throw new ModelError("empty choice"); }
+      // a success is shared only when it changes something: a slot that was failing is healthy again
+      const wasFailing = h().fails > 0;
       h().fails = 0; h().lastOk = Date.now();
+      if (wasFailing) told();
       return msg;
     },
   };

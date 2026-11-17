@@ -17,6 +17,8 @@ import { waitUntil } from "@vercel/functions";
 import * as Sentry from "@sentry/nextjs";
 import { neonTurnLog, type TurnLogger } from "@/server/log";
 import { opikClient, traceTurn, type TurnTrace } from "@/server/opik";
+import { neonHealthBoard, type HealthBoard } from "@/server/health";
+import { applyHealth, setHealthSink } from "./models";
 import { runAgent, SYSTEM } from "./run";
 import { ALL_FACTS_SOURCE, TOOL_DEFS, toolContext } from "./tools";
 import type { AgentEvent, Exchange, ModelClient, RunMeta, Screen } from "./types";
@@ -75,6 +77,8 @@ export interface HandlerDeps {
   now: () => number;
   /** stores each finished turn (Neon in production); absent locally and in tests */
   log?: TurnLogger;
+  /** which model keys are resting or failing, shared across instances (Neon in production) */
+  health?: HealthBoard;
   /** opens an Opik trace for one turn (when OPIK_API_KEY is set) */
   tracer?: (t: { question: string; turns: string[]; session?: string; killed: boolean; country?: string }) => TurnTrace | undefined;
 }
@@ -91,6 +95,7 @@ export function defaultDeps(env = process.env): HandlerDeps {
     cache: makeCache(),
     now: () => Date.now(),
     log: neonTurnLog(env.DATABASE_URL),
+    health: neonHealthBoard(env.DATABASE_URL),
     tracer: (t) => { const c = opikClient(env); return c ? traceTurn(c, t) : undefined; },
   };
 }
@@ -143,6 +148,8 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
   const state = sanitizeState(parsed.state);
   const shown = [...new Set([...state.shown, ...parsed.shown.map(String)])].filter((s) => isProjectId(s) || SHOWN_OK.has(s)).slice(0, LIMITS.shown);
   const now = deps.now();
+  // what other instances know about the model keys is read while the limits are checked, not after
+  const sharedHealth = deps.health?.load() ?? Promise.resolve(null);
   const spent = await spend(deps.limiter, ip, now);
   if (spent.limited) return new Response("slow down", { status: 429, headers: { "Retry-After": "60" } });
 
@@ -178,6 +185,10 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           const record = (ev: AgentEvent) => { if (ev.type !== "trace" && ev.type !== "state") recorded.push(ev); emit(ev); };
           const budgetOut = spent.budgetOut;
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
+          // fold in what other instances learned about the keys, and share what this turn learns
+          const shared = await sharedHealth;
+          if (shared) { const n = applyHealth(shared); if (n) emit({ type: "trace", step: "model", detail: `key health shared by other instances · ${n} slot${n === 1 ? "" : "s"} known`, level: "info" }); }
+          if (deps.health) { const board = deps.health; setHealthSink((id, st) => waitUntil(board.save(id, st))); }
           meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut, style: parsed.style }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, retriever: deps.retriever, selfCheck: deps.selfCheck, signal: ctl.signal });
           if (!spent.shared && !budgetOut && meta.mode !== "model" && meta.mode !== "partial") budget.runs--; // local fallback only: a turn that touched no model is given back
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
