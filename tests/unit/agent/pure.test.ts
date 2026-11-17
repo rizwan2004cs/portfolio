@@ -196,7 +196,7 @@ describe("router (deterministic fallback)", () => {
     expect(text("Does he know REST APIs")).toMatch(/^REST APIs is in his toolkit, but none of his public projects shows it yet\.$/);
     expect(text("does he know node.js?")).toMatch(/shows in Wanderlust/);
     expect(text("does he know Azure Functions?")).toMatch(/Novulis Consulting/);
-    expect(text("Why should I hire him over other freshers?")).toMatch(/^His agents keep working/);
+    expect(text("Why should I hire him over other freshers?")).toMatch(/^His stuff doesn’t fall over/);
     expect(text("Is he open to work?")).not.toMatch(/\bopen to (work|roles)\b|looking/i);
     expect(text("Did he build PACK alone?")).toMatch(/Team of two with Mahesh Babu Kona/);
     expect(text("Where does he work?")).toBe("Associate Software Engineer (R&D) at Novulis Consulting, Jun 2026 – now: Full-time in Bengaluru: researching emerging technology, building prototypes and proofs of concept, and full-stack product work on Azure (App Service, Functions, Azure OpenAI, DevOps, Blob Storage and Azure SQL) and Power Platform.");
