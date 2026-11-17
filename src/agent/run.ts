@@ -253,7 +253,9 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // list) or no model can be asked; otherwise it becomes the model's notes, and the model answers the question asked
   const EXACT = new Set(["offer_resume", "offer_contact", "match_role", "compare_projects", "switch_mode", "ask_visitor", "list_projects", "show_harness"]);
   const exact = isFact && (input.killModel || !deps.models.length || /\b(resume|cv|contact|email|linkedin|phone)\b/i.test(last) || factual.some((e) => e.type === "approval" || (e.type === "tool" && EXACT.has(e.name))));
-  const notes = isFact && !exact ? factual.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ") : "";
+  const notes = isFact && !exact ? factual.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ")
+    // "what's he weak at?": his gaps are on record, and a small model otherwise reads the question as personal
+    : !isFact && !natural && /\bweak(est|ness(es)?)?\b|\bgaps?\b|\black(s|ing)?\b|improve on|not good at|red flags?|bad at|struggle/i.test(last) && !input.state?.fit ? `${GAPS} Say this as his honest gaps in public work, not as a refusal.` : "";
   const g = input.killModel ? { ok: true, note: "skipped · model offline, router can't be injected" }
     : exact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await guarding!;
   emit({ type: "trace", step: "guard", detail: g.note, level: g.ok ? "ok" : "warn" });
@@ -344,7 +346,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const fallbackToRouter = (detail: string): RunMeta => {
     emit({ type: "trace", step: "fallback", detail, level: "warn" });
     // the written line the model was given as notes is the answer when no model could say it better
-    if (notes) { factual.forEach(out); return finish({ mode: "facts" }); }
+    if (notes && factual.length) { factual.forEach(out); return finish({ mode: "facts" }); }
     if (natural) { emit({ type: "text", text: naturalLine() }); emit({ type: "suggest", options: BEHAVIOR[kind].chips }); spoke = true; return finish({ mode: "scope" }); }
     router(subject, out, { facts: hits.map((h) => h.text), shown: input.shown });
     return finish({ mode: "router" });
@@ -488,7 +490,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         if (deps.selfCheck && !natural && kind !== "playful" && gr.parts.filter((p) => p.ok).length >= 3 && !deps.signal.aborted) {
           const t0 = Date.now();
           const verdicts = await deps.selfCheck(gr.parts.filter((p) => p.ok).map((p) => p.s).join(" "), `${lastFacts.join(" ")}\n${KNOWLEDGE}\n${source}`, deps.signal);
-          const bad = verdicts?.filter((v) => !v.ok) ?? [];
+          // "Yes." and "No." are answers, not claims a reader can find missing from the facts
+          const bad = verdicts?.filter((v) => !v.ok && v.sentence.trim().split(/\s+/).length >= 3) ?? [];
           if (verdicts === null) emit({ type: "trace", step: "self-check", detail: `second reader unavailable (${((Date.now() - t0) / 1000).toFixed(1)}s) · word check stands`, level: "info" });
           // a reader that rejects every sentence of an answer the word check passed is the one being wrong: not trusted
           else if (bad.length === verdicts.length) emit({ type: "trace", step: "self-check", detail: `a second model rejected all ${verdicts.length} sentences the word check passed · not trusted, word check stands (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "warn" });
@@ -515,7 +518,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           } else if (verdicts.every((v) => v === null)) emit({ type: "trace", step: "grounding", detail: `check by meaning unavailable (${took}) · word check stands`, level: "info" });
           else { const v = verdicts.find((x) => x && !x.ok)!; emit({ type: "trace", step: "grounding", detail: `read against his facts by meaning: not supported (${v.why} · ${took})`, level: "info" }); }
         }
-        if (gr.dropped.length) emit({ type: "trace", step: "grounding", detail: `removed ${gr.dropped.length} of ${gr.total} sentence${gr.total > 1 ? "s" : ""}: not in his facts (${gr.dropped.flat().slice(0, 4).map((w) => `“${w}”`).join(", ")})`, level: "warn" });
+        if (gr.dropped.length) emit({ type: "trace", step: "grounding", detail: `removed ${gr.dropped.length} of ${gr.total} sentence${gr.total > 1 ? "s" : ""}: not in his facts (${gr.dropped.flat().slice(0, 4).map((w) => `“${w}”`).join(", ")})${gr.parts.filter((p) => !p.ok && p.check).slice(0, 2).map((p) => ` · ${p.check} check: “${p.s.slice(0, 70)}”`).join("")}`, level: "warn" });
         else emit({ type: "trace", step: "grounding", detail: gr.total > 1 ? `all ${gr.total} sentences checked against his facts · verified` : "the sentence was checked against his facts · verified", level: "ok" });
         // an answer that was entirely invented, with nothing on screen, is better replaced by the router
         // "not covered" is only precise when a project is named; otherwise finish() describes what is on screen
@@ -548,7 +551,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         return finish({ mode: "router" });
       }
       if (!spoke && !visible) {
-        if (notes) { emit({ type: "trace", step: "harness", detail: "model gave no answer → the written answer from his record", level: "warn" }); factual.forEach(out); return finish({ mode: "facts" }); }
+        if (notes && factual.length) { emit({ type: "trace", step: "harness", detail: "model gave no answer → the written answer from his record", level: "warn" }); factual.forEach(out); return finish({ mode: "facts" }); }
         emit({ type: "trace", step: "harness", detail: "model gave no answer → deterministic router (no AI)", level: "warn" });
         router(subject, out, { facts: hits.map((h) => h.text), shown: input.shown });
         return finish({ mode: "router" });
