@@ -144,3 +144,46 @@ describe("golden · a dare to break the agent is the game, not abuse", () => {
     expect(r.text).toMatch(/keep it to his work/);
   });
 });
+
+describe("golden · what the 162-turn battery found", () => {
+  it("a model that shrugs at a work question hands the turn to the next model once", async () => {
+    const weak = scripted("nemotron", [say("His write-up doesn't cover that.", call("suggest", { options: ["x"] }))]);
+    const next = scripted("gemini", [say("About five months full-time at Novulis Consulting, after two internships.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["What does he care about when he builds?"] }, [weak, next]);
+    expect(r.meta.model).toBe("gemini"); expect(r.of("trace").some((t) => /gave a non-answer/.test(t.detail))).toBe(true);
+  });
+  it("a model that recites its vendor is replaced by who built the agent", async () => {
+    const m = scripted("a", [say("My name is Nemotron. I am created by NVIDIA researchers.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["who built you ?"] }, [m]);
+    expect(r.text).toMatch(/Rizwan built me/); expect(r.text).not.toMatch(/Nemotron|NVIDIA/);
+  });
+  it("'kills the model' and 'can i break you' get the invitation whatever the classifier said", async () => {
+    for (const q of ["can i break you", "try to break it", "i said i'm gonna kill the model ehre"]) {
+      const r = await turn({ turns: [q] }, [scripted("never", [new Error("must not be called")])], undefined, undefined, kindIs("work"));
+      expect(r.text, q).toMatch(/^Go for it/);
+    }
+    const real = await turn({ turns: ["what happens if the model dies"] }, [scripted("a", [say("The next model in the chain answers.", call("suggest", { options: ["x"] }))])], undefined, undefined, kindIs("work"));
+    expect(real.text).not.toMatch(/^Go for it/);
+  });
+  it("'so what', 'prove it', 'you are wrong' reach the model; 'hmm' is small talk", async () => {
+    for (const q of ["so what", "prove it", "you are wrong", "this is useless"]) {
+      const m = scripted("a", [say("Fair. Which answer was off?", call("suggest", { options: ["x"] }))]);
+      const r = await turn({ turns: [q] }, [m], undefined, undefined, kindIs("unclear", 0.9));
+      expect(r.meta.mode, q).toBe("model");
+    }
+    const m = scripted("a", [say("Take your time.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["hmm"] }, [m], undefined, undefined, kindIs("unclear", 0.9));
+    expect(r.meta.mode).toBe("model"); expect(String(m.calls[0][0].content)).toMatch(/greeting, thanks/);
+  });
+  it("'show me something cool' called off-topic is a request for his work", async () => {
+    const m = scripted("a", [say("PACK: seven agents play Werewolf.", call("open_project", { id: "pack" }), call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["show me something cool"] }, [m], undefined, undefined, kindIs("off_topic"));
+    expect(r.meta.mode).toBe("model");
+  });
+  it("the model knows he has not trained models and where each project lives", async () => {
+    const m = scripted("a", [say("No.", call("suggest", { options: ["x"] }))]);
+    await turn({ turns: ["What does he care about when he builds?"] }, [m]);
+    const sys = String(m.calls[0][0].content);
+    expect(sys).toMatch(/has not trained or fine-tuned models/); expect(sys).toMatch(/Links: /); expect(sys).toMatch(/This agent: Rizwan built it himself, and this portfolio site/);
+  });
+});
