@@ -213,7 +213,8 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
         const row = { session: parsed.threadId, turn: history.length, question: turns.at(-1)!, events: seen, meta, ms: deps.now() - now, killed: parsed.killModel, country, error };
         // a reply that ran without an error can still be a bad one: those are reported as warnings, with the question,
         // the reply and the trace, so a weak answer is seen without a visitor having to send a screenshot
-        const weak = weakReply(turns.at(-1)!, seen, meta, row.ms, parsed.killModel);
+        // the nightly battery and the conversation replay mark their requests: their weak replies are in their own report
+        const weak = req.headers.get("x-agent-eval") ? null : weakReply(turns.at(-1)!, seen, meta, row.ms, parsed.killModel);
         if (weak) Sentry.captureMessage(`agent weak reply: ${weak}`, { level: "warning", tags: { reason: weak, mode: meta?.mode ?? "none" }, extra: { question: turns.at(-1)!.slice(0, 500), reply: seen.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ").slice(0, 800), trace: seen.filter((e) => e.type === "trace").map((e) => (e.type === "trace" ? `${e.step}: ${e.detail}` : "")).slice(0, 30), ms: row.ms, turn: history.length } });
         if (deps.log) waitUntil(deps.log(row).catch((e) => console.error("turn log failed", e instanceof Error ? e.message : e)));
         if (tt) waitUntil(tt.end({ meta, events: seen, error }).catch((e) => console.error("opik trace failed", e instanceof Error ? e.message : e)));
