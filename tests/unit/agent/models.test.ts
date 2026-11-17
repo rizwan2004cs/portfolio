@@ -92,7 +92,7 @@ describe("nvidia fallback", () => {
     let body: Record<string, unknown> = {}, auth = "", url = "";
     const fake = (async (u: string, init: RequestInit) => { url = u; auth = String((init.headers as Record<string, string>).Authorization); body = JSON.parse(String(init.body)); return reply("ok"); }) as unknown as typeof fetch;
     const chain = modelChain(["k1"], "g", fake, "or", "nv");
-    expect(chain.map((m) => m.name)).toEqual(["gpt-oss-120b", "gpt-oss-20b", "nemotron-3.5-lightning-30b-a3b", "nemotron-3.5-super-vl-120b-a12b", "nemotron-3-ultra-550b-a55b", "gemini-2.5-flash", "openrouter · free models"]);
+    expect(chain.map((m) => m.name)).toEqual(["gpt-oss-120b", "gpt-oss-20b", "nemotron-3.5-lightning-30b-a3b", "nemotron-3.5-super-vl-120b-a12b", "gemini-2.5-flash", "openrouter · free models", "nemotron-3-ultra-550b-a55b"]);
     await chain[2].complete([], new AbortController().signal);
     expect(url).toBe("https://integrate.api.nvidia.com/v1/chat/completions"); expect(auth).toBe("Bearer nv");
     expect(body.model).toBe("nvidia/nemotron-3.5-lightning-30b-a3b"); expect(body.chat_template_kwargs).toEqual({ enable_thinking: false }); expect(body.tools).toBeTruthy();

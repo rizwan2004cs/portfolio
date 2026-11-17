@@ -22,7 +22,7 @@ export function unsupported(sentence: string, src: string): string[] {
   const month = (w: string) => /^(january|february|march|april|june|july|august|september|october|november|december)$/.test(w) && src.includes(w.slice(0, 3));
   const known = (w: string) => src.includes(stem(w)) || month(w) || (w.includes("-") && w.split("-").filter((x) => x.length >= 3).every((x) => src.includes(stem(x))));
   const miss = words.filter((w) => !known(w));
-  return miss.length >= 2 && miss.length / words.length > 0.3 ? miss : [];
+  return miss.length >= 3 && miss.length / words.length > 0.5 ? miss : [];
 }
 
 const NOT_NAMES = new Set("He His Him The A An It Its This That These Those At In On For With And But So Yes No Also Rizwan Rizwan’s Rizwan's Syed Mohammad".split(" "));
@@ -157,6 +157,8 @@ export function groundAnswer(answer: string, source: string, question: string, t
     const base = afterRefusal ? wide : src, miss = opts.loose ? [] : unsupported(s, base);
     const words = miss.length > 0;
     if (!miss.length) miss.push(...misanchored(s, base), ...misattributed(s, base), ...misattributedTech(s), ...roleBleed(s));
+    // whether he is looking for a job is never in the facts, however few words the claim uses
+    if (!miss.length && /\b(looking for|seeking|searching for|open to|available for|in the market for|actively (looking|interviewing))\b[^.]{0,40}\b(jobs?|roles?|work|opportunit\w*|positions?|offers?|openings?)\b/i.test(s)) miss.push("job-seeking claim");
     // puffery ("routinely", "extensive experience") is never in the write-ups
     const puff = s.match(/\b(routinely|extensive(ly)?|expert(ise)?|years of|seasoned|mastery|deep experience|similar stacks|proven track record|battle.tested|production.(ready|grade)|in production|at scale|enterprise.grade|several production|deep (prompt|knowledge|expertise|understanding)|most (freshers|candidates|engineers|graduates|people)|unlike (most|other)|few (freshers|candidates|engineers))\b/i);
     const puffed = !miss.length && !!puff;
