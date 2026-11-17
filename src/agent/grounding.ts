@@ -48,7 +48,8 @@ export function misanchored(sentence: string, src: string): string[] {
 
 // every technology the site mentions, longest first so "Supabase Realtime" wins over "Supabase"
 const TECH = [...new Set([...MARQUEE_A, ...MARQUEE_B, ...TOOLKIT.flatMap(([, l]) => l), ...PROJECTS.flatMap((p) => [...p.stack, ...(p.keywords ?? [])])].map((t) => t.toLowerCase()))]
-  .filter((t) => t.length > 2).sort((a, b) => b.length - a.length);
+  // one-word terms that are also plain English ("its own voice", "search for") are not technology claims on their own
+  .filter((t) => t.length > 2 && !/^(voice|agents?|search|chat|auth|realtime|mobile|web|cloud|data|vision|speech)$/.test(t)).sort((a, b) => b.length - a.length);
 const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** Reasoning across projects can mix them up: "CCR and FinBoom use FastAPI and Azure" names real projects and
  *  real technologies that don't belong together. When a sentence names projects, every technology it mentions

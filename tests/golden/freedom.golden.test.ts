@@ -187,3 +187,16 @@ describe("golden · what the 162-turn battery found", () => {
     expect(sys).toMatch(/has not trained or fine-tuned models/); expect(sys).toMatch(/Links: /); expect(sys).toMatch(/This agent: Rizwan built it himself, and this portfolio site/);
   });
 });
+
+describe("golden · the agent is never Rizwan, and answers fit the question", () => {
+  it("'I built this agent myself' from a model is replaced: the agent speaks as the agent", async () => {
+    const r = await turn({ turns: ["who built you ?"] }, [scripted("a", [say("I built this agent myself, and I also built this portfolio site with it.", call("suggest", { options: ["x"] }))])]);
+    expect(r.text).toMatch(/^Rizwan built me/);
+  });
+  it("a what-question does not start with Yes; small talk stays at two sentences", async () => {
+    const r = await turn({ turns: ["what's his cgpa"] }, [scripted("a", [say("Yes, his CGPA is 9.09.", call("suggest", { options: ["x"] }))])], undefined, undefined, kindIs("work"));
+    expect(r.text).toMatch(/^His CGPA is 9\.09/);
+    const t = await turn({ turns: ["how are you ?"] }, [scripted("a", [say("Doing well, thanks! Want to see PACK? I can also show his resume. Or match a role.", call("suggest", { options: ["x"] }))])], undefined, undefined, kindIs("small_talk"));
+    expect(t.text).toBe("Doing well, thanks! Want to see PACK?");
+  });
+});

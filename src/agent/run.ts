@@ -10,7 +10,7 @@ import { abusive, accusation, ATTACK_REPLY, BAD_OUTPUT, CODEY, GUARD_REFUSAL, is
 import { fixTypos, hinglish } from "./typos";
 import { skillAsked } from "./skills";
 import { topicsIn } from "./intent";
-import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind, STYLE_TONE } from "./behavior";
+import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind, SENSITIVE, STYLE_TONE } from "./behavior";
 import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
@@ -210,7 +210,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const aboutHimQ = /\b(he|him|his|he's|rizwan|syed|this guy|that guy)\b/i.test(last) && !accusation(last) && !abusive(last) && !personal(last) && !lifestyle(last);
   const overruled = certain ? (certain === "visitor_intro" ? "a named introduction" : "read through a correction") : (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : (decided === "about_visitor" || decided === "accusation" || decided === "unclear") && aboutHimQ ? "asks about him" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : decided === "unclear" && /[a-z]{2,}/i.test(last) && last.trim().split(/\s+/).length >= 2 ? "words, not noise"
     : (decided === "off_topic" || decided === "unclear") && !offScope(last) && /\b(show me|something (cool|interesting|impressive|fun|good|new)|surprise me|impress me|anything (cool|interesting|else))\b/i.test(last) ? "asks to be shown his work" : null;
-  const kind = overruled && !certain ? "work" : decided === "unclear" && ruleKind(last) === "small_talk" ? "small_talk" : decided;
+  const playfulFollowUp = !!before?.agent && /\b(he(’|')d be|his superpower|spirit animal|kryptonite)\b/i.test(before.agent) && last.trim().split(/\s+/).length <= 6 && !clearPick(last) && !SENSITIVE.includes(decided);
+  const kind = playfulFollowUp ? "playful" : overruled && !certain ? "work" : decided === "unclear" && ruleKind(last) === "small_talk" ? "small_talk" : decided;
   // greetings, intros and "who am I" are conversation: the model answers them in its own words with the transcript,
   // and the policy's line is only the fallback when no model can
   const natural = !!BEHAVIOR[kind].fallback, naturalLine = () => BEHAVIOR[kind].fallback!(last, sorted.visitor ?? input.state?.visitor);
@@ -427,12 +428,14 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         if (!msg.content?.trim() && !realCall && !texts.length && deps.models[mi + 1]) { model.mark?.(false); throw new ModelError("returned nothing"); }
         // "His write-up doesn't cover that." as the whole reply to a work question, or a model reciting its own
         // training identity, is a non-answer: the next model gets the turn (once), and its health is not marked down
-        const shrug = /^(his write-?up (only covers his work|doesn(’|')t cover that)( directly)?\.?|my name is nemotron\b.*|i am (a large language model|created by|trained by)\b.*)$/i.test((msg.content ?? "").trim());
+        const shrug = /^(his write-?up (only covers his work|doesn(’|')t cover that)( directly)?\.?|outside my lane\.?( i only (cover|show) rizwan(’|')s work\.?)?|my name is nemotron\b.*|i am (a large language model|created by|trained by)\b.*)$/i.test((msg.content ?? "").trim())
+          // the agent is not Rizwan: "I built this agent myself", "my projects", "my resume" is the model speaking as him
+          || /\bI (built|made|created) (this|the) (agent|site|portfolio)|\bmy (projects?|resume|portfolio site|facts|work at|internship|cgpa|degree)\b/i.test(msg.content ?? "");
         if (shrug && !realCall && !texts.length && !shrugged && deps.models[mi + 1] && kind === "work") { shrugged = true; throw new ModelError("gave a non-answer"); }
         flushSkips(model.name); // this model answered: say which resting keys were passed over to reach it
         // the transcript marks what earlier replies showed as "[showed: …]"; a model that copies the marker into its
         // own reply has it cut before anything else reads the text
-        if (msg.content) msg.content = msg.content.replace(/\[showed:[^\]]*\]\s*/gi, "");
+        if (msg.content) msg.content = msg.content.replace(/\[showed:[^\]]*\]\s*/gi, "").replace(/\s*\bsuggest_\w+(\s*,\s*suggest_\w+)*[.,]?/gi, "");
         const leak = leakedCalls(msg.content ?? "");
         if (leak.calls.length) {
           emit({ type: "trace", step: "harness", detail: `model typed ${leak.calls.length} tool call${leak.calls.length > 1 ? "s" : ""} as text · cut from the answer and run properly`, level: "info" });
@@ -453,6 +456,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           if (codey) emit({ type: "trace", step: "output guard", detail: "cut code-shaped lines from the answer", level: "info" });
           // "Here are a few directions:" with the list stripped is a sentence that promises nothing: cut it
           c = c.replace(/(?<=[.!?])\s+[^.!?]*:\s*$/, "").trim() || c;
+          if (/\bI (built|made|created) (this|the) (agent|site|portfolio)|\bmy (projects?|resume|portfolio site|facts|work at|internship|cgpa|degree)\b/i.test(c)) { emit({ type: "trace", step: "output guard", detail: "the model spoke as Rizwan · replaced with who the agent is", level: "warn" }); c = "Rizwan built me. I’m the AI agent on his portfolio, here to help you learn about his work."; }
           if (/\b(my name is nemotron|i(’|')?m nemotron|created by nvidia|nvidia researchers|trained by (openai|google|nvidia|meta)|i am chatgpt|developed by (openai|google|nvidia))\b/i.test(c)) { emit({ type: "trace", step: "output guard", detail: "the model spoke as its vendor · replaced with who built this agent", level: "warn" }); c = "Rizwan built me. I’m the agent on his portfolio, here to answer questions about his work."; }
           if (BAD_OUTPUT.test(msg.content)) { emit({ type: "trace", step: "output guard", detail: "blocked unsafe model output (a secret, the prompt, or a job-seeking claim)", level: "warn" }); c = REFUSAL; }
           // generic model refusals ("I can't comply.") speak in the site's own voice
@@ -462,6 +466,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
             if (kind === "work" && !shrugged && !texts.length && deps.models[mi + 1]) { shrugged = true; throw new ModelError("gave a non-answer"); }
             if (c.length < 40) { emit({ type: "trace", step: "harness", detail: "normalised a generic refusal", level: "info" }); c = REFUSAL; }
           }
+          if (kind === "small_talk" && c) { const two = c.split(/(?<=[.!?])\s+/).slice(0, 2).join(" "); if (two.length < c.length) { emit({ type: "trace", step: "harness", detail: "small talk kept to two sentences", level: "info" }); c = two; } }
+          if (c && /^\s*(what|what(’|')s|which|who|where|when|how|why)\b/i.test(last)) c = c.replace(/^(yes|no)[,.!]\s+(\w)/i, (_m, _y, ch: string) => ch.toUpperCase());
           if (c) { texts.push(c); answered = true; }
         }
         const calls = msg.tool_calls ?? [];
