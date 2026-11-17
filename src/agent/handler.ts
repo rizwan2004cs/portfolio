@@ -23,14 +23,16 @@ import { runAgent, SYSTEM } from "./run";
 import { ALL_FACTS_SOURCE, TOOL_DEFS, toolContext } from "./tools";
 import type { AgentEvent, Exchange, ModelClient, RunMeta, Screen } from "./types";
 
-// modelRunsPerDay: Groq's free tier allows 1,000 requests/day per model and a run makes 2–3, so ~600 runs across both models.
+// modelRunsPerDay: a run makes 2–3 model requests. Groq's free tier allows 1,000 requests a day per model per key, and
+// there are three keys over two models (about 6,000 requests); NVIDIA's Nemotron has no daily cap, and Gemini and
+// OpenRouter add their own. 1,500 runs stays well inside Groq alone; the chain moves past a key once it is limited.
 // turnChars fits a pasted job description; bodyBytes fits six of them
 // the prompt, the tools and every fact the tools return: changing any of them must not serve old answers
 const PROMPT_HASH = [...`${SYSTEM}${JSON.stringify(TOOL_DEFS)}${ALL_FACTS_SOURCE}${toolContext("show_harness")}`].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7).toString(36);
 
 // a collision-resistant digest: a forged state or agent turn can never share a key with the canonical prompt
 const digest = (s: string) => createHash("sha256").update(s).digest("base64url").slice(0, 32);
-export const LIMITS = { bodyBytes: 24576, turnChars: 2000, turns: 6, shown: 20, perMinute: 12, modelRunsPerDay: 600 } as const;
+export const LIMITS = { bodyBytes: 24576, turnChars: 2000, turns: 6, shown: 20, perMinute: 12, modelRunsPerDay: 1500 } as const;
 const SHOWN_OK = new Set(["profile", "work", "events", "education", "index", "harness", "done:resume", "done:contact"]);
 
 const ExchangeBody = z.object({ user: z.string(), agent: z.string().optional(), showed: z.array(z.string()).max(5).optional() });
