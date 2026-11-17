@@ -78,13 +78,17 @@ export function misattributedTech(sentence: string): string[] {
  *  sentence names one role, words that only another role's description uses are flagged. */
 export function roleBleed(sentence: string): string[] {
   const low = sentence.toLowerCase();
+  // a sentence that names two employers ("before Novulis he interned at Supraja") is about both: nothing bleeds
+  if (new Set(EXPERIENCE.filter((x) => low.includes(x.title.toLowerCase().split(" ")[0])).map((x) => x.title.split(" ")[0])).size > 1) return [];
   const byRole = EXPERIENCE.filter((x) => low.includes(x.role.toLowerCase()));
   const hits = byRole.length ? byRole : EXPERIENCE.filter((x) => x.minor && /\bintern/.test(low) && low.includes(x.title.toLowerCase()));
   if (hits.length !== 1) return [];
   const x = hits[0], own = `${x.role} ${x.body} ${x.title} ${x.when}`.toLowerCase();
   const others = EXPERIENCE.filter((y) => y !== x).map((y) => y.body.toLowerCase()).join(" ");
   const words = [...new Set((low.match(/[a-z][a-z0-9-]{4,}/g) ?? []).filter((w) => !STOP.has(w)))];
-  return words.filter((w) => !own.includes(stem(w)) && others.includes(stem(w)));
+  // one borrowed word ("completed", "remote") is ordinary language; two or more is another role's duties
+  const borrowed = words.filter((w) => !own.includes(stem(w)) && others.includes(stem(w)));
+  return borrowed.length >= 2 ? borrowed : [];
 }
 
 const PRIZE = /\b(won|wins?|winner|winning|prizes?|awards?|awarded|placed)\b/i;
@@ -142,7 +146,7 @@ export function groundAnswer(answer: string, source: string, question: string, t
   const kept: string[] = [];
   const dropped: string[][] = [];
   /** every sentence with its verdict, in order: "words" is the only drop a reader of the facts may overturn */
-  const parts: { s: string; ok: boolean; why?: "words" | "claims" | "puffery" | "refusal"; miss?: string[] }[] = [];
+  const parts: { s: string; ok: boolean; why?: "words" | "claims" | "puffery" | "refusal"; miss?: string[]; check?: string }[] = [];
   const sentences = splitSentences(answer);
   let afterRefusal = false;
   for (const s of sentences) {
@@ -156,14 +160,15 @@ export function groundAnswer(answer: string, source: string, question: string, t
     // free, its numbers, names, tech and roles are not
     const base = afterRefusal ? wide : src, miss = opts.loose ? [] : unsupported(s, base);
     const words = miss.length > 0;
-    if (!miss.length) miss.push(...misanchored(s, base), ...misattributed(s, base), ...misattributedTech(s), ...roleBleed(s));
+    let check = words ? "words" : "";
+    if (!miss.length) for (const [name, found] of [["number", misanchored(s, base)], ["prize", misattributed(s, base)], ["tech", misattributedTech(s)], ["role", roleBleed(s)]] as const) if (found.length) { miss.push(...found); check ||= name; }
     // whether he is looking for a job is never in the facts, however few words the claim uses
     if (!miss.length && /\b(looking for|seeking|searching for|open to|available for|in the market for|actively (looking|interviewing))\b[^.]{0,40}\b(jobs?|roles?|work|opportunit\w*|positions?|offers?|openings?)\b/i.test(s)) miss.push("job-seeking claim");
     // puffery ("routinely", "extensive experience") is never in the write-ups
     const puff = s.match(/\b(routinely|extensive(ly)?|expert(ise)?|years of|seasoned|mastery|deep experience|similar stacks|proven track record|battle.tested|production.(ready|grade)|in production|at scale|enterprise.grade|several production|deep (prompt|knowledge|expertise|understanding)|most (freshers|candidates|engineers|graduates|people)|unlike (most|other)|few (freshers|candidates|engineers))\b/i);
     const puffed = !miss.length && !!puff;
     if (puffed) miss.push(puff![0].toLowerCase());
-    if (miss.length) { dropped.push(miss); parts.push({ s, ok: false, why: words ? "words" : puffed ? "puffery" : "claims", miss }); } else { kept.push(s); parts.push({ s, ok: true }); }
+    if (miss.length) { dropped.push(miss); parts.push({ s, ok: false, why: words ? "words" : puffed ? "puffery" : "claims", miss, check: check || (puffed ? "puffery" : "claim") }); } else { kept.push(s); parts.push({ s, ok: true }); }
   }
   const extracted = kept.length ? null : bestFact(facts, question, title ?? "");
   const text = kept.length ? kept.join(" ") : extracted ?? `His write-up doesn’t cover ${topicOf(question)}${title ? ` for ${title}` : ""}.`;

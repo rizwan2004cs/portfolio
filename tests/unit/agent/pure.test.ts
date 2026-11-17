@@ -476,3 +476,10 @@ describe("grounding · paraphrase is not a lie", () => {
     expect(unsupported("He architected Kubernetes clusters, Terraform pipelines and Kafka streams for Shopify.", src).length).toBeGreaterThan(0);
   });
 });
+
+describe("grounding · two employers in one sentence", () => {
+  it("'before Novulis he interned at Supraja doing vulnerability assessment' is not one role borrowing another's duties", async () => {
+    const { roleBleed } = await import("@/agent/grounding");
+    expect(roleBleed("Before Novulis, he was a Cyber Security intern at Supraja Technologies doing web application vulnerability assessment.")).toEqual([]);
+  });
+});
