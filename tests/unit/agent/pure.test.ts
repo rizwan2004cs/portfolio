@@ -483,3 +483,12 @@ describe("grounding · two employers in one sentence", () => {
     expect(roleBleed("Before Novulis, he was a Cyber Security intern at Supraja Technologies doing web application vulnerability assessment.")).toEqual([]);
   });
 });
+
+describe("grounding · the prize check is for prizes", () => {
+  it("'the game always wins the room over' is not an achievement claim; 'he won first place' still is", async () => {
+    const { misattributed } = await import("@/agent/grounding");
+    const src = "pack: seven langgraph agents play werewolf. superteam ctf v2: won $115.";
+    expect(misattributed("It keeps seven agents playing Werewolf without a hitch, and the winning move is the fallback.", src)).toEqual([]);
+    expect(misattributed("He won first place at Google DevFest for PACK.", src).length).toBeGreaterThan(0);
+  });
+});

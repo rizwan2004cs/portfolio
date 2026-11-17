@@ -120,10 +120,7 @@ export function mountAgent(shell: HTMLElement): () => void {
   /* ---------- shared state + AG-UI event log ---------- */
   // `session` is the server's snapshot of the conversation (focus, what was shown and offered, who the visitor is):
   // it goes back with every message, so the agent remembers across turns and reloads
-  const S: Record<string, unknown> = { visitor: null, focus: null, model: "online", mode: "agent", style: "default", onScreen: [], shortlist: [], approvals: {}, session: null };
-  // the reply style: a composer control, remembered on this device, sent with every message
-  const STYLES = ["short", "friendly", "formal", "detailed"];
-  let style = STYLES.includes(store("rz_style") ?? "") ? (store("rz_style") as string) : "";
+  const S: Record<string, unknown> = { visitor: null, focus: null, model: "online", mode: "agent", onScreen: [], shortlist: [], approvals: {}, session: null };
   function renderState(changed: string[] = []) {
     const lines = Object.entries(S).map(([k, v]) => `  <span class="k">"${k}"</span>: <span${changed.includes(k) ? ' class="flash"' : ""}>${esc(JSON.stringify(v))}</span>`);
     q("#state").innerHTML = `{\n${lines.join(",\n")}\n}`;
@@ -463,7 +460,9 @@ export function mountAgent(shell: HTMLElement): () => void {
       const shortlistQ = /^(show |open |view )?(my |the )?shortlist$/i.test(text);
       // the site's own internals have one answer: shown here, no model call (and no model picking a random project)
       const siteQ = /^(how does (this|the) (site|agent|portfolio|chat) work\??|how (is|was) (this|the) (site|agent) (built|made)\??|internals( of (this|the) (site|agent))?|show (me )?(the )?harness)$/i.test(text);
-      const offlineQ = /^(take the model offline|kill the model)$/i.test(text), restoreQ = /^(restore|bring back|turn on)( the)? model$/i.test(text);
+      // the kill switch in the visitor's own words: "kills the model", "i said i'm gonna kill the model here", "turn off the ai"
+      const offlineQ = /^(ok |okay |please |now |i said |so )*(i(’|')?m |i am |i(’|')?ll |i will |let me |can i |i want to |i wanna )?(gonna |going to |go )?(kill|kills|killing|take down|take|turn off|switch off|shut ?down|disable|unplug)( the| your| this)? (model|ai|llm)( offline| off| down)?( here| now| then)?[\s.!?]*$/i.test(text.trim()),
+        restoreQ = /^(ok |okay |please |now )*(restore|bring back|turn on|switch on|revive|enable|restart)( the| your)? (model|ai|llm)( back| on| again)?[\s.!?]*$/i.test(text.trim());
       // commands that never need a model: answered here, instantly, and can't be misread
       // only the explicit command opens the card in the browser; "who is he?" is a question and goes to the agent
       const profileQ = /^((view|show|open|see)\s)(his\s)?profile$/i.test(text);
@@ -580,7 +579,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     try { return await stream(text, setNext, think); } finally { think.remove(); } // never leave "working" behind, even on a dropped connection
   }
   async function stream(text: string, setNext: (o: string[]) => void, think: HTMLElement): Promise<Meta> {
-    const res = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ history: trimHistory([...convo, { user: text }].slice(-6)), shown: [...shown], state: S.session, killModel: down, ...(style ? { style } : {}) }) });
+    const res = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify({ history: trimHistory([...convo, { user: text }].slice(-6)), shown: [...shown], state: S.session, killModel: down }) });
     if (res.status === 429) { think.remove(); await say("You’re going fast. Give it a minute; the buttons below still work."); return { mode: "local" }; }
     if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
     let meta: Meta | null = null, plan: ReturnType<typeof planCard> | null = null, pending: number | null = null, compactNext = false;
@@ -791,8 +790,8 @@ export function mountAgent(shell: HTMLElement): () => void {
     const m = q("#menu"), b = q("#plus"); m.classList.toggle("on", on); b.setAttribute("aria-expanded", String(on));
     if (!on) return;
     m.innerHTML = MENU.map((x, i) => (x === "sep" ? '<div class="sep"></div>' : `<button role="menuitem" class="${x[3] || ""}" data-i="${i}">${x[1]}${x[0] === "Kill the model" && down ? "Restore the model" : x[0]}</button>`)).join("");
-    m.querySelectorAll<HTMLButtonElement>("button").forEach((x) => (x.onclick = () => { openMenu(false); (MENU[Number(x.dataset.i)] as [string, string, () => void])[2](); }));
-    q<HTMLButtonElement>("button", m).focus();
+    m.querySelectorAll<HTMLButtonElement>("button[data-i]").forEach((x) => (x.onclick = () => { openMenu(false); (MENU[Number(x.dataset.i)] as [string, string, () => void])[2](); }));
+    q<HTMLButtonElement>("button[data-i]", m).focus();
   }
   const ac = new AbortController(), sig = { signal: ac.signal };
   document.querySelectorAll<HTMLButtonElement>(".tabs button").forEach((b) => (b.onclick = () => {
@@ -800,9 +799,7 @@ export function mountAgent(shell: HTMLElement): () => void {
     document.querySelectorAll(".tabpane").forEach((p) => p.classList.toggle("on", p.id === "tp-" + b.dataset.tab));
   }));
   q<HTMLButtonElement>("#plus").onclick = (e) => { e.stopPropagation(); openMenu(!q("#menu").classList.contains("on")); };
-  const styleSel = q<HTMLSelectElement>("#style");
-  styleSel.value = style; if (style) setState({ style });
-  styleSel.onchange = () => { style = STYLES.includes(styleSel.value) ? styleSel.value : ""; store("rz_style", style); setState({ style: style || "default" }); tr("", "ui", `reply style · ${style || "default"}`); };
+
   addEventListener("click", (e) => { if (!(e.target as Element).closest?.("#menu")) openMenu(false); }, sig);
   addEventListener("keydown", (e) => {
     if (e.key === "Escape") { openMenu(false); shell.classList.remove("trace-open"); }

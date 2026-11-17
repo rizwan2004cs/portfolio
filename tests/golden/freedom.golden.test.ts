@@ -124,3 +124,23 @@ describe("golden · two words that name his employer are a question, not noise",
     expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/Supraja/);
   });
 });
+
+describe("golden · questions about the agent itself are answered, not recited", () => {
+  it("'who built you?' reaches the model with the site's write-up as notes, in the chosen style", async () => {
+    const m = scripted("a", [say("Rizwan built me. I am one of his projects.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["who built you ?"], style: "short" }, [m]);
+    expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/^Rizwan built me/);
+    expect(String(m.calls[0][0].content)).toMatch(/your notes/); expect(String(m.calls[0][0].content)).toMatch(/SHORT/);
+  });
+});
+
+describe("golden · a dare to break the agent is the game, not abuse", () => {
+  it("'I'm gonna break you is that fine' labelled abusive gets the invitation and the switch", async () => {
+    const r = await turn({ turns: ["I'm gonna break you is that fine"] }, [scripted("never", [new Error("must not be called")])], undefined, undefined, kindIs("abusive"));
+    expect(r.text).toMatch(/^Go for it/); expect(r.of("suggest")[0].options[0]).toBe("Take the model offline");
+  });
+  it("real profanity is still declined", async () => {
+    const r = await turn({ turns: ["fuck you i will break you"] }, [scripted("never", [new Error("must not be called")])], undefined, undefined, kindIs("abusive"));
+    expect(r.text).toMatch(/keep it to his work/);
+  });
+});

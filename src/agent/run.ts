@@ -27,6 +27,7 @@ export const KNOWLEDGE = [
   `Profile: ${PROFILE.name}, ${PROFILE.role}, ${PROFILE.location}. ${PROFILE.summary} Education: ${PROFILE.education}.`,
   `Work: ${EXPERIENCE.map((x) => `${x.title}: ${x.body} (${x.when})`).join("; ")}.`,
   `Experience: ${experienceLine()}`,
+  `This agent: Rizwan built it himself; it is one of his projects and runs on this portfolio. It talks to visitors (recruiters, hiring managers, engineers, anyone curious) and answers their questions about his work from the facts here. Asked "who built you", "who made you" or "who are you assisting": say Rizwan built it and that it helps visitors learn about his work. If a visitor says its answers are wrong, bad or not working, it does not defend itself or describe its checks: it owns it in one short sentence that starts with "Fair," or "You're right," (never with "Sorry" or "I can't"), and asks which answer was off so it can try that question again.`,
   `Why him: ${WHY_HIM}`,
   `Role changes: both internships were fixed-term. The Supraja Technologies internship (Jun – Sep 2025) ended with its project; the Novulis Consulting internship (Mar – May 2026) converted to the full-time Associate Software Engineer (R&D) role in June 2026. No role ended early, and he has not left Novulis.`,
   `Gaps: ${GAPS}`,
@@ -202,7 +203,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // "who is he?", "who the hell is he?", "a student or a working professional?" ask about him: the classifier's
   // about_visitor, accusation or unclear yields unless the word rules find a real accusation, abuse or a private topic
   const aboutHimQ = /\b(he|him|his|he's|rizwan|syed|this guy|that guy)\b/i.test(last) && !accusation(last) && !abusive(last) && !personal(last) && !lifestyle(last);
-  const overruled = certain ? (certain === "visitor_intro" ? "a named introduction" : "read through a correction") : (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : (decided === "about_visitor" || decided === "accusation" || decided === "unclear") && aboutHimQ ? "asks about him" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : null;
+  const overruled = certain ? (certain === "visitor_intro" ? "a named introduction" : "read through a correction") : (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : (decided === "about_visitor" || decided === "accusation" || decided === "unclear") && aboutHimQ ? "asks about him" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : decided === "unclear" && last.trim().split(/\s+/).length >= 4 ? "a full sentence, not noise" : null;
   const kind = overruled && !certain ? "work" : decided;
   // greetings, intros and "who am I" are conversation: the model answers them in its own words with the transcript,
   // and the policy's line is only the fallback when no model can
@@ -234,6 +235,15 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
     }
   }
   emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : overruled ? `${sorted.note} · ${overruled}: treated as ${kind}` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
+  // "I'm gonna break you, is that fine?": on this site that is the game, not abuse. Without profanity or an injection,
+  // a message about breaking or killing the agent gets the invitation and the switch
+  if ((kind === "abusive" || kind === "off_topic" || kind === "unclear") && !abusive(last) && !isAttack(last)
+    && /\b(break|breaking|kill|kills|killing|crash|destroy|take down|shut ?down|beat|defeat|outsmart|trick|fool|test)\b[^.?!]{0,30}\b(you|u|ya|model|agent|ai|bot|llm|site|this)\b/i.test(last)) {
+    emit({ type: "trace", step: "policy", detail: `${kind} by the classifier · a dare to break the agent, not abuse: invited to try the kill switch · 0 tokens`, level: "info" });
+    emit({ type: "text", text: "Go for it. The switch is right there: take the model offline and I’ll keep answering from his facts." });
+    emit({ type: "suggest", options: ["Take the model offline", "How does this site work?", "Everything he’s built"] });
+    return { mode: "scope" };
+  }
   if (BEHAVIOR[kind].reply) {
     emit({ type: "trace", step: "policy", detail: `${kind} · fixed reply from the behaviour policy, no model, no panel · 0 tokens`, level: "info" });
     emit({ type: "text", text: BEHAVIOR[kind].reply!(last) });
@@ -251,7 +261,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const isFact = !natural && factAnswer(subject, (e) => factual.push(e), false, input.shown, input.state) && !(history.length > 1 && isUnclearReply(factual));
   // a written fact line is spoken as it is only when the turn is an action (an approval, a fit report, a table, a
   // list) or no model can be asked; otherwise it becomes the model's notes, and the model answers the question asked
-  const EXACT = new Set(["offer_resume", "offer_contact", "match_role", "compare_projects", "switch_mode", "ask_visitor", "list_projects", "show_harness"]);
+  const EXACT = new Set(["offer_resume", "offer_contact", "match_role", "compare_projects", "switch_mode", "ask_visitor", "list_projects"]);
   const exact = isFact && (input.killModel || !deps.models.length || /\b(resume|cv|contact|email|linkedin|phone)\b/i.test(last) || factual.some((e) => e.type === "approval" || (e.type === "tool" && EXACT.has(e.name))));
   const notes = isFact && !exact ? factual.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ")
     // "what's he weak at?": his gaps are on record, and a small model otherwise reads the question as personal
@@ -378,7 +388,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   let looked = false, tools = 0, drops = 0, lastTitle: string | null = subjectProject?.title ?? null, lastFacts: string[] = subjectProject?.facts ?? [], mi = 0;
   // the chain in order of availability: a slot that just answered goes first, throttled or empty ones drop back
   const chain = orderByHealth(deps.models);
-  if (chain.some((m, i) => m !== deps.models[i])) emit({ type: "trace", step: "model", detail: `chain ordered by availability: ${chain.map((m) => m.name).join(" → ")}`, level: "info" });
+  if (chain.some((m, i) => m !== deps.models[i])) emit({ type: "trace", step: "model", detail: `chain ordered by availability: ${chain.slice(0, 3).map((m) => m.name).join(" → ")}${chain.length > 3 ? ` → ${chain.length - 3} more` : ""}`, level: "info" });
   deps = { ...deps, models: chain };
   // facts of projects the visitor already has on screen are fair sources for follow-ups ("what vector DB does it use?")
   // the model was given every fact, so every fact is a fair source; number, prize and scope checks stay relational
@@ -497,9 +507,9 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           else if (bad.length === verdicts.length) emit({ type: "trace", step: "self-check", detail: `a second model rejected all ${verdicts.length} sentences the word check passed · not trusted, word check stands (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "warn" });
           else if (!bad.length) emit({ type: "trace", step: "self-check", detail: `a second model read all ${verdicts.length} sentences against the facts · supported (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "ok" });
           else {
-            for (const b of bad) { const p = gr.parts.find((x) => x.ok && x.s === b.sentence); if (p) { p.ok = false; p.why = "claims"; p.miss = [b.why || "second reader"]; gr.dropped.push([b.why || "second reader"]); } }
-            gr.text = gr.parts.filter((p) => p.ok).map((p) => p.s).join(" ") || gr.text;
-            emit({ type: "trace", step: "self-check", detail: `a second model read ${verdicts.length} sentences · removed ${bad.length}: ${bad.map((b) => `“${b.sentence.slice(0, 40)}…” (${b.why})`).join("; ")} (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "warn" });
+            // the second reader is a small model that is wrong about real projects often enough ("no such project" for
+            // Campus Premier League): its doubts are shown in the trace, and the sentence stays unless a rule rejected it
+            emit({ type: "trace", step: "self-check", detail: `a second model read ${verdicts.length} sentences · questioned ${bad.length}, kept (the rule checks passed them): ${bad.map((b) => `“${b.sentence.slice(0, 40)}…” (${b.why})`).join("; ")} (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "warn" });
           }
         }
         // a sentence dropped for its wording alone gets a second reading: the closest facts are retrieved by meaning and
@@ -569,7 +579,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       if (rest) resting.push(model.name);
       else { flushSkips(model.name); emit({ type: "trace", step: "model", detail: `${model.name} ${why} ${then}`, level: "err" }); }
       if (messages.length > base.length) handoff = true;
-      if (++mi < deps.models.length) continue;
+      // a visitor waits for one answer, not for every model's timeout in turn: after twelve seconds the written
+      // answer or the router takes over
+      if (++mi < deps.models.length && Date.now() - t0 < 12_000) continue;
+      if (mi < deps.models.length) emit({ type: "trace", step: "model", detail: "twelve seconds spent on models that did not answer · stopped trying", level: "warn" });
       flushSkips("deterministic router");
       // every model is down: if something is already on screen, stop with what's verified rather than a second answer
       if (visible) {
