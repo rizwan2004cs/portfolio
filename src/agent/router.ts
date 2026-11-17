@@ -120,6 +120,12 @@ export function router(lastUser: string, emit: Emit, opts: { facts?: string[]; s
     call("suggest", { options: DEFAULT_NEXT });
     return;
   }
+  // a judgement about him ("is he any good?", "is this guy legit?") with every model down: his strongest evidence
+  if (/\b(he|him|his|rizwan|this guy|that guy)\b/i.test(lastUser) && /\b(good|legit|worth|smart|skilled|talented|real|trust\w*|care|strong|capable|impressive|any use|competent|solid)\b/i.test(lastUser)) {
+    say(WHY_HIM); if (!opts.shown?.includes("profile")) call("show_profile");
+    call("suggest", { options: ["Everything he’s built", "Get resume", "Contact Rizwan"] });
+    return;
+  }
   say("Outside my lane. Closest thing I can show you is everything he’s built.");
   call("suggest", { options: DEFAULT_NEXT });
 }

@@ -60,7 +60,7 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
     name,
     health: (): SlotHealth => ({ resting: (cooling(fetchImpl).get(slot) ?? 0) > Date.now(), fails: h().fails, lastOk: h().lastOk }),
     mark: (ok) => { if (ok) { h().fails = 0; h().lastOk = Date.now(); } else h().fails++; told(); },
-    async complete(messages: ChatMessage[], signal: AbortSignal, onTool?: (name: string) => void): Promise<AssistantMessage> {
+    async complete(messages: ChatMessage[], signal: AbortSignal, onTool?: (name: string) => void, onText?: (delta: string) => void): Promise<AssistantMessage> {
       const until = cooling(fetchImpl).get(slot) ?? 0;
       if (until > Date.now()) throw new ModelError(`HTTP 429 · resting ${Math.ceil((until - Date.now()) / 1000)}s`, 429);
       // streamed, so a tool call shows the moment the model names it; the reply is still assembled whole before use
@@ -85,7 +85,7 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
         cooling(fetchImpl).set(slot, Date.now() + Math.min(Number.isFinite(wait) && wait > 0 ? wait : 20, 300) * 1000);
       }
       if (!r.ok) { h().fails++; told(); throw new ModelError(`HTTP ${r.status}`, r.status); }
-      const msg = (r.headers.get("content-type") ?? "").includes("text/event-stream") ? await readStream(r, onTool) : (await r.json() as { choices?: { message?: AssistantMessage }[] }).choices?.[0]?.message;
+      const msg = (r.headers.get("content-type") ?? "").includes("text/event-stream") ? await readStream(r, onTool, onText) : (await r.json() as { choices?: { message?: AssistantMessage }[] }).choices?.[0]?.message;
       if (!msg) { h().fails++; told(); throw new ModelError("empty choice"); }
       // a success is shared only when it changes something: a slot that was failing is healthy again
       const wasFailing = h().fails > 0;
@@ -97,14 +97,14 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
 }
 
 /** One assistant message out of an OpenAI-style SSE stream: content deltas joined, tool calls assembled by index. */
-export async function readStream(r: Response, onTool?: (name: string) => void): Promise<AssistantMessage> {
+export async function readStream(r: Response, onTool?: (name: string) => void, onText?: (delta: string) => void): Promise<AssistantMessage> {
   const calls = new Map<number, { id: string; name: string; args: string }>();
   let content = "";
   const named = new Set<string>();
   const take = (chunk: { choices?: { delta?: { content?: string | null; tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[] } }[] }) => {
     const d = chunk.choices?.[0]?.delta;
     if (!d) return;
-    if (d.content) content += d.content;
+    if (d.content) { content += d.content; onText?.(d.content); }
     for (const tc of d.tool_calls ?? []) {
       const i = tc.index ?? 0, cur = calls.get(i) ?? { id: "", name: "", args: "" };
       if (tc.id) cur.id = tc.id;

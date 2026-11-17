@@ -492,3 +492,15 @@ describe("grounding · the prize check is for prizes", () => {
     expect(misattributed("He won first place at Google DevFest for PACK.", src).length).toBeGreaterThan(0);
   });
 });
+
+describe("grounding · names", () => {
+  it("rejects a name nowhere in his facts, but not months, acronyms or plurals of known words", async () => {
+    const { groundAnswer } = await import("@/agent/grounding");
+    const { ALL_FACTS_SOURCE } = await import("@/agent/tools");
+    const keep = (x: string) => groundAnswer(x, ALL_FACTS_SOURCE, "q").dropped.length === 0;
+    expect(keep("Before that he interned at Novulis Consulting from March to May 2026.")).toBe(true);
+    expect(keep("PACK runs on Groq with LLMs falling back in order.")).toBe(true);
+    expect(keep("PACK was rebuilt for Shopify and Stripe in 2026.")).toBe(false);
+    expect(keep("His Python is 8 / 10, shown in PACK.")).toBe(false);
+  });
+});

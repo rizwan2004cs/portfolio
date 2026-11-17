@@ -7,9 +7,16 @@ const id = (p: string) => `${p}_${Date.now().toString(36)}_${(seq++).toString(36
 /** Maps one harness event onto AG-UI protocol events.
  *  text → TEXT_MESSAGE_START/CONTENT/END · tool → TOOL_CALL_START/ARGS/END ·
  *  panels, approvals, suggestions, frontend tools and trace → CUSTOM (name = kind). */
-export function toAgui(ev: AgentEvent): BaseEvent[] {
+export function toAgui(ev: AgentEvent, live: Set<string> = new Set()): BaseEvent[] {
   switch (ev.type) {
+    // a streamed message: the first delta opens it, later ones add to it, the finished text closes it with the
+    // authoritative wording (a client that rendered the deltas swaps in the final text)
+    case "delta": {
+      const opened = live.has(ev.stream); live.add(ev.stream);
+      return [...(opened ? [] : [{ type: EventType.TEXT_MESSAGE_START, messageId: ev.stream, role: "assistant" } as BaseEvent]), { type: EventType.TEXT_MESSAGE_CONTENT, messageId: ev.stream, delta: ev.text } as BaseEvent];
+    }
     case "text": {
+      if (ev.stream && live.has(ev.stream)) { live.delete(ev.stream); return [custom("text_final", { messageId: ev.stream, text: ev.text }), { type: EventType.TEXT_MESSAGE_END, messageId: ev.stream } as BaseEvent]; }
       const messageId = id("msg");
       return [
         { type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant" } as BaseEvent,
