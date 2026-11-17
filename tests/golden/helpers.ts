@@ -33,10 +33,22 @@ export const tools = (...tool_calls: ReturnType<typeof call>[]): AssistantMessag
 export const passScreen: Screen = async () => ({ ok: true, note: "pass · <0.001" });
 export const blockScreen: Screen = async () => ({ ok: false, note: "flagged · 0.999" });
 
-export async function turn(input: Partial<RunInput> & { turns: string[]; retriever?: Retriever; selfCheck?: SelfCheck }, models: ModelClient[], screen: Screen = passScreen, signal = new AbortController().signal, classify?: Classifier) {
-  const { retriever, selfCheck, ...rest } = input;
+/** A model that writes its reply in chunks through onText, the way a streaming provider does, then returns it whole. */
+export function streaming(name: string, content: string, tool_calls: ReturnType<typeof call>[] = [], chunk = 7, fail = false): ModelClient {
+  return {
+    name,
+    async complete(_messages, _signal, _onTool, onText) {
+      for (let i = 0; i < content.length; i += chunk) onText?.(content.slice(i, i + chunk));
+      if (fail) throw new ModelError("HTTP 500", 500);
+      return { content, tool_calls };
+    },
+  };
+}
+
+export async function turn(input: Partial<RunInput> & { turns: string[]; retriever?: Retriever; selfCheck?: SelfCheck; stream?: boolean }, models: ModelClient[], screen: Screen = passScreen, signal = new AbortController().signal, classify?: Classifier) {
+  const { retriever, selfCheck, stream, ...rest } = input;
   const evs: AgentEvent[] = [];
-  const meta: RunMeta = await runAgent({ shown: [], killModel: false, ...rest }, (e) => evs.push(e), { models, screen, signal, classify, retriever, selfCheck });
+  const meta: RunMeta = await runAgent({ shown: [], killModel: false, ...rest }, (e) => evs.push(e), { models, screen, signal, classify, retriever, selfCheck, stream });
   return { evs, meta, text: evs.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" "), of: <T extends AgentEvent["type"]>(t: T) => evs.filter((e): e is Extract<AgentEvent, { type: T }> => e.type === t) };
 }
 

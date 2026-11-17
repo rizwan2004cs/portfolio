@@ -1,6 +1,6 @@
 import { EVENTS, EXPERIENCE, experienceLine, GAPS, PROFILE, PROJECTS, projectById, TOOLKIT, toolUses, WHY_HIM } from "@/content/data";
 import type { Project } from "@/content/types";
-import { clean, dedupeSentences, leakedCalls, repairLeak } from "./clean";
+import { clean, dedupeSentences, leakedCalls, repairLeak, splitSentences } from "./clean";
 import { bestFact, groundAnswer } from "./grounding";
 import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
@@ -73,6 +73,8 @@ export interface RunDeps {
   retriever?: Retriever;
   /** one read of a long draft against the facts, a verdict per sentence */
   selfCheck?: SelfCheck;
+  /** send sentences to the visitor as the model writes them (the live site); off in tests unless asked for */
+  stream?: boolean;
 }
 
 const MAX_STEPS = 4;
@@ -168,7 +170,9 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
     || /^\s*(why|how|how so|when|where|which one|and|so|more|tell me more|go on|elaborate|details?|more details|really|ok and|and then|what else)\s*[?!.]*$/i.test(last) || /^\s*(and|so|but)\s+(the|its|his|what|how|why)\b/i.test(last);
   const subject = input.turns.length > 1 && !clearPick(last) && refersBack ? `${input.turns.at(-2)} ${last}` : last;
   // the project the visitor is talking about: named now, or named in the turn a pronoun points back to
-  const subjectProject = clearPick(subject);
+  const sharedTech = projectFilter(last, undefined, true);
+  const askedForMany = !!sharedTech && sharedTech.projects.length > 1 && /\b(which|what|any|all|other)\b[^?]{0,30}\bprojects?\b|\bprojects?\b[^?]{0,30}\b(use|uses|used|using|with|built on|run on)\b/i.test(last);
+  const subjectProject = askedForMany ? undefined : clearPick(subject);
   // a short message after a reply ("Not animal", "and the stack?") is judged with the exchange it answers, so a tool
   // call about the project the agent just named is about his work
   const followUp = input.history && input.history.length > 1 && last.trim().split(/\s+/).length <= 6 && !clearPick(last);
@@ -336,7 +340,54 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
     const focus = profileFocus(last);
     if (ABOUT_HIM.test(last) && !input.shown.includes("profile") && !input.shown.includes(focus ?? "profile")) return panel("show_profile", focus ? { focus } : {}, focus === "events" ? "his events and prizes" : focus ? `his ${focus}` : "his profile");
   };
+  // ---- streaming: a sentence goes out the moment the model finishes writing it, if it passes the same rule checks the
+  // whole answer gets. The first sentence waits for the second (a one-line shrug or refusal is decided on the whole
+  // reply), and the first sentence that fails, or that only the finished answer can judge, stops the stream: the
+  // rest is decided at the end as before, and the finished text closes the message with its final wording.
+  const liveId = `live_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+  const live = { on: !!deps.stream && (kind === "work" || kind === "playful"), sent: [] as string[], buf: "", first: null as string | null, held: false, closed: false };
+  const HOLD = /\[showed:|suggest_|[|{}<>]|:\s*$|doesn(’|')t cover|not covered|isn(’|')t covered|no (details|information)\b|\bI (built|made|created) (this|the)|\bmy (projects?|resume|facts|work|internship|cgpa|degree)\b|nemotron|nvidia researchers|chatgpt|^(sorry|i(’|')?m sorry|i can(’|')?t|i cannot|i won(’|')?t|i(’|')?m unable|outside my lane|his write-?up)\b/i;
+  const liveOk = (raw: string): string | null => {
+    let x = raw.trim();
+    if (!x || HOLD.test(x) || ANNOUNCES.test(x) || CODEY.test(x) || BAD_OUTPUT.test(x) || isRefusal(x)) return null;
+    if (!live.sent.length && /^\s*(what|what(’|')s|which|who|where|when|how|why)\b/i.test(last)) x = x.replace(/^(yes|no)[,.!]\s+(\w)/i, (_m, _y, ch: string) => ch.toUpperCase());
+    const k = x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (live.sent.some((y) => y.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === k)) return null;
+    const g = groundAnswer(x, source, last, lastTitle, `${source} ${ALL_FACTS_SOURCE}`, lastFacts, { loose: kind === "playful" });
+    return g.dropped.length ? null : x;
+  };
+  const liveSend = (sentence: string) => {
+    if (live.held || live.closed) return;
+    const ok = liveOk(sentence);
+    if (!ok) { live.held = true; return; }
+    emit({ type: "delta", stream: liveId, text: (live.sent.length ? " " : "") + ok });
+    live.sent.push(ok);
+  };
+  const livePush = (delta: string) => {
+    if (!live.on || live.held || live.closed) return;
+    live.buf += delta;
+    const cut = live.buf.search(/[.!?]["”’)]?\s+(?=\S)[^.!?]*$/);
+    if (cut < 0) return;
+    const end = live.buf.slice(0, cut + 1).search(/\S*$/) >= 0 ? cut + 1 : cut;
+    const done = live.buf.slice(0, end + (/["”’)]/.test(live.buf[end] ?? "") ? 1 : 0));
+    live.buf = live.buf.slice(done.length);
+    for (const sentence of splitSentences(done)) {
+      if (live.first === null && !live.sent.length) { live.first = sentence; continue; }
+      if (live.first !== null) { const f = live.first; live.first = null; liveSend(f); }
+      liveSend(sentence);
+    }
+  };
+  /** Close the live message with the finished wording (or what was streamed, when nothing else is said). */
+  const liveClose = (finalText?: string) => {
+    if (live.closed || !live.sent.length) { live.closed = true; return false; }
+    live.closed = true;
+    emit({ type: "text", text: finalText ?? live.sent.join(" "), stream: liveId });
+    spoke = true;
+    return true;
+  };
   const finish = (meta: RunMeta): RunMeta => {
+    // a turn never ends with a message left open: what was streamed is the answer when nothing replaced it
+    liveClose();
     if (!spoke) {
       // the model said nothing usable: answer from the facts on screen before falling back to a stock line;
       // "what is it built with?" is answered by the project's stack, which no fact sentence lists
@@ -406,6 +457,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   if (kind === "playful") source += ` ${last} superpower super power superhero hero spirit animal secret weapon kryptonite vibe tagline motto pitch words describe character would be like rate limits free tier ${PLAYFUL_IMAGES.join(" ")} ${PLAYFUL_WORDS.join(" ")}`;
   const texts: string[] = [];
   const t0 = Date.now();
+
   // keys still resting from an earlier rate limit are skipped without a call: one quiet line, not a red row each;
   // a mid-answer handoff is announced for the model that actually takes over
   let resting: string[] = [], handoff = false, shrugged = false;
@@ -421,7 +473,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         let answered = false;
         const s0 = Date.now();
         // the visitor sees the agent reach for a tool the moment the model names it, before the reply is complete
-        const msg = await model.complete(messages, deps.signal, (name) => { if (name !== "suggest") emit({ type: "trace", step: "working", detail: `${model.name} is calling ${name}…`, level: "info" }); });
+        const msg = await model.complete(messages, deps.signal, (name) => { if (name !== "suggest") emit({ type: "trace", step: "working", detail: `${model.name} is calling ${name}…`, level: "info" }); }, livePush);
+        if (live.sent.length && !live.held && !live.closed) live.held = true; // whatever is left is judged with the whole message
         // an empty reply with nothing said yet is a failure like any other: the next model in the chain gets the turn
         // no text and no real tool call (a lone suggest is chips, not an answer): the next model gets the turn
         const realCall = (msg.tool_calls ?? []).some((c) => c.function.name !== "suggest");
@@ -569,7 +622,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           // a visitor who gave their name is greeted by it, whatever the model chose to say first
           const name = kind === "visitor_intro" ? (sorted.visitor ?? input.state?.visitor)?.name : undefined;
           const greeting = said.text && name && /^[A-Z][a-z]{1,20}$/.test(name) && !/^(Recruiter|Founder|Manager|Hiring|Engineer|Developer|Student|Friend)$/.test(name) && !said.text.includes(name) ? `Hi ${name}. ${said.text.replace(/^(hi|hello|hey)( there)?[,.!]\s*/i, "")}` : said.text;
-          if (greeting) out({ type: "text", text: greeting });
+          if (greeting && !liveClose(greeting)) out({ type: "text", text: greeting });
         }
         if (spoke) openNamed(gr.text);
         if (spoke && !visible) showContext();
@@ -594,6 +647,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       return finish({ mode: "model", model: model.name, ms: Date.now() - t0, tools, fallback: mi > 0 });
     } catch (e) {
       if (deps.signal.aborted) return { mode: "aborted" };
+      if (live.sent.length && !live.closed) {
+        emit({ type: "trace", step: "model", detail: `${model.name} failed after ${live.sent.length} sentence${live.sent.length > 1 ? "s" : ""} were shown · stopped with those`, level: "warn" });
+        liveClose(); return finish({ mode: "partial" });
+      }
       const status = e instanceof ModelError ? e.status : undefined, rest = e instanceof Error && /resting (\d+s)/.exec(e.message)?.[1];
       const why = rest ? `rate-limited (HTTP 429) · resting ${rest}` : status === 429 ? "rate-limited (HTTP 429)" : status && status >= 500 ? `provider error (HTTP ${status})`
         : status ? `rejected (HTTP ${status})` : e instanceof Error && e.name === "TimeoutError" ? "timed out" : e instanceof Error && e.message === "returned nothing" ? "returned nothing" : e instanceof Error && e.message === "gave a non-answer" ? "gave a non-answer" : "failed";

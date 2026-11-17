@@ -164,6 +164,15 @@ export function groundAnswer(answer: string, source: string, question: string, t
     // free, its numbers, names, tech and roles are not
     const base = afterRefusal ? wide : src, miss = opts.loose ? [] : unsupported(s, base);
     const words = miss.length > 0;
+    // a name (a company, product or place) that appears nowhere in his facts is an invention, however few words it
+    // takes: "for Shopify" fails here even when the rest of the sentence reads like his facts
+    if (!miss.length && !opts.loose) {
+      const lowWide = wide.toLowerCase();
+      const names = [...new Set((s.match(/(?<=\s)[A-Z][a-zA-Z0-9]{2,}(?:[-.][A-Za-z0-9]+)*/g) ?? []).filter((w) => !NOT_NAMES.has(w) && !lowWide.includes(w.toLowerCase())))];
+      if (names.length) miss.push(...names.map((n) => n.toLowerCase()));
+    }
+    // the tools his public work does not show are named in his gaps: claiming them without a negation is false
+    if (!miss.length && /\b(kubernetes|k8s|aws|amazon web services|eks|terraform)\b/i.test(s) && !/\b(no|not|never|doesn(’|')t|does not|isn(’|')t|without|lacks?|gaps?|missing|yet)\b/i.test(s)) miss.push("gap tool claimed");
     let check = words ? "words" : "";
     if (!miss.length) for (const [name, found] of [["number", misanchored(s, base)], ["prize", misattributed(s, base)], ["tech", misattributedTech(s)], ["role", roleBleed(s)]] as const) if (found.length) { miss.push(...found); check ||= name; }
     // whether he is looking for a job is never in the facts, however few words the claim uses

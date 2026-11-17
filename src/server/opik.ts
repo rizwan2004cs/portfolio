@@ -39,10 +39,10 @@ export function traceTurn(c: Opik, t: { question: string; turns: string[]; sessi
     models: (list) => list.map((m) => ({
       ...m,
       name: m.name,
-      complete: async (messages, signal, onTool) => {
+      complete: async (messages, signal, onTool, onText) => {
         const span = trace.span({ name: m.name, type: "llm", input: { messages }, model: m.name.split(" · ")[0], provider: PROVIDER(m.name) });
         try {
-          const out = await m.complete(messages, signal, onTool);
+          const out = await m.complete(messages, signal, onTool, onText);
           span.update({ output: { content: out.content ?? null, tool_calls: out.tool_calls ?? [] } }).end();
           return out;
         } catch (e) {

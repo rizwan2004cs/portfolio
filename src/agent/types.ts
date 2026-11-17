@@ -4,7 +4,10 @@ export type PanelKind = "project" | "architecture" | "index" | "profile" | "harn
 export type Level = "ok" | "info" | "warn" | "err";
 
 export type AgentEvent =
-  | { type: "text"; text: string }
+  /** a finished message; `stream` names the live message it closes when its sentences were already sent as deltas */
+  | { type: "text"; text: string; stream?: string }
+  /** one or more sentences of a message still being written: shown at once, never stored or replayed */
+  | { type: "delta"; stream: string; text: string }
   | { type: "tool"; name: string; args: Record<string, unknown> }
   | { type: "panel"; panel: { kind: PanelKind; id?: string } }
   | { type: "approval"; action: "resume" | "contact" }
@@ -62,7 +65,7 @@ export type ChatMessage =
 export interface ModelClient {
   name: string;
   /** `onTool` fires as soon as a streamed reply names a tool, before the arguments or the text have finished */
-  complete(messages: ChatMessage[], signal: AbortSignal, onTool?: (name: string) => void): Promise<AssistantMessage>;
+  complete(messages: ChatMessage[], signal: AbortSignal, onTool?: (name: string) => void, onText?: (delta: string) => void): Promise<AssistantMessage>;
   /** how this slot has been doing lately, so the chain can be ordered by availability */
   health?: () => SlotHealth;
   /** the run loop reports outcomes the client cannot see itself (an empty reply) */

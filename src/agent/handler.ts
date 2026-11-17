@@ -166,7 +166,8 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
       const country = req.headers.get("x-vercel-ip-country") ?? undefined;
       const tt = deps.tracer?.({ question: turns.at(-1)!, turns, session: parsed.threadId, killed: parsed.killModel, country });
       const seen: AgentEvent[] = [];
-      const emit = (ev: AgentEvent) => { seen.push(ev); tt?.event(ev); toAgui(ev).forEach(send); };
+      const live = new Set<string>();
+      const emit = (ev: AgentEvent) => { if (ev.type !== "delta") { seen.push(ev); tt?.event(ev); } toAgui(ev, live).forEach(send); };
       let meta: RunMeta | undefined, error: string | undefined;
       send(runStarted(threadId, runId));
       try {
@@ -182,14 +183,14 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
           meta = { mode: "cache", ...(Object.keys(facts).length ? { visitor: facts } : {}) };
         } else {
           const recorded: AgentEvent[] = [];
-          const record = (ev: AgentEvent) => { if (ev.type !== "trace" && ev.type !== "state") recorded.push(ev); emit(ev); };
+          const record = (ev: AgentEvent) => { if (ev.type !== "trace" && ev.type !== "state" && ev.type !== "delta") recorded.push(ev.type === "text" && ev.stream ? { type: "text", text: ev.text } : ev); emit(ev); };
           const budgetOut = spent.budgetOut;
           if (budgetOut) emit({ type: "trace", step: "budget", detail: "daily model budget used up · deterministic router only", level: "warn" });
           // fold in what other instances learned about the keys, and share what this turn learns
           const shared = await sharedHealth;
           if (shared) { const n = applyHealth(shared); if (n) emit({ type: "trace", step: "model", detail: `key health shared by other instances · ${n} slot${n === 1 ? "" : "s"} known`, level: "info" }); }
           if (deps.health) { const board = deps.health; setHealthSink((id, st) => waitUntil(board.save(id, st))); }
-          meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut, style: parsed.style }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, retriever: deps.retriever, selfCheck: deps.selfCheck, signal: ctl.signal });
+          meta = await runAgent({ turns, history, shown, state, killModel: parsed.killModel || budgetOut, style: parsed.style }, record, { models: tt ? tt.models(deps.models()) : deps.models(), screen: tt ? tt.screen(deps.screen) : deps.screen, classify: deps.classify, retriever: deps.retriever, selfCheck: deps.selfCheck, signal: ctl.signal, stream: true });
           if (!spent.shared && !budgetOut && meta.mode !== "model" && meta.mode !== "partial") budget.runs--; // local fallback only: a turn that touched no model is given back
           if (meta.mode === "model" && !meta.stock) deps.cache.set(key, recorded);
         }

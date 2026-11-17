@@ -17,7 +17,9 @@ type Ev =
   | { type: "panel"; panel: { kind: string; id?: string } } | { type: "approval"; action: "resume" | "contact" }
   | { type: "suggest"; options: string[] } | { type: "frontend"; name: string; args: { mode: string } }
   | { type: "trace"; step: string; detail: string; level: string } | { type: "done"; meta: Meta }
-  | { type: "state"; state: Record<string, unknown> };
+  | { type: "state"; state: Record<string, unknown> }
+  // a message the server streams sentence by sentence (its id starts with "live_"): drawn as it grows, then finalised
+  | { type: "live"; id: string; delta: string } | { type: "live_end"; id: string; text: string };
 
 const P = new Map(PROJECTS.map((p) => [p.id, p]));
 /** The projects a list panel shows: the ids in its key ("pack,ccr"), or all of them. */
@@ -53,6 +55,31 @@ export function mountAgent(shell: HTMLElement): () => void {
   }
   // a project named in an answer opens that project
   const wireAnswer = (el: ParentNode) => el.querySelectorAll<HTMLButtonElement>(".msg .pj[data-openp]").forEach((b) => (b.onclick = () => void send(`Open ${P.get(b.dataset.openp!)!.title}`)));
+  /** A streamed answer: one bubble that grows sentence by sentence, plain text while it streams, then the final wording
+   *  formatted like any other answer (paragraphs, project links, figures). Screen readers get the finished text once. */
+  const liveEls = new Map<string, { el: HTMLElement; text: string }>();
+  function liveGrow(id: string, delta: string) {
+    let cur = liveEls.get(id);
+    if (!cur) {
+      const slot = target?.querySelector(".ttext") ?? undefined;
+      const el = add(`<div class="msg${lastAgentRun ? " cont" : ""} streaming"><span class="mark${down ? " degraded" : ""}" aria-hidden="true"><i></i></span><div class="text"><span class="sr"></span><span class="tv" aria-hidden="true"></span></div></div>`, slot);
+      cur = { el, text: "" }; liveEls.set(id, cur); lastAgentRun = true;
+    }
+    cur.text += delta;
+    const tv = cur.el.querySelector<HTMLElement>(".tv");
+    if (tv) { const span = document.createElement("span"); span.className = "w"; span.textContent = delta; tv.appendChild(span); }
+  }
+  async function liveEnd(id: string, text: string) {
+    const cur = liveEls.get(id);
+    if (!cur) { await say(text); return; }
+    liveEls.delete(id);
+    cur.el.classList.remove("streaming");
+    const sr = cur.el.querySelector<HTMLElement>(".sr"), tv = cur.el.querySelector<HTMLElement>(".tv");
+    if (sr) sr.textContent = text;
+    if (tv) tv.innerHTML = answerHtml(text);
+    wireAnswer(cur.el);
+    turnSaid.push(text);
+  }
   async function say(text: string, opts: { big?: boolean } = {}) {
     const words = text.split(/(\s+)/), slot = target?.querySelector(".ttext") ?? undefined;
     // the plain sentence for screen readers; the formatted one (paragraphs, project links, figures) for the eye
@@ -583,13 +610,15 @@ export function mountAgent(shell: HTMLElement): () => void {
     if (res.status === 429) { think.remove(); await say("You’re going fast. Give it a minute; the buttons below still work."); return { mode: "local" }; }
     if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
     let meta: Meta | null = null, plan: ReturnType<typeof planCard> | null = null, pending: number | null = null, compactNext = false;
-    const textBuf = new Map<string, string>(), toolBuf = new Map<string, { name: string; args: string }>();
+    const textBuf = new Map<string, string>(), textFinal = new Map<string, string>(), toolBuf = new Map<string, { name: string; args: string }>();
     let chain = Promise.resolve();
     const handle = async (e: Ev) => {
       if (e.type !== "trace") think.remove();
       if (e.type === "trace") tr(e.level, e.step, e.detail);
       else if (e.type === "state") { setState({ session: e.state, focus: (e.state.focus as string | null) ?? S.focus }); rememberVisit(e.state); }
       else if (e.type === "text") await say(e.text);
+      else if (e.type === "live") liveGrow(e.id, e.delta);
+      else if (e.type === "live_end") await liveEnd(e.id, e.text);
       else if (e.type === "tool") {
         if (e.name === "suggest") return;
         if (!plan) plan = planCard();
@@ -614,8 +643,15 @@ export function mountAgent(shell: HTMLElement): () => void {
       let ui: Ev | null = null;
       switch (a.type) {
         case "TEXT_MESSAGE_START": textBuf.set(a.messageId, ""); break;
-        case "TEXT_MESSAGE_CONTENT": textBuf.set(a.messageId, (textBuf.get(a.messageId) ?? "") + a.delta); break;
-        case "TEXT_MESSAGE_END": ui = { type: "text", text: textBuf.get(a.messageId) ?? "" }; textBuf.delete(a.messageId); break;
+        case "TEXT_MESSAGE_CONTENT":
+          textBuf.set(a.messageId, (textBuf.get(a.messageId) ?? "") + a.delta);
+          if (String(a.messageId).startsWith("live_")) ui = { type: "live", id: a.messageId, delta: a.delta };
+          break;
+        case "TEXT_MESSAGE_END": {
+          const full = textFinal.get(a.messageId) ?? textBuf.get(a.messageId) ?? "";
+          ui = String(a.messageId).startsWith("live_") ? { type: "live_end", id: a.messageId, text: full } : { type: "text", text: full };
+          textBuf.delete(a.messageId); textFinal.delete(a.messageId); break;
+        }
         case "TOOL_CALL_START": toolBuf.set(a.toolCallId, { name: a.toolCallName, args: "" }); break;
         case "TOOL_CALL_ARGS": { const t = toolBuf.get(a.toolCallId); if (t) t.args += a.delta; break; }
         case "TOOL_CALL_END": { const t = toolBuf.get(a.toolCallId); if (t) { let args = {}; try { args = JSON.parse(t.args || "{}"); } catch { /* keep {} */ } ui = { type: "tool", name: t.name, args }; } break; }
@@ -625,6 +661,7 @@ export function mountAgent(shell: HTMLElement): () => void {
           else if (a.name === "suggest") ui = { type: "suggest", options: a.value.options };
           else if (a.name === "frontend_tool") ui = { type: "frontend", name: a.value.name, args: a.value.args };
           else if (a.name === "trace") ui = { type: "trace", ...a.value };
+          else if (a.name === "text_final") textFinal.set(a.value.messageId, a.value.text);
           break;
         case "STATE_SNAPSHOT": ui = { type: "state", state: a.snapshot }; break;
         case "RUN_FINISHED": ui = { type: "done", meta: a.result ?? { mode: "local" } }; break;

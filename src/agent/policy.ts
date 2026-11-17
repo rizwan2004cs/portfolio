@@ -49,7 +49,10 @@ export function checkToolCall(call: { name: string; args: Record<string, unknown
   }
   const subject = ctx.subject ?? ctx.last;
   // the full list only answers broad questions; "what did he build at Impact Lab?" has one clear answer (DUO)
-  const pick = clearPick(subject);
+  // …but "which projects use Supabase?" asks for every project with that tool: a technology shared by several projects
+  // is a filter, not a pick, even when one project mentions it most
+  const shared = projectFilter(ctx.last, undefined, true);
+  const pick = shared && shared.projects.length > 1 && /\b(which|what|any|all|other)\b[^?]{0,30}\bprojects?\b|\bprojects?\b[^?]{0,30}\b(use|uses|used|using|with|built on|run on)\b/i.test(ctx.last) ? undefined : clearPick(subject);
   if (name === "list_projects" && pick)
     return { action: "drop", detail: `blocked the full list: the question points at ${pick.title}`, reason: `the question is about ${pick.title}; open that project instead` };
   // the harness is only for questions about this site itself; "how does NGO handle failures?" or
