@@ -620,10 +620,12 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         else if (!gr.dropped.length || gr.total > gr.dropped.length || (visible && (lastTitle || gr.extracted))) {
           // "Here is his resume." / "Opening CCR's architecture." with nothing opened is a claim about the screen that isn't true
           const shownNow = `${asked ?? ""} ${lastKind} ${lastProject?.title ?? ""}`;
-          const said = narrated(dedupeSentences(gr.text), shownNow);
+          const said = { ...narrated(dedupeSentences(gr.text), shownNow) };
           if (said.cut) emit({ type: "trace", step: "grounding", detail: `removed ${said.cut} sentence${said.cut > 1 ? "s" : ""} describing something that wasn’t shown`, level: "warn" });
           // a visitor who gave their name is greeted by it, whatever the model chose to say first
           const name = kind === "visitor_intro" ? (sorted.visitor ?? input.state?.visitor)?.name : undefined;
+          // a rating the check cut leaves the evidence behind it: say so, and don't start on "He also"
+          if (gr.parts.some((p) => !p.ok && p.miss?.includes("invented score")) && said.text) said.text = `No scores here, only evidence. ${said.text.replace(/^(He|His)( work)? also\b/, "$1$2")}`;
           const greeting = said.text && name && /^[A-Z][a-z]{1,20}$/.test(name) && !/^(Recruiter|Founder|Manager|Hiring|Engineer|Developer|Student|Friend)$/.test(name) && !said.text.includes(name) ? `Hi ${name}. ${said.text.replace(/^(hi|hello|hey)( there)?[,.!]\s*/i, "")}` : said.text;
           if (greeting && !liveClose(greeting)) out({ type: "text", text: greeting });
         }

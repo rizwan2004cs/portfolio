@@ -71,3 +71,12 @@ describe("golden · a judgement about him with every model down", () => {
     expect(r.text).toMatch(/doesn’t fall over/); expect(r.text).not.toMatch(/Outside my lane/);
   });
 });
+
+describe("golden · no invented ratings", () => {
+  it("'rate his python out of 10' keeps the evidence and drops the score", async () => {
+    const { scripted, say } = await import("./helpers");
+    const m = scripted("a", [say("8 / 10. He also uses Python in PACK and CCR Compliance Advisor.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["rate his python out of 10"] }, [m], undefined, undefined, work);
+    expect(r.text).toMatch(/^No scores here, only evidence\. He uses Python in PACK/); expect(r.text).not.toMatch(/8 \/ 10/);
+  });
+});
