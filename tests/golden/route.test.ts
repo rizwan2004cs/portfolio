@@ -193,3 +193,17 @@ describe("route · turn log", () => {
     expect(evs.at(-1).type).toBe("RUN_FINISHED");
   });
 });
+
+describe("weak replies are reported", () => {
+  it("names the reason, and stays quiet for deliberate refusals and a killed model", async () => {
+    const { weakReply } = await import("@/agent/handler");
+    const text = (t: string) => ({ type: "text" as const, text: t }), tr = (step: string, detail: string) => ({ type: "trace" as const, step, detail, level: "info" as const });
+    expect(weakReply("who is he", [text("Outside my lane. Closest thing I can show you is everything he’s built.")], { mode: "router" }, 900, false)).toBe("dead-end");
+    expect(weakReply("who is he", [text("He is an AI engineer.")], { mode: "router" }, 900, false)).toBe("router-answered");
+    expect(weakReply("q", [tr("grounding", "removed 1 of 1 sentence: not in his facts"), text("PACK is live.")], { mode: "facts" }, 900, false)).toBe("answer-discarded");
+    expect(weakReply("q", [text("He is an AI engineer.")], { mode: "model" }, 9500, false)).toBe("slow");
+    expect(weakReply("q", [text("He is an AI engineer.")], { mode: "model" }, 900, false)).toBeNull();
+    expect(weakReply("is he married", [tr("policy", "personal · fixed reply from the behaviour policy"), text("I stick to his work.")], { mode: "scope" }, 300, false)).toBeNull();
+    expect(weakReply("q", [text("Outside my lane.")], { mode: "router" }, 300, true)).toBeNull();
+  });
+});

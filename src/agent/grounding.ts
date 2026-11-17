@@ -32,7 +32,8 @@ const NOT_NAMES = new Set("He His Him The A An It Its This That These Those At I
 export function misanchored(sentence: string, src: string): string[] {
   // "millions of sections" is a number claim too, just without digits
   const qty = (sentence.match(/\b(millions?|billions?|thousands?|hundreds|dozens|lakhs?|crores?)\b/gi) ?? []).filter((w) => !src.toLowerCase().includes(w.toLowerCase()));
-  const nums = sentence.match(/[$₹]?\d[\d,.]*\d|[$₹]\d/g) ?? [];
+  // a bare year that appears anywhere in the facts is a date, not a figure that needs anchoring
+  const nums = (sentence.match(/[$₹]?\d[\d,.]*\d|[$₹]\d/g) ?? []).filter((n) => !(/^(19|20)\d\d$/.test(n) && src.includes(n)));
   if (!nums.length) return qty;
   // names (Monad, Superteam, Gemini) anchor a number better than generic words like "prize"
   const names = [...new Set((sentence.match(/\b[A-Z][A-Za-z0-9-]+/g) ?? []).filter((w) => !NOT_NAMES.has(w)).map((w) => w.toLowerCase()))];
@@ -47,15 +48,17 @@ export function misanchored(sentence: string, src: string): string[] {
 
 // every technology the site mentions, longest first so "Supabase Realtime" wins over "Supabase"
 const TECH = [...new Set([...MARQUEE_A, ...MARQUEE_B, ...TOOLKIT.flatMap(([, l]) => l), ...PROJECTS.flatMap((p) => [...p.stack, ...(p.keywords ?? [])])].map((t) => t.toLowerCase()))]
-  .filter((t) => t.length > 2).sort((a, b) => b.length - a.length);
+  // one-word terms that are also plain English ("its own voice", "search for") are not technology claims on their own
+  .filter((t) => t.length > 2 && !/^(voice|agents?|search|chat|auth|realtime|mobile|web|cloud|data|vision|speech)$/.test(t)).sort((a, b) => b.length - a.length);
 const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** Reasoning across projects can mix them up: "CCR and FinBoom use FastAPI and Azure" names real projects and
  *  real technologies that don't belong together. When a sentence names projects, every technology it mentions
  *  must appear in at least one of those projects. Returns the misattributed technologies. */
 export function misattributedTech(sentence: string): string[] {
-  const low = sentence.toLowerCase();
+  // a link is where something lives, not a technology claim ("live at finboom-cyan.vercel.app")
+  const low = sentence.toLowerCase().replace(/\b[\w-]+(\.[\w-]+)+(\/\S*)?/g, " ");
   const named = [
-    ...PROJECTS.filter((p) => new RegExp(`\\b${esc(p.title.toLowerCase())}\\b`).test(low) || new RegExp(`\\b${esc(p.id)}\\b`).test(low))
+    ...PROJECTS.filter((p) => new RegExp(`\\b${esc(p.title.toLowerCase())}\\b`).test(low) || (!/^(voice|ngo|kerala|site)$/.test(p.id) && new RegExp(`\\b${esc(p.id)}\\b`).test(low)))
       .map((p) => ({ title: p.title, text: `${p.facts.join(" ")} ${p.stack.join(" ")} ${(p.keywords ?? []).join(" ")} ${p.oneLiner}`.toLowerCase() })),
     // his jobs say nothing about tools, so "Azure at Novulis" can't be grounded
     ...EXPERIENCE.filter((x) => low.includes(x.title.toLowerCase())).map((x) => ({ title: x.title, text: x.body.toLowerCase() })),
@@ -88,7 +91,7 @@ export function roleBleed(sentence: string): string[] {
   const words = [...new Set((low.match(/[a-z][a-z0-9-]{4,}/g) ?? []).filter((w) => !STOP.has(w)))];
   // one borrowed word ("completed", "remote") is ordinary language; two or more is another role's duties
   const borrowed = words.filter((w) => !own.includes(stem(w)) && others.includes(stem(w)));
-  return borrowed.length >= 2 ? borrowed : [];
+  return borrowed.length >= 3 ? borrowed : [];
 }
 
 // an achievement claim: "won", "prize", "award", "placed second". "wins", "winning" and a bare "placed" are ordinary words
@@ -167,7 +170,8 @@ export function groundAnswer(answer: string, source: string, question: string, t
     if (!miss.length && /\b(looking for|seeking|searching for|open to|available for|in the market for|actively (looking|interviewing))\b[^.]{0,40}\b(jobs?|roles?|work|opportunit\w*|positions?|offers?|openings?)\b/i.test(s)) miss.push("job-seeking claim");
     // puffery ("routinely", "extensive experience") is never in the write-ups
     const puff = s.match(/\b(routinely|extensive(ly)?|expert(ise)?|years of|seasoned|mastery|deep experience|similar stacks|proven track record|battle.tested|production.(ready|grade)|in production|at scale|enterprise.grade|several production|deep (prompt|knowledge|expertise|understanding)|most (freshers|candidates|engineers|graduates|people)|unlike (most|other)|few (freshers|candidates|engineers))\b/i);
-    const puffed = !miss.length && !!puff;
+    // "his write-up doesn't give a total years of experience" denies the puffery: it is not puffery
+    const puffed = !miss.length && !!puff && !/\b(doesn(’|')t|does not|no|not|never|isn(’|')t|without)\b[^.]{0,40}$/i.test(s.slice(0, puff.index ?? 0));
     if (puffed) miss.push(puff![0].toLowerCase());
     if (miss.length) { dropped.push(miss); parts.push({ s, ok: false, why: words ? "words" : puffed ? "puffery" : "claims", miss, check: check || (puffed ? "puffery" : "claim") }); } else { kept.push(s); parts.push({ s, ok: true }); }
   }

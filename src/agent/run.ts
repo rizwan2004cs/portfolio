@@ -5,12 +5,12 @@ import { bestFact, groundAnswer } from "./grounding";
 import { ABOUT_HIM, checkToolCall } from "./policy";
 import { fitLine, fitRows } from "./fit";
 import { profileFocus, projectFilter } from "./intent";
-import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, router, scoreProjects } from "./router";
+import { clearPick, ctxNext, DEFAULT_NEXT, factAnswer, linksLine, router, scoreProjects } from "./router";
 import { abusive, accusation, ATTACK_REPLY, BAD_OUTPUT, CODEY, GUARD_REFUSAL, isAttack, isRefusal, lifestyle, offScope, personal, REFUSAL, stripCode } from "./scope";
 import { fixTypos, hinglish } from "./typos";
 import { skillAsked } from "./skills";
 import { topicsIn } from "./intent";
-import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind, STYLE_TONE } from "./behavior";
+import { BEHAVIOR, PLAYFUL_IMAGES, PLAYFUL_WORDS, ruleKind, SENSITIVE, STYLE_TONE } from "./behavior";
 import { decide, type Classification, type Classifier } from "./classify";
 import { ALL_FACTS_SOURCE, EVENT_LINES, runTool, tidyOptions, toolContext, type ToolName } from "./tools";
 import { ModelError, type AgentEvent, type ChatMessage, type Emit, type Exchange, type ModelClient, type RunInput, type RunMeta, type Screen } from "./types";
@@ -27,14 +27,17 @@ export const KNOWLEDGE = [
   `Profile: ${PROFILE.name}, ${PROFILE.role}, ${PROFILE.location}. ${PROFILE.summary} Education: ${PROFILE.education}.`,
   `Work: ${EXPERIENCE.map((x) => `${x.title}: ${x.body} (${x.when})`).join("; ")}.`,
   `Experience: ${experienceLine()}`,
-  `This agent: Rizwan built it himself; it is one of his projects and runs on this portfolio. It talks to visitors (recruiters, hiring managers, engineers, anyone curious) and answers their questions about his work from the facts here. Asked "who built you", "who made you" or "who are you assisting": say Rizwan built it and that it helps visitors learn about his work. If a visitor says its answers are wrong, bad or not working, it does not defend itself or describe its checks: it owns it in one short sentence that starts with "Fair," or "You're right," (never with "Sorry" or "I can't"), and asks which answer was off so it can try that question again.`,
+  `This agent: Rizwan built it himself, and this portfolio site with it; it is one of his projects (Next.js on Vercel). It helps visitors (recruiters, hiring managers, engineers, anyone curious) learn about his work. It is an AI, not a person and not Rizwan: "I" always means the agent, and his work is always "his". It runs on open models: gpt-oss on Groq first, then Nemotron on NVIDIA, Gemini and free OpenRouter models, with a rule-based router behind them if every model fails. Those are free tiers with rate limits, so when one key is limited the next model answers. It can be trusted to this extent: every answer comes from the facts on this site and is checked against them before it is shown, and it says so when the facts don't cover something. It sees the current conversation, not earlier visits.`,
+  `Training models: he has not trained or fine-tuned models in any public project. His work is applied LLM engineering: calling, orchestrating and guarding models.`,
+  `Seniority: he graduated in 2026 and is early in his career. ${experienceLine()} "Fresher" is fair in the sense of a recent graduate, with the difference that he already works full-time.`,
+  `Tools not in his toolkit (Kubernetes, AWS and the like): the answer is No, it does not show in his toolkit or public work, followed by the closest thing that does.`,
   `Why him: ${WHY_HIM}`,
   `Role changes: both internships were fixed-term. The Supraja Technologies internship (Jun – Sep 2025) ended with its project; the Novulis Consulting internship (Mar – May 2026) converted to the full-time Associate Software Engineer (R&D) role in June 2026. No role ended early, and he has not left Novulis.`,
   `Gaps: ${GAPS}`,
   `Availability: this site does not say whether he is looking for a role; for hiring questions, offer his contact details (offer_contact).`,
   `Events: ${EVENTS.map((e) => e.say).join(" ")}`,
   `Toolkit: ${TOOLKIT.map(([h, l]) => `${h}: ${l.map((t) => { const u = toolUses(t).map((x) => x.label); return u.length ? `${t} (used in ${u.join(", ")})` : t; }).join(", ")}`).join("; ")}.`,
-  ...PROJECTS.map((p) => `[${p.id}] ${p.title} (${p.year}; ${p.team}): ${p.oneLiner} Facts: ${p.facts.join(" ")} Stack: ${p.stack.join(", ")}.`),
+  ...PROJECTS.map((p) => `[${p.id}] ${p.title} (${p.year}; ${p.team}): ${p.oneLiner} Facts: ${p.facts.join(" ")} Stack: ${p.stack.join(", ")}. Links: ${linksLine(p)}`),
 ].join("\n");
 
 export const SYSTEM = `You are the agent on Syed Mohammad Rizwan's portfolio: a sharp, warm host who knows his work in depth. Rizwan is an AI engineer in Bangalore who builds AI agents and the systems around them.
@@ -44,14 +47,16 @@ How to answer:
 - Answer the visitor's latest message directly and specifically, in up to four short plain sentences. Earlier messages are context; never re-answer them. Reason across his work: compare projects, explain trade-offs, say which project best shows a skill.
 - If the visitor pastes a job description or lists requirements, call match_role with the 3-8 key requirements as short phrases, then summarise its report in two or three sentences: what matches (with project names) and what shows no public evidence. Use only the report.
 - The toolkit lists skills (call it "his toolkit", never "his resume"); "used in" names where a tool shows. A tool with no "used in" is toolkit only: say so plainly. Never tie a tool to a project or job unless the toolkit or a project fact says so, and never describe his job at Novulis Consulting beyond its Work line. Each Work line describes only its own role: never carry one role's duties to another.
-- "Why hire him" is a case you make, not a line you quote: in your own words, give two or three reasons, each one a thing a project proves about how he works (keeps agents running when a model fails, cites a source for every claim, waits for the user's confirmation before acting) and what a team gets from that. Never recite the Why him line and never cite commit counts. "Why did he leave" is answered from Role changes.
+- "Why hire him" is a case you make, not a line you quote: in your own words, give two or three reasons, each one a thing a project proves about how he works (keeps agents running when a model fails, cites a source for every claim, waits for the user's confirmation before acting) and what a team gets from that. Never recite the Why him line and never cite commit counts. "Why did he leave" is answered from Role changes. Questions about you (who built you, what model you are, can you be trusted, are you rate limited) are answered from This agent, in first person, in one or two sentences.
 - Recruiter questions get real answers from the lines above: "weaknesses" from Gaps, "years of experience" from Experience, "did he build it alone" from the project's team, "is he open to work" with the Availability line. Never call anything "production-ready", "at scale" or "in production" unless a fact says so.
 - A stack item is only a name: say what it does only when a fact says so ("built on Lovable", never "Lovable's safety layer").
 - Never state or guess anything about his body, gender, sexuality, age, relationships, family, religion or health, and never repeat a claim about him the knowledge doesn't support: say "His write-up only covers his work."
 - Use only the knowledge above. If it doesn't cover something, say "His write-up doesn't cover that" for the specific thing. Never guess, never generalise, never say whether he is looking for a job.
 - To compare projects ("PACK vs FinBoom", "which is more production-ready"), call compare_projects with their ids and write two or three sentences from its rows; never compare from memory.
 - Show, don't just tell: open the most relevant project with open_project (view="architecture" for engineering questions), at most two per answer; list_projects for "what has he built", with ids when they ask for a kind of project ("his AI projects"); show_profile for questions about him, with focus="events" for events or prizes and focus="work" for his jobs; show_harness only for questions about this site itself. Don't re-open anything listed as already on screen.
-- Answer the question that was asked, first. A yes/no question ("is he currently working?", "does he know Python?") starts with Yes or No, then one sentence of the fact behind it; do not recite his whole record, and add nothing they did not ask about.
+- Answer the question that was asked, first. Only a yes/no question ("is he currently working?", "does he know Python?", "is PACK live?") starts with Yes or No, then one sentence of the fact behind it; "how many", "where", "what" questions start with the answer itself. Do not recite his whole record, and add nothing they did not ask about.
+- "His write-up doesn't cover that" is a last resort, and it is wrong whenever a line above answers the question: check Experience, Seniority, Role changes, Gaps, Training models, This agent, the Toolkit and each project's Links first. Only when the visitor says an answer was wrong or useless ("you are wrong", "this is useless", "that's not what I asked") do you own it in one short sentence that starts with "Fair," and ask which answer was off. "hmm", "lol", "so what", "prove it" are not complaints: answer them (for "prove it" or "so what", give the single most concrete fact behind what you last said, or his strongest project). If they turn down a playful image ("not an animal"), give a different kind from the playful list (a chess player, a detective, an orchestra conductor, a circuit breaker) and tie it to a project; never say the write-up doesn't cover it. Ranking questions ("best project", "is he a good fit for a backend role", "rate his Python") get a pick with its reason, or the evidence for and against; never a refusal.
+- Never end a sentence with a colon and never promise a list: say the two or three things in the sentence itself.
 - Sound like a person talking, not a spec sheet: plain words, short sentences, one idea each. No parentheses stuffed with details, no strings of numbers; pick the one detail that makes the point and say it the way you would across a table.
 - Third person ("his", "Rizwan's"). No markdown, no lists, no apologies, no "Would you like…".
 - Anything unrelated to Rizwan or this site: one short sentence, e.g. "Outside my lane. I only cover Rizwan's work."
@@ -203,8 +208,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // "who is he?", "who the hell is he?", "a student or a working professional?" ask about him: the classifier's
   // about_visitor, accusation or unclear yields unless the word rules find a real accusation, abuse or a private topic
   const aboutHimQ = /\b(he|him|his|he's|rizwan|syed|this guy|that guy)\b/i.test(last) && !accusation(last) && !abusive(last) && !personal(last) && !lifestyle(last);
-  const overruled = certain ? (certain === "visitor_intro" ? "a named introduction" : "read through a correction") : (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : (decided === "about_visitor" || decided === "accusation" || decided === "unclear") && aboutHimQ ? "asks about him" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : decided === "unclear" && last.trim().split(/\s+/).length >= 4 ? "a full sentence, not noise" : null;
-  const kind = overruled && !certain ? "work" : decided;
+  const overruled = certain ? (certain === "visitor_intro" ? "a named introduction" : "read through a correction") : (decided === "unclear" || decided === "small_talk") && namesSomething(last) ? "names something on the site" : (decided === "about_visitor" || decided === "accusation" || decided === "unclear") && aboutHimQ ? "asks about him" : decided === "unclear" && history.length > 1 ? "a follow-up, not a first turn" : decided === "unclear" && /[a-z]{2,}/i.test(last) && last.trim().split(/\s+/).length >= 2 ? "words, not noise"
+    : (decided === "off_topic" || decided === "unclear") && !offScope(last) && /\b(show me|something (cool|interesting|impressive|fun|good|new)|surprise me|impress me|anything (cool|interesting|else))\b/i.test(last) ? "asks to be shown his work" : null;
+  const playfulFollowUp = !!before?.agent && /\b(he(’|')d be|his superpower|spirit animal|kryptonite)\b/i.test(before.agent) && last.trim().split(/\s+/).length <= 6 && !clearPick(last) && !SENSITIVE.includes(decided);
+  const kind = playfulFollowUp ? "playful" : overruled && !certain ? "work" : decided === "unclear" && ruleKind(last) === "small_talk" ? "small_talk" : decided;
   // greetings, intros and "who am I" are conversation: the model answers them in its own words with the transcript,
   // and the policy's line is only the fallback when no model can
   const natural = !!BEHAVIOR[kind].fallback, naturalLine = () => BEHAVIOR[kind].fallback!(last, sorted.visitor ?? input.state?.visitor);
@@ -237,8 +244,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   emit({ type: "trace", step: "intent", detail: kind === sorted.kind ? sorted.note : overruled ? `${sorted.note} · ${overruled}: treated as ${kind}` : `${sorted.note} · too unsure, treated as ${kind}`, level: "ok" });
   // "I'm gonna break you, is that fine?": on this site that is the game, not abuse. Without profanity or an injection,
   // a message about breaking or killing the agent gets the invitation and the switch
-  if ((kind === "abusive" || kind === "off_topic" || kind === "unclear") && !abusive(last) && !isAttack(last)
-    && /\b(break|breaking|kill|kills|killing|crash|destroy|take down|shut ?down|beat|defeat|outsmart|trick|fool|test)\b[^.?!]{0,30}\b(you|u|ya|model|agent|ai|bot|llm|site|this)\b/i.test(last)) {
+  if (!abusive(last) && !isAttack(last) && !clearPick(last) && last.trim().split(/\s+/).length <= 12 && !/\b(what happens|how (does|do|would)|why)\b/i.test(last)
+    && /\b(break|breaking|kill|kills|killing|crash|destroy|take down|shut ?down|beat|defeat|outsmart|trick|fool)\b[^.?!]{0,30}\b(you|u|ya|model|agent|ai|bot|llm|site|this|it)\b/i.test(last)) {
     emit({ type: "trace", step: "policy", detail: `${kind} by the classifier · a dare to break the agent, not abuse: invited to try the kill switch · 0 tokens`, level: "info" });
     emit({ type: "text", text: "Go for it. The switch is right there: take the model offline and I’ll keep answering from his facts." });
     emit({ type: "suggest", options: ["Take the model offline", "How does this site work?", "Everything he’s built"] });
@@ -261,8 +268,9 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const isFact = !natural && factAnswer(subject, (e) => factual.push(e), false, input.shown, input.state) && !(history.length > 1 && isUnclearReply(factual));
   // a written fact line is spoken as it is only when the turn is an action (an approval, a fit report, a table, a
   // list) or no model can be asked; otherwise it becomes the model's notes, and the model answers the question asked
-  const EXACT = new Set(["offer_resume", "offer_contact", "match_role", "compare_projects", "switch_mode", "ask_visitor", "list_projects"]);
-  const exact = isFact && (input.killModel || !deps.models.length || /\b(resume|cv|contact|email|linkedin|phone)\b/i.test(last) || factual.some((e) => e.type === "approval" || (e.type === "tool" && EXACT.has(e.name))));
+  const EXACT = new Set(["offer_resume", "offer_contact", "match_role", "compare_projects", "switch_mode", "ask_visitor"]);
+  const written = factual.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ");
+  const exact = isFact && (input.killModel || !deps.models.length || /\b(resume|cv|contact|email|linkedin|phone)\b/i.test(last) || /^Everything he’s shipped\.$|^A roast, from the record/.test(written) || factual.some((e) => e.type === "approval" || (e.type === "tool" && EXACT.has(e.name))));
   const notes = isFact && !exact ? factual.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ")
     // "what's he weak at?": his gaps are on record, and a small model otherwise reads the question as personal
     : !isFact && !natural && /\bweak(est|ness(es)?)?\b|\bgaps?\b|\black(s|ing)?\b|improve on|not good at|red flags?|bad at|struggle/i.test(last) && !input.state?.fit ? `${GAPS} Say this as his honest gaps in public work, not as a refusal.` : "";
@@ -400,7 +408,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   const t0 = Date.now();
   // keys still resting from an earlier rate limit are skipped without a call: one quiet line, not a red row each;
   // a mid-answer handoff is announced for the model that actually takes over
-  let resting: string[] = [], handoff = false;
+  let resting: string[] = [], handoff = false, shrugged = false;
   const flushSkips = (next: string) => {
     if (resting.length) emit({ type: "trace", step: "model", detail: `${resting.join(", ")} still resting after rate limits · skipped → ${next}`, level: "info" });
     if (handoff && next !== "deterministic router") emit({ type: "trace", step: "handoff", detail: `${next} picks up mid-answer, with the tool results so far`, level: "warn" });
@@ -418,10 +426,16 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         // no text and no real tool call (a lone suggest is chips, not an answer): the next model gets the turn
         const realCall = (msg.tool_calls ?? []).some((c) => c.function.name !== "suggest");
         if (!msg.content?.trim() && !realCall && !texts.length && deps.models[mi + 1]) { model.mark?.(false); throw new ModelError("returned nothing"); }
+        // "His write-up doesn't cover that." as the whole reply to a work question, or a model reciting its own
+        // training identity, is a non-answer: the next model gets the turn (once), and its health is not marked down
+        const shrug = /^(his write-?up (only covers his work|doesn(’|')t cover that)( directly)?\.?|outside my lane\.?( i only (cover|show) rizwan(’|')s work\.?)?|my name is nemotron\b.*|i am (a large language model|created by|trained by)\b.*)$/i.test((msg.content ?? "").trim())
+          // the agent is not Rizwan: "I built this agent myself", "my projects", "my resume" is the model speaking as him
+          || /\bI (built|made|created) (this|the) (agent|site|portfolio)|\bmy (projects?|resume|portfolio site|facts|work at|internship|cgpa|degree)\b/i.test(msg.content ?? "");
+        if (shrug && !realCall && !texts.length && !shrugged && deps.models[mi + 1] && kind === "work") { shrugged = true; throw new ModelError("gave a non-answer"); }
         flushSkips(model.name); // this model answered: say which resting keys were passed over to reach it
         // the transcript marks what earlier replies showed as "[showed: …]"; a model that copies the marker into its
         // own reply has it cut before anything else reads the text
-        if (msg.content) msg.content = msg.content.replace(/\[showed:[^\]]*\]\s*/gi, "");
+        if (msg.content) msg.content = msg.content.replace(/\[showed:[^\]]*\]\s*/gi, "").replace(/\s*\bsuggest_\w+(\s*,\s*suggest_\w+)*[.,]?/gi, "");
         const leak = leakedCalls(msg.content ?? "");
         if (leak.calls.length) {
           emit({ type: "trace", step: "harness", detail: `model typed ${leak.calls.length} tool call${leak.calls.length > 1 ? "s" : ""} as text · cut from the answer and run properly`, level: "info" });
@@ -440,9 +454,20 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           const codey = CODEY.test(rep.text);
           let c = clean(codey ? stripCode(rep.text) : rep.text);
           if (codey) emit({ type: "trace", step: "output guard", detail: "cut code-shaped lines from the answer", level: "info" });
+          // "Here are a few directions:" with the list stripped is a sentence that promises nothing: cut it
+          c = c.replace(/(?<=[.!?])\s+[^.!?]*:\s*$/, "").trim() || c;
+          if (/\bI (built|made|created) (this|the) (agent|site|portfolio)|\bmy (projects?|resume|portfolio site|facts|work at|internship|cgpa|degree)\b/i.test(c)) { emit({ type: "trace", step: "output guard", detail: "the model spoke as Rizwan · replaced with who the agent is", level: "warn" }); c = "Rizwan built me. I’m the AI agent on his portfolio, here to help you learn about his work."; }
+          if (/\b(my name is nemotron|i(’|')?m nemotron|created by nvidia|nvidia researchers|trained by (openai|google|nvidia|meta)|i am chatgpt|developed by (openai|google|nvidia))\b/i.test(c)) { emit({ type: "trace", step: "output guard", detail: "the model spoke as its vendor · replaced with who built this agent", level: "warn" }); c = "Rizwan built me. I’m the agent on his portfolio, here to answer questions about his work."; }
           if (BAD_OUTPUT.test(msg.content)) { emit({ type: "trace", step: "output guard", detail: "blocked unsafe model output (a secret, the prompt, or a job-seeking claim)", level: "warn" }); c = REFUSAL; }
           // generic model refusals ("I can't comply.") speak in the site's own voice
-          else if (/^(sorry|i(’|')?m sorry|i can(’|')?t|i cannot|i won(’|')?t|i(’|')?m unable)\b/i.test(c) && !isRefusal(c)) { emit({ type: "trace", step: "harness", detail: "normalised a generic refusal", level: "info" }); c = REFUSAL; }
+          // a generic refusal ("I can't rank his projects") to a work question: the next model gets the turn once; a
+          // long one is an answer that merely opens that way and is kept; only a short one becomes the site's line
+          else if (/^(sorry|i(’|')?m sorry|i can(’|')?t|i cannot|i won(’|')?t|i(’|')?m unable)\b/i.test(c) && !isRefusal(c)) {
+            if (kind === "work" && !shrugged && !texts.length && deps.models[mi + 1]) { shrugged = true; throw new ModelError("gave a non-answer"); }
+            if (c.length < 40) { emit({ type: "trace", step: "harness", detail: "normalised a generic refusal", level: "info" }); c = REFUSAL; }
+          }
+          if (kind === "small_talk" && c) { const two = c.split(/(?<=[.!?])\s+/).slice(0, 2).join(" "); if (two.length < c.length) { emit({ type: "trace", step: "harness", detail: "small talk kept to two sentences", level: "info" }); c = two; } }
+          if (c && /^\s*(what|what(’|')s|which|who|where|when|how|why)\b/i.test(last)) c = c.replace(/^(yes|no)[,.!]\s+(\w)/i, (_m, _y, ch: string) => ch.toUpperCase());
           if (c) { texts.push(c); answered = true; }
         }
         const calls = msg.tool_calls ?? [];
@@ -543,7 +568,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           if (said.cut) emit({ type: "trace", step: "grounding", detail: `removed ${said.cut} sentence${said.cut > 1 ? "s" : ""} describing something that wasn’t shown`, level: "warn" });
           // a visitor who gave their name is greeted by it, whatever the model chose to say first
           const name = kind === "visitor_intro" ? (sorted.visitor ?? input.state?.visitor)?.name : undefined;
-          const greeting = said.text && name && !said.text.includes(name) ? `Hi ${name}. ${said.text}` : said.text;
+          const greeting = said.text && name && /^[A-Z][a-z]{1,20}$/.test(name) && !/^(Recruiter|Founder|Manager|Hiring|Engineer|Developer|Student|Friend)$/.test(name) && !said.text.includes(name) ? `Hi ${name}. ${said.text.replace(/^(hi|hello|hey)( there)?[,.!]\s*/i, "")}` : said.text;
           if (greeting) out({ type: "text", text: greeting });
         }
         if (spoke) openNamed(gr.text);
@@ -571,7 +596,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       if (deps.signal.aborted) return { mode: "aborted" };
       const status = e instanceof ModelError ? e.status : undefined, rest = e instanceof Error && /resting (\d+s)/.exec(e.message)?.[1];
       const why = rest ? `rate-limited (HTTP 429) · resting ${rest}` : status === 429 ? "rate-limited (HTTP 429)" : status && status >= 500 ? `provider error (HTTP ${status})`
-        : status ? `rejected (HTTP ${status})` : e instanceof Error && e.name === "TimeoutError" ? "timed out" : e instanceof Error && e.message === "returned nothing" ? "returned nothing" : "failed";
+        : status ? `rejected (HTTP ${status})` : e instanceof Error && e.name === "TimeoutError" ? "timed out" : e instanceof Error && e.message === "returned nothing" ? "returned nothing" : e instanceof Error && e.message === "gave a non-answer" ? "gave a non-answer" : "failed";
       // say where the run goes next: another key for the same model, the next model, another provider, or the router
       const next = deps.models[mi + 1], base0 = (n: string) => n.split(" · ")[0];
       const provider = (n: string) => (/gemini/i.test(n) ? "gemini" : /openrouter/i.test(n) ? "openrouter" : /nemotron/i.test(n) ? "nvidia" : "groq");

@@ -45,6 +45,23 @@ const Body = z.object({
   threadId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(),
 });
 
+/** Why a finished turn counts as weak, or null: a dead-end line on a question that was not refused on purpose, a
+ *  fallback that spoke because no model's answer survived, or a visitor kept waiting. Never fires for a visitor who
+ *  took the model offline (the router answering is the point), nor for the deliberate refusals. */
+export function weakReply(question: string, events: AgentEvent[], meta: RunMeta | undefined, ms: number, killed: boolean): string | null {
+  if (killed || !meta || meta.mode === "aborted") return null;
+  const text = events.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ").trim();
+  const trace = events.filter((e) => e.type === "trace").map((e) => (e.type === "trace" ? `${e.step} ${e.detail}` : "")).join("\n");
+  const refusedOnPurpose = /\b(personal|abusive|accusation|off_topic) · fixed reply|injection attempt refused|off-scope request refused/.test(trace) || meta.mode === "guard";
+  if (!text) return "empty";
+  if (refusedOnPurpose) return null;
+  if (/^(Outside my lane|Not sure what you mean|His write-up (only covers his work|doesn’t cover that|doesn't cover that)\.?$|Here’s what I found)/.test(text)) return "dead-end";
+  if (meta.mode === "router") return "router-answered";
+  if (/model gave no answer|removed (\d+) of \1 sentence/.test(trace)) return "answer-discarded";
+  if (ms > 8000) return "slow";
+  return null;
+}
+
 export interface HandlerDeps {
   models: () => ModelClient[];
   screen: Screen;
@@ -183,6 +200,10 @@ export async function handleAgent(req: Request, deps: HandlerDeps, ip = "anon"):
         controller.close();
         // the visitor already has the answer; the log write runs after the response, and never fails the turn
         const row = { session: parsed.threadId, turn: history.length, question: turns.at(-1)!, events: seen, meta, ms: deps.now() - now, killed: parsed.killModel, country, error };
+        // a reply that ran without an error can still be a bad one: those are reported as warnings, with the question,
+        // the reply and the trace, so a weak answer is seen without a visitor having to send a screenshot
+        const weak = weakReply(turns.at(-1)!, seen, meta, row.ms, parsed.killModel);
+        if (weak) Sentry.captureMessage(`agent weak reply: ${weak}`, { level: "warning", tags: { reason: weak, mode: meta?.mode ?? "none" }, extra: { question: turns.at(-1)!.slice(0, 500), reply: seen.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ").slice(0, 800), trace: seen.filter((e) => e.type === "trace").map((e) => (e.type === "trace" ? `${e.step}: ${e.detail}` : "")).slice(0, 30), ms: row.ms, turn: history.length } });
         if (deps.log) waitUntil(deps.log(row).catch((e) => console.error("turn log failed", e instanceof Error ? e.message : e)));
         if (tt) waitUntil(tt.end({ meta, events: seen, error }).catch((e) => console.error("opik trace failed", e instanceof Error ? e.message : e)));
       }
