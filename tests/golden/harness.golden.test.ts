@@ -553,9 +553,9 @@ describe("golden · empty replies and the hiring question", () => {
     expect(r.text).toMatch(/strongest evidence/); expect(r.meta.model).toBe("openrouter · free models");
     expect(r.of("trace").some((t) => /returned nothing/.test(t.detail))).toBe(true);
   });
-  it("'why should we hire him?' is answered from his facts at once", async () => {
-    const r = await turn({ turns: ["Why should we hire him?"] }, [never()]);
-    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/strongest evidence is PACK/);
+  it("'why should we hire him?' with every model down still gets the written evidence line from the router", async () => {
+    const r = await turn({ turns: ["Why should we hire him?"] }, [scripted("a", [new Error("down")])]);
+    expect(r.meta.mode).toBe("router"); expect(r.text).toMatch(/doesn’t fall over/);
   });
 });
 
@@ -805,7 +805,7 @@ describe("golden · ratings, seniority, leadership, startups, role fit, skill-li
   it("'fit for a data scientist role' with nothing pasted asks for the requirements and says where his work sits", async () => {
     const r = await fixed("is he a good fit for a data scientist role");
     expect(r.text).toMatch(/^Paste the role’s requirements and I’ll map each one to his work\. One thing up front: his work is applied LLM engineering/);
-    expect((await fixed("would he fit a devops role")).text).toMatch(/^Paste the role’s requirements and I’ll map each one to his work\. His strongest evidence: PACK/);
+    expect((await fixed("would he fit a devops role")).text).toMatch(/^Paste the role’s requirements and I’ll map each one to his work\. In short: His stuff doesn’t fall over/);
   });
   it("'roast him' gets a roast built from facts, no model", async () => {
     const r = await fixed("roast him");

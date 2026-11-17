@@ -30,8 +30,13 @@ export interface RunMeta {
 
 /** One exchange: what the visitor said and, once answered, what the agent replied and showed. */
 export interface Exchange { user: string; agent?: string; showed?: string[] }
+/** How the visitor asked to be answered; absent means the default voice. */
+export type Style = "short" | "friendly" | "formal" | "detailed";
+export const STYLES: readonly Style[] = ["short", "friendly", "formal", "detailed"];
 export interface RunInput {
   turns: string[];
+  /** the reply style the visitor chose in the composer */
+  style?: Style;
   /** the conversation so far, newest last (its `user` fields are `turns`); absent from old clients */
   history?: Exchange[];
   shown: string[];

@@ -196,7 +196,7 @@ describe("router (deterministic fallback)", () => {
     expect(text("Does he know REST APIs")).toMatch(/^REST APIs is in his toolkit, but none of his public projects shows it yet\.$/);
     expect(text("does he know node.js?")).toMatch(/shows in Wanderlust/);
     expect(text("does he know Azure Functions?")).toMatch(/Novulis Consulting/);
-    expect(text("Why should I hire him over other freshers?")).toMatch(/^His strongest evidence is PACK/);
+    expect(text("Why should I hire him over other freshers?")).toMatch(/^His stuff doesn’t fall over/);
     expect(text("Is he open to work?")).not.toMatch(/\bopen to (work|roles)\b|looking/i);
     expect(text("Did he build PACK alone?")).toMatch(/Team of two with Mahesh Babu Kona/);
     expect(text("Where does he work?")).toBe("Associate Software Engineer (R&D) at Novulis Consulting, Jun 2026 – now: Full-time in Bengaluru: researching emerging technology, building prototypes and proofs of concept, and full-stack product work on Azure (App Service, Functions, Azure OpenAI, DevOps, Blob Storage and Azure SQL) and Power Platform.");
@@ -456,5 +456,14 @@ describe("a toolkit term is attributed through its own pattern", () => {
   it("'RAG' is not a misattribution for CCR, whose facts say retrieval and Pinecone; a tech a project never used still is", () => {
     expect(misattributedTech("CCR Compliance Advisor is his RAG project: it cites a section for every claim.")).toEqual([]);
     expect(misattributedTech("PACK stores its game state in Pinecone.")).toContain("pinecone");
+  });
+});
+
+describe("grounding · hyphenated words and temporal glue", () => {
+  it("'mar-may' and 'web-app' are in the facts when their parts are; 'prior' carries no claim", async () => {
+    const { unsupported } = await import("@/agent/grounding");
+    const src = "software engineering intern (r&d) at novulis consulting, mar – may 2026. cyber security intern (web application vapt) at supraja technologies, jun – sep 2025: web application vulnerability assessment";
+    expect(unsupported("Prior to that he interned at Novulis (Mar-May 2026) and at Supraja Technologies (Jun-Sep 2025) doing web-app vulnerability assessment.", src)).toEqual([]);
+    expect(unsupported("He interned at Novulis building Kubernetes-operators and Terraform-modules for Shopify.", src).length).toBeGreaterThan(0);
   });
 });

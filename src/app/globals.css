@@ -313,6 +313,8 @@
   .sugg button kbd { font:400 11px/16px var(--f-mono); color:var(--muted); }
   @media (hover:hover) { .sugg button:hover { border-color:var(--ink); background:var(--panel); } }
   .sugg button:active { transform:scale(.97); }
+  .style { all:unset; cursor:pointer; flex:none; box-sizing:border-box; height:32px; padding:0 28px 0 var(--s3); font:inherit; font-size:13px; color:var(--soft); border:1px solid var(--line); background:var(--bg) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4' fill='none' stroke='%23777' stroke-width='1.5'/></svg>") no-repeat right 8px center/12px; transition:border-color var(--fast) var(--ease); }
+  .style:hover, .style:focus-visible { border-color:var(--ink); color:var(--ink); }
   .breaker { all:unset; cursor:pointer; flex:none; display:inline-flex; align-items:center; gap:var(--s2); height:32px; padding:0 var(--s3); font-size:13px; border:1px solid rgba(185,58,11,.35); color:var(--err); background:#fbf1ec; transition:border-color var(--fast) var(--ease), transform 120ms var(--ease); }
   .breaker:hover { border-color:var(--err); }
   .breaker:active { transform:scale(.97); }
