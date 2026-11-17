@@ -25,7 +25,7 @@ describe("golden · the model answers whenever it can", () => {
     const r = await turn({ turns: ["Why should we hire him?"] }, [m]);
     expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/PACK/);
     const down = await turn({ turns: ["Why should we hire him?"] }, [scripted("a", [new Error("down")])]);
-    expect(down.meta.mode).toBe("router"); expect(down.text).toMatch(/strongest evidence is PACK/);
+    expect(down.meta.mode).toBe("router"); expect(down.text).toMatch(/agents keep working when things go wrong/);
   });
   it("'who the hell is he?' called an accusation by the classifier is still a question about him", async () => {
     const m = scripted("a", [say("Syed Mohammad Rizwan is an AI engineer in Bangalore who builds AI agents.", call("suggest", { options: ["x"] }))]);
@@ -63,7 +63,7 @@ describe("golden · panels are not repeated", () => {
   });
   it("the canned 'why hire him' line with every model down shows his profile once, not twice", async () => {
     const r = await turn({ turns: ["Why should we hire him?"], shown: ["profile"] }, [scripted("a", [new Error("down")])]);
-    expect(r.text).toMatch(/strongest evidence/); expect(r.of("panel").length).toBe(0);
+    expect(r.text).toMatch(/agents keep working/); expect(r.of("panel").length).toBe(0);
   });
 });
 

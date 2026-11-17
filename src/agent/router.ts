@@ -268,7 +268,7 @@ export function factAnswer(lastUser: string, emit: Emit, loose = false, shown: r
   // "is he a fit for a data scientist role?" with no requirements pasted: ask for them, and say where his work sits
   if (re(/\b(fit|fits|suited|suitable|right|good|match|matches|hire\w*|consider\w*)( for| as| in| into)? (a |an |the )?[\w\s-]{2,30}?(role|position|job|team|opening|engineer|developer)\b/) && !re(/,.*,/) && lastUser.length < 140 && !re(/\b(hire him|hiring him|why)\b/)) {
     const research = re(/data scien\w*|\bml\b|machine learning|research|model training|deep learning/);
-    say(`Paste the role’s requirements and I’ll map each one to his work.${research ? " One thing up front: his work is applied LLM engineering, calling and orchestrating models rather than training them." : ` His strongest evidence: ${WHY_HIM.replace(/^His strongest evidence is /, "")}`}`);
+    say(`Paste the role’s requirements and I’ll map each one to his work.${research ? " One thing up front: his work is applied LLM engineering, calling and orchestrating models rather than training them." : ` In short: ${WHY_HIM}`}`);
     call("suggest", { options: ["Why should we hire him?", "What are his gaps?", "Everything he’s built"] }); return true;
   }
   // "show me his resume", "cv?": the resume, once the visitor approves; a pasted job description is handled above
