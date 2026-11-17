@@ -23,9 +23,11 @@ import { runAgent, SYSTEM } from "./run";
 import { ALL_FACTS_SOURCE, TOOL_DEFS, toolContext } from "./tools";
 import type { AgentEvent, Exchange, ModelClient, RunMeta, Screen } from "./types";
 
-// modelRunsPerDay: a run makes 2–3 model requests. Groq's free tier allows 1,000 requests a day per model per key, and
-// there are three keys over two models (about 6,000 requests); NVIDIA's Nemotron has no daily cap, and Gemini and
-// OpenRouter add their own. 1,500 runs stays well inside Groq alone; the chain moves past a key once it is limited.
+// modelRunsPerDay, measured 2026-11-18 from the providers' own rate-limit headers: each of the three Groq keys allows
+// 1,000 requests a day per model (gpt-oss-120b and -20b), 6,000 in all, and a run makes 2–3 requests, so 1,500 runs
+// stays inside Groq. NVIDIA and Gemini send no limit headers (their caps are unknown); OpenRouter's free models were
+// out of their daily quota. The tighter limit is per minute: 8,000 tokens per key and model, against about 5,700
+// prompt tokens a turn, so one request per key per minute.
 // turnChars fits a pasted job description; bodyBytes fits six of them
 // the prompt, the tools and every fact the tools return: changing any of them must not serve old answers
 const PROMPT_HASH = [...`${SYSTEM}${JSON.stringify(TOOL_DEFS)}${ALL_FACTS_SOURCE}${toolContext("show_harness")}`].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7).toString(36);
