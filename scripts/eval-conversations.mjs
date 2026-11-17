@@ -12,7 +12,7 @@ const convos = JSON.parse(readFileSync(new URL("../tests/fixtures/conversations.
 const gap = Number(process.env.GAP_MS ?? 8000);
 
 async function ask(history, shown, state) {
-  const r = await fetch(`${base}/api/agent`, { method: "POST", headers: { "content-type": "application/json", accept: "text/event-stream" }, body: JSON.stringify({ history, shown, state }) });
+  const r = await fetch(`${base}/api/agent`, { method: "POST", headers: { "content-type": "application/json", accept: "text/event-stream", "x-agent-eval": "conversations" }, body: JSON.stringify({ history, shown, state }) });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const out = { text: "", panels: [], meta: null, state: null, trace: [] };
   for (const line of (await r.text()).split("\n")) {

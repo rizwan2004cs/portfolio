@@ -1,0 +1,33 @@
+# Every night (03:30 IST), 162 realistic visitor messages go to the live agent and every reply is checked: stock
+# non-answers, replies with no model behind them, the agent speaking as its vendor or as Rizwan, and slow turns. The
+# report lands on the run summary; the job fails on more than three dead ends or any leak. No secrets needed.
+name: Nightly battery
+
+on:
+  schedule:
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Categories to run, comma-separated (blank for all)"
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  battery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      URL: ${{ vars.SITE_URL || 'https://mohammad-rizwan.tech' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run the battery against the live agent
+        env:
+          ONLY: ${{ inputs.only || '' }}
+          GAP_MS: "6000"
+        run: node scripts/eval-battery.mjs "$URL"
