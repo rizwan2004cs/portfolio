@@ -95,3 +95,32 @@ describe("golden · reply style", () => {
     expect(String(d.calls[0][0].content)).not.toMatch(/Reply style/);
   });
 });
+
+describe("golden · the transcript's markers never reach the visitor", () => {
+  it("a model that copies '[showed: his profile]' into its reply has it cut", async () => {
+    const m = scripted("a", [say("[showed: his profile] He is an AI engineer in Bangalore who builds AI agents.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["who is he ?"], shown: ["profile"] }, [m]);
+    expect(r.text).toMatch(/^He is an AI engineer/); expect(r.text).not.toMatch(/showed/);
+  });
+});
+
+describe("golden · written facts are the model's notes, not the reply", () => {
+  it("'is he currently working' reaches the model with his record as notes, and the model answers yes first", async () => {
+    const m = scripted("a", [say("Yes. He has been an Associate Software Engineer (R&D) at Novulis Consulting since June 2026.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["is he currently working"] }, [m]);
+    expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/^Yes\./);
+    expect(String(m.calls[0][0].content)).toMatch(/your notes[^]*Novulis/);
+  });
+  it("with every model down the written answer is said as before", async () => {
+    const r = await turn({ turns: ["is he currently working"] }, [scripted("a", [new Error("down")])]);
+    expect(r.meta.mode).toBe("facts"); expect(r.text).toMatch(/Novulis/);
+  });
+});
+
+describe("golden · two words that name his employer are a question, not noise", () => {
+  it("'before novulis' called unclear by the classifier still reaches the model", async () => {
+    const m = scripted("a", [say("Before Novulis he was a Cyber Security intern at Supraja Technologies, June to September 2025.", call("suggest", { options: ["x"] }))]);
+    const r = await turn({ turns: ["before novulis"] }, [m], undefined, undefined, kindIs("unclear", 0.9));
+    expect(r.meta.mode).toBe("model"); expect(r.text).toMatch(/Supraja/);
+  });
+});

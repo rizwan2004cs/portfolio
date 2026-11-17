@@ -465,7 +465,8 @@ export function mountAgent(shell: HTMLElement): () => void {
       const siteQ = /^(how does (this|the) (site|agent|portfolio|chat) work\??|how (is|was) (this|the) (site|agent) (built|made)\??|internals( of (this|the) (site|agent))?|show (me )?(the )?harness)$/i.test(text);
       const offlineQ = /^(take the model offline|kill the model)$/i.test(text), restoreQ = /^(restore|bring back|turn on)( the)? model$/i.test(text);
       // commands that never need a model: answered here, instantly, and can't be misread
-      const profileQ = /^((view|show|open|see)\s)?(his\s)?profile$|^(ask |tell me )?about (rizwan|him)$|^who(’|')?s rizwan\??$|^who is (he|rizwan)\??$/i.test(text);
+      // only the explicit command opens the card in the browser; "who is he?" is a question and goes to the agent
+      const profileQ = /^((view|show|open|see)\s)(his\s)?profile$/i.test(text);
       const classicQ = /^(switch (to )?(the )?classic( mode| site| view)?|switch mode|(open |go to )?(the )?classic( site| mode| view)?)$/i.test(text);
       const resumeQ = /^((get|see|view|open|show|download)\s)?(his\s)?(resume|cv)$/i.test(text);
       const contactQ = /^(contact( rizwan| him)?|connect( with)?( rizwan| him)?|email( rizwan| him)?|(his )?linkedin|(his )?socials?|get in touch|how (do|can) i (reach|contact) (him|rizwan)\??|reach (him|rizwan))$/i.test(text);

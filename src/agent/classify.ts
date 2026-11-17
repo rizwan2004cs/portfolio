@@ -57,7 +57,7 @@ export function classifierMessages(text: string, previous?: Previous): ChatMessa
 
 /** Nemotron with a short timeout, on NVIDIA then OpenRouter; any failure falls back to the word rules, so the site never
  *  depends on an endpoint being up. A timeout stops the chain: the visitor is waiting. */
-export function nemotronClassifier(endpoints: ClassifierEndpoint[] | string | undefined, fetchImpl: typeof fetch = fetch, timeoutMs = 2000): Classifier {
+export function nemotronClassifier(endpoints: ClassifierEndpoint[] | string | undefined, fetchImpl: typeof fetch = fetch, timeoutMs = 1500): Classifier {
   const list = typeof endpoints === "string" ? classifierEndpoints(endpoints) : endpoints ?? [];
   const rules = (text: string, why: string): Classification => ({ kind: ruleKind(text), confidence: 1, source: "rules", note: why });
   if (!list.length) return async (text) => rules(text, "rules · no classifier key");
