@@ -6,6 +6,7 @@ import { neon } from "@neondatabase/serverless";
 import { FACTS } from "../src/content/facts";
 import { EMBED_DIMS, embed, vec } from "../src/server/retrieval";
 import { LIMITS_DDL } from "../src/server/limits";
+import { HEALTH_DDL } from "../src/server/health";
 
 for (const f of [".env.local", ".env.neon.local"]) {
   try { for (const line of readFileSync(f, "utf8").split("\n")) { const m = /^([A-Z_]+)=(.*)$/.exec(line.trim()); if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^"(.*)"$/, "$1"); } } catch { /* optional */ }
@@ -25,6 +26,7 @@ await sql.query(`create table if not exists facts (
   embedding halfvec(${EMBED_DIMS}) not null, updated_at timestamptz not null default now())`);
 await sql`create index if not exists facts_embedding_hnsw on facts using hnsw (embedding halfvec_cosine_ops)`;
 await sql.query(LIMITS_DDL); // the shared rate-limit counters live in the same database
+await sql.query(HEALTH_DDL); // and the model keys' shared health
 await sql`create index if not exists facts_tsv_gin on facts using gin (tsv)`;
 
 const have = new Set((await sql`select id from facts`).map((r) => String(r.id)));
