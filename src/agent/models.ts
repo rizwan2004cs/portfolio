@@ -39,7 +39,7 @@ function chatModel(name: string, url: string, key: string, body: Record<string, 
       // streamed, so a tool call shows the moment the model names it; the reply is still assembled whole before use
       const call = () => fetchImpl(url, {
         method: "POST",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(8_000)]),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(6_000)]),
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
         body: JSON.stringify({ ...body, messages, tools: TOOLS(), tool_choice: "auto", stream: true }),
       });

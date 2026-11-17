@@ -497,9 +497,9 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
           else if (bad.length === verdicts.length) emit({ type: "trace", step: "self-check", detail: `a second model rejected all ${verdicts.length} sentences the word check passed · not trusted, word check stands (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "warn" });
           else if (!bad.length) emit({ type: "trace", step: "self-check", detail: `a second model read all ${verdicts.length} sentences against the facts · supported (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "ok" });
           else {
-            for (const b of bad) { const p = gr.parts.find((x) => x.ok && x.s === b.sentence); if (p) { p.ok = false; p.why = "claims"; p.miss = [b.why || "second reader"]; gr.dropped.push([b.why || "second reader"]); } }
-            gr.text = gr.parts.filter((p) => p.ok).map((p) => p.s).join(" ") || gr.text;
-            emit({ type: "trace", step: "self-check", detail: `a second model read ${verdicts.length} sentences · removed ${bad.length}: ${bad.map((b) => `“${b.sentence.slice(0, 40)}…” (${b.why})`).join("; ")} (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "warn" });
+            // the second reader is a small model that is wrong about real projects often enough ("no such project" for
+            // Campus Premier League): its doubts are shown in the trace, and the sentence stays unless a rule rejected it
+            emit({ type: "trace", step: "self-check", detail: `a second model read ${verdicts.length} sentences · questioned ${bad.length}, kept (the rule checks passed them): ${bad.map((b) => `“${b.sentence.slice(0, 40)}…” (${b.why})`).join("; ")} (${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "warn" });
           }
         }
         // a sentence dropped for its wording alone gets a second reading: the closest facts are retrieved by meaning and
@@ -569,7 +569,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       if (rest) resting.push(model.name);
       else { flushSkips(model.name); emit({ type: "trace", step: "model", detail: `${model.name} ${why} ${then}`, level: "err" }); }
       if (messages.length > base.length) handoff = true;
-      if (++mi < deps.models.length) continue;
+      // a visitor waits for one answer, not for every model's timeout in turn: after twelve seconds the written
+      // answer or the router takes over
+      if (++mi < deps.models.length && Date.now() - t0 < 12_000) continue;
+      if (mi < deps.models.length) emit({ type: "trace", step: "model", detail: "twelve seconds spent on models that did not answer · stopped trying", level: "warn" });
       flushSkips("deterministic router");
       // every model is down: if something is already on screen, stop with what's verified rather than a second answer
       if (visible) {

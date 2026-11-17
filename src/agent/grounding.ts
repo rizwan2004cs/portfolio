@@ -91,7 +91,8 @@ export function roleBleed(sentence: string): string[] {
   return borrowed.length >= 2 ? borrowed : [];
 }
 
-const PRIZE = /\b(won|wins?|winner|winning|prizes?|awards?|awarded|placed)\b/i;
+// an achievement claim: "won", "prize", "award", "placed second". "wins", "winning" and a bare "placed" are ordinary words
+const PRIZE = /\b(won|winner|prizes?|awards?|awarded|placed (first|second|third|1st|2nd|3rd|top))\b/i;
 /** A prize claim must belong to the event it names: "won … for building DUO" fails when the facts only say
  *  he built DUO there. Returns the names in the sentence that no prize-bearing source segment mentions. */
 export function misattributed(sentence: string, src: string): string[] {

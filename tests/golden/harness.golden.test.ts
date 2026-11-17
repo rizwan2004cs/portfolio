@@ -960,12 +960,12 @@ describe("follow-ups with the conversation in hand", () => {
     const r = await turn({ turns: [prev.user, "would he suit us?"], history: [prev, { user: "would he suit us?" }], shown: ["pack"] }, [m]);
     expect(r.text).toBe("Which role are you hiring for?"); expect(r.of("suggest").at(-1)!.options.slice(0, 2)).toEqual(["Backend engineer", "AI engineer"]); expect(r.meta.mode).toBe("model");
   });
-  it("a long answer gets a second reader: a sentence it rejects is dropped even when the word check let it through", async () => {
+  it("a long answer gets a second reader: its doubts are shown in the trace, and a sentence the rule checks passed stays", async () => {
     const m = scripted("gpt-oss-120b", [say("A LangGraph state machine runs the game. Seven agents reason, speak and bet. Each agent keeps private reasoning while the UI shows dialogue.", call("open_project", { id: "pack" }), call("suggest", { options: ["x"] }))]);
     const selfCheck = async (draft: string) => draft.split(/(?<=\.)\s+/).map((sentence, i) => ({ sentence, ok: i !== 1, why: i === 1 ? "bet is not in the facts" : "" }));
     const r = await turn({ turns: ["how does PACK work?"], selfCheck }, [m]);
-    expect(r.text).toBe("A LangGraph state machine runs the game. Each agent keeps private reasoning while the UI shows dialogue.");
-    expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/a second model read 3 sentences · removed 1/);
+    expect(r.text).toBe("A LangGraph state machine runs the game. Seven agents reason, speak and bet. Each agent keeps private reasoning while the UI shows dialogue.");
+    expect(r.of("trace").map((e) => e.detail).join("\n")).toMatch(/a second model read 3 sentences · questioned 1, kept/);
     const harsh = await turn({ turns: ["how does PACK work?"], selfCheck: async (draft: string) => draft.split(/(?<=\.)\s+/).map((sentence) => ({ sentence, ok: false, why: "no" })) }, [m]);
     expect(harsh.text).toMatch(/^A LangGraph state machine runs the game\. Seven agents/); expect(harsh.of("trace").map((e) => e.detail).join("\n")).toMatch(/rejected all 3 sentences .* not trusted/);
     const quiet = await turn({ turns: ["how does PACK work?"], selfCheck: async () => null }, [m]);
