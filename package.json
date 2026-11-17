@@ -20,12 +20,12 @@
     "eval:deepeval": "cd evals && DEEPEVAL_TELEMETRY_OPT_OUT=YES .venv/bin/deepeval test run . && .venv/bin/python summarize.py"
   },
   "dependencies": {
-    "@ag-ui/core": "1.0.3",
-    "@ag-ui/encoder": "1.0.3",
+    "@ag-ui/core": "1.0.5",
+    "@ag-ui/encoder": "1.0.5",
     "@neondatabase/serverless": "1.2.0",
     "@sentry/nextjs": "11.9.0",
     "@vercel/analytics": "2.0.1",
-    "@vercel/functions": "3.10.3",
+    "@vercel/functions": "3.11.3",
     "@vercel/speed-insights": "2.0.0",
     "next": "16.4.6",
     "opik": "2.2.121",
@@ -34,7 +34,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@mermaid-js/mermaid-cli": "12.0.0",
+    "@mermaid-js/mermaid-cli": "12.2.0",
     "@playwright/test": "1.64.1",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
@@ -46,5 +46,9 @@
     "tsx": "^4.23.15",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
+  },
+  "overrides": {
+    "glob@>=9.0.0 <=14.0.1": "14.0.6",
+    "minimatch@>=7.0.0 <11.0.1": "11.0.9"
   }
 }
