@@ -302,7 +302,8 @@
   /* composer */
   .composer { flex:none; border-top:1px solid var(--line); padding:var(--s3) var(--s6) var(--s4); background:var(--bg); }
   .row2 { max-width:720px; margin:0 auto var(--s3); display:flex; gap:var(--s2); align-items:center; }
-  .sugg { flex:1; display:flex; flex-wrap:wrap; gap:var(--s2); min-height:32px; }
+  .sugg { flex:1; min-width:0; display:flex; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; gap:var(--s2); min-height:32px; }
+  .sugg::-webkit-scrollbar { display:none; }
   /* narrow screens: chips get their own full-width row above Trace / Kill, and fade at the edge so a cut chip reads as "scroll" */
   @media (max-width:900px) {
     .row2 { flex-wrap:wrap; justify-content:flex-end; }

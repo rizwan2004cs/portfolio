@@ -378,7 +378,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   let looked = false, tools = 0, drops = 0, lastTitle: string | null = subjectProject?.title ?? null, lastFacts: string[] = subjectProject?.facts ?? [], mi = 0;
   // the chain in order of availability: a slot that just answered goes first, throttled or empty ones drop back
   const chain = orderByHealth(deps.models);
-  if (chain.some((m, i) => m !== deps.models[i])) emit({ type: "trace", step: "model", detail: `chain ordered by availability: ${chain.map((m) => m.name).join(" → ")}`, level: "info" });
+  if (chain.some((m, i) => m !== deps.models[i])) emit({ type: "trace", step: "model", detail: `chain ordered by availability: ${chain.slice(0, 3).map((m) => m.name).join(" → ")}${chain.length > 3 ? ` → ${chain.length - 3} more` : ""}`, level: "info" });
   deps = { ...deps, models: chain };
   // facts of projects the visitor already has on screen are fair sources for follow-ups ("what vector DB does it use?")
   // the model was given every fact, so every fact is a fair source; number, prize and scope checks stay relational

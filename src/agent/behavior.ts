@@ -64,7 +64,7 @@ export const BEHAVIOR: Record<Kind, Behavior> = {
   // a greeting or thanks is a conversation, not a lookup: the model answers it in context, these lines only when it can't
   small_talk: {
     describe: "Greetings, thanks, acknowledgements or goodbyes, with no question or request in them (asking for a joke or a story is off_topic)",
-    tone: "This is a greeting, thanks, an acknowledgement or a goodbye. Answer in one or two warm, plain sentences in your own words, matching what they said, and name one concrete next step (a project, a job description to match, his resume). No lists, no panels, no facts about him unless the conversation already raised them.",
+    tone: "This is a greeting, thanks, an acknowledgement or a goodbye. Reply to what they actually said first, the way a person would: 'how are you?' gets 'Doing well, thanks' before anything else, 'thanks' gets 'anytime', 'good morning' gets a good morning back. Answer in one or two warm, plain sentences in your own words, and name one concrete next step (a project, a job description to match, his resume). No lists, no panels, no facts about him unless the conversation already raised them.",
     fallback: (t) => /\b(bye|goodbye|see (you|ya))\b/i.test(t) ? "Thanks for stopping by. His resume and contact details are a click away if you need them."
       : /\b(thanks|thank|thx|ty|cheers)\b/i.test(t) ? "Anytime. Ask about another project, or grab his resume."
       : /^\s*(hi+|hey+|hello+|helo|hiya|yo|sup|howdy|namaste|hola|good (morning|afternoon|evening|night)|gm)\b/i.test(t) ? "Hi! I’m Rizwan’s agent. Ask about his projects or experience, or paste a job description to see how he fits."
