@@ -50,6 +50,7 @@ How to answer:
 - Use only the knowledge above. If it doesn't cover something, say "His write-up doesn't cover that" for the specific thing. Never guess, never generalise, never say whether he is looking for a job.
 - To compare projects ("PACK vs FinBoom", "which is more production-ready"), call compare_projects with their ids and write two or three sentences from its rows; never compare from memory.
 - Show, don't just tell: open the most relevant project with open_project (view="architecture" for engineering questions), at most two per answer; list_projects for "what has he built", with ids when they ask for a kind of project ("his AI projects"); show_profile for questions about him, with focus="events" for events or prizes and focus="work" for his jobs; show_harness only for questions about this site itself. Don't re-open anything listed as already on screen.
+- Answer the question that was asked, first. A yes/no question ("is he currently working?", "does he know Python?") starts with Yes or No, then one sentence of the fact behind it; do not recite his whole record, and add nothing they did not ask about.
 - Sound like a person talking, not a spec sheet: plain words, short sentences, one idea each. No parentheses stuffed with details, no strings of numbers; pick the one detail that makes the point and say it the way you would across a table.
 - Third person ("his", "Rizwan's"). No markdown, no lists, no apologies, no "Would you like…".
 - Anything unrelated to Rizwan or this site: one short sentence, e.g. "Outside my lane. I only cover Rizwan's work."
@@ -179,6 +180,10 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // a visitor who took the model offline gets no AI anywhere, the classifier included
   const history: Exchange[] = input.history?.length ? input.history : input.turns.map((user) => ({ user }));
   const before = history.length > 1 ? history.at(-2) : undefined;
+  // the facts closest in meaning are fetched while the classifier runs, not after it: one wait instead of two
+  const wantsFacts = !!deps.retriever && !input.killModel && !scoreProjects(last).some((x) => x.s > 0) && !clearPick(subject);
+  const tFacts = Date.now();
+  const finding = wantsFacts ? deps.retriever!.search(last, 4, deps.signal).catch(() => []) : null;
   const sorted = await (input.killModel || !deps.classify ? Promise.resolve<Classification>({ kind: ruleKind(last), confidence: 1, source: "rules", note: "rules" }) : deps.classify(last, deps.signal, before ? { user: before.user, agent: before.agent } : undefined));
   // "unclear" is a first-turn verdict: two words after a reply ("Not animal") are a follow-up, and the model has the transcript
   // an introduction with no fields from the classifier still yields the name written in it
@@ -220,9 +225,9 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // a question the word scoring cannot place ("something with retrieval and citations?") still reaches the model with
   // the facts closest to it in meaning, from the index; the tools remain the only way to show anything
   let hits: Awaited<ReturnType<Retriever["search"]>> = [];
-  if (deps.retriever && !input.killModel && !scoreProjects(last).some((x) => x.s > 0) && !clearPick(subject)) {
-    const t0 = Date.now();
-    hits = await deps.retriever.search(last, 4, deps.signal).catch(() => []);
+  if (finding) {
+    const t0 = tFacts;
+    hits = await finding;
     if (hits.length) {
       context += `${context ? "\n" : ""}Facts closest to this question (from his write-ups; cite them, don't add to them):\n${hits.map((h) => `- ${h.text}`).join("\n")}`;
       emit({ type: "trace", step: "retrieval", detail: `${hits.length} facts by meaning and keywords (${hits.map((h) => h.project ?? h.kind).join(", ")} · ${((Date.now() - t0) / 1000).toFixed(1)}s)`, level: "info" });
@@ -244,8 +249,13 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // the deterministic "not sure what you mean" is only ever a first-turn answer: after a reply, a short message the facts
   // can't place is a follow-up, and the model reads it with the conversation
   const isFact = !natural && factAnswer(subject, (e) => factual.push(e), false, input.shown, input.state) && !(history.length > 1 && isUnclearReply(factual));
+  // a written fact line is spoken as it is only when the turn is an action (an approval, a fit report, a table, a
+  // list) or no model can be asked; otherwise it becomes the model's notes, and the model answers the question asked
+  const EXACT = new Set(["offer_resume", "offer_contact", "match_role", "compare_projects", "switch_mode", "ask_visitor", "list_projects", "show_harness"]);
+  const exact = isFact && (input.killModel || !deps.models.length || /\b(resume|cv|contact|email|linkedin|phone)\b/i.test(last) || factual.some((e) => e.type === "approval" || (e.type === "tool" && EXACT.has(e.name))));
+  const notes = isFact && !exact ? factual.filter((e) => e.type === "text").map((e) => (e.type === "text" ? e.text : "")).join(" ") : "";
   const g = input.killModel ? { ok: true, note: "skipped · model offline, router can't be injected" }
-    : isFact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await guarding!;
+    : exact ? { ok: true, note: "skipped · answered from his facts, no model to steer" } : await guarding!;
   emit({ type: "trace", step: "guard", detail: g.note, level: g.ok ? "ok" : "warn" });
   if (!g.ok) {
     emit({ type: "text", text: GUARD_REFUSAL });
@@ -333,13 +343,16 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   };
   const fallbackToRouter = (detail: string): RunMeta => {
     emit({ type: "trace", step: "fallback", detail, level: "warn" });
+    // the written line the model was given as notes is the answer when no model could say it better
+    if (notes) { factual.forEach(out); return finish({ mode: "facts" }); }
     if (natural) { emit({ type: "text", text: naturalLine() }); emit({ type: "suggest", options: BEHAVIOR[kind].chips }); spoke = true; return finish({ mode: "scope" }); }
     router(subject, out, { facts: hits.map((h) => h.text), shown: input.shown });
     return finish({ mode: "router" });
   };
 
   // one-answer questions (availability, experience, who built it) never need a model, so they never risk one
-  if (isFact) {
+  if (notes) emit({ type: "trace", step: "facts", detail: "his record answers this · handed to the model as notes, to say in its own words", level: "info" });
+  if (exact) {
     emit({ type: "trace", step: "facts", detail: "a question with one factual answer · answered from his facts, no model call", level: "ok" });
     factual.forEach(out);
     return finish({ mode: "facts" });
@@ -348,7 +361,8 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   if (!deps.models.length) { emit({ type: "trace", step: "model", detail: "no model configured", level: "err" }); return fallbackToRouter(ROUTER); }
 
   const base: ChatMessage[] = [
-    { role: "system", content: SYSTEM + (context ? `\n${context}` : "") + (BEHAVIOR[kind].tone ? `\n${BEHAVIOR[kind].tone}` : "") + (input.style && STYLE_TONE[input.style] ? `\n${STYLE_TONE[input.style]}` : "") },
+    { role: "system", content: SYSTEM + (context ? `\n${context}` : "") + (BEHAVIOR[kind].tone ? `\n${BEHAVIOR[kind].tone}` : "") + (input.style && STYLE_TONE[input.style] ? `\n${STYLE_TONE[input.style]}` : "")
+      + (notes ? `\nWhat his record says about this exact question (your notes: every fact you need is here; do not read them out, answer the question): ${notes}` : "") },
     ...transcript(history),
   ];
 
@@ -368,6 +382,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
   // the model was given every fact, so every fact is a fair source; number, prize and scope checks stay relational
   let source = `${ALL_FACTS_SOURCE} ${KNOWLEDGE} ${onScreen.map((p) => `${p.facts.join(" ")} ${p.stack.join(" ")}`).join(" ")}`;
   // a playful answer may use the question's own framing ("his superpower is…"): those words are the visitor's, not claims
+  if (notes) source += ` ${notes}`;
   if (kind === "playful") source += ` ${last} superpower super power superhero hero spirit animal secret weapon kryptonite vibe tagline motto pitch words describe character would be like rate limits free tier ${PLAYFUL_IMAGES.join(" ")} ${PLAYFUL_WORDS.join(" ")}`;
   const texts: string[] = [];
   const t0 = Date.now();
@@ -392,6 +407,9 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         const realCall = (msg.tool_calls ?? []).some((c) => c.function.name !== "suggest");
         if (!msg.content?.trim() && !realCall && !texts.length && deps.models[mi + 1]) { model.mark?.(false); throw new ModelError("returned nothing"); }
         flushSkips(model.name); // this model answered: say which resting keys were passed over to reach it
+        // the transcript marks what earlier replies showed as "[showed: …]"; a model that copies the marker into its
+        // own reply has it cut before anything else reads the text
+        if (msg.content) msg.content = msg.content.replace(/\[showed:[^\]]*\]\s*/gi, "");
         const leak = leakedCalls(msg.content ?? "");
         if (leak.calls.length) {
           emit({ type: "trace", step: "harness", detail: `model typed ${leak.calls.length} tool call${leak.calls.length > 1 ? "s" : ""} as text · cut from the answer and run properly`, level: "info" });
@@ -464,7 +482,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
       // verify before the visitor sees it: every claim must come from this turn's sources
       const answer = texts.join(" ").trim();
       if (answer) {
-        const gr = groundAnswer(answer, source, last, lastTitle, `${source} ${ALL_FACTS_SOURCE}`, lastFacts, { loose: kind === "playful" || natural });
+        const gr = groundAnswer(answer, source, last, lastTitle, `${source} ${ALL_FACTS_SOURCE}`, lastFacts, { loose: kind === "playful" || natural || !!notes });
         // a long answer gets a second reader before the visitor does: one model read of every sentence against the
         // facts the tools returned; a sentence it rejects is dropped even when the word check let it through
         if (deps.selfCheck && !natural && kind !== "playful" && gr.parts.filter((p) => p.ok).length >= 3 && !deps.signal.aborted) {
@@ -530,6 +548,7 @@ async function runTurn(input: RunInput, emit: Emit, deps: RunDeps & { onClassifi
         return finish({ mode: "router" });
       }
       if (!spoke && !visible) {
+        if (notes) { emit({ type: "trace", step: "harness", detail: "model gave no answer → the written answer from his record", level: "warn" }); factual.forEach(out); return finish({ mode: "facts" }); }
         emit({ type: "trace", step: "harness", detail: "model gave no answer → deterministic router (no AI)", level: "warn" });
         router(subject, out, { facts: hits.map((h) => h.text), shown: input.shown });
         return finish({ mode: "router" });

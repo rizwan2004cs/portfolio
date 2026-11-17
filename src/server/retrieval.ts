@@ -63,7 +63,7 @@ export const vec = (v: number[]) => `[${v.map((x) => x.toFixed(6)).join(",")}]`;
 const within = <T,>(p: Promise<T>, ms: number): Promise<T> => Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(Object.assign(new Error("retrieval timed out"), { name: "TimeoutError" })), ms))]);
 
 /** The retriever, or undefined when either the database or the embedding key is missing (the word check still runs). */
-export function neonRetriever(url: string | undefined, key: string | undefined, fetchImpl: typeof fetch = fetch, timeoutMs = 3500, sqlImpl?: Sql): Retriever | undefined {
+export function neonRetriever(url: string | undefined, key: string | undefined, fetchImpl: typeof fetch = fetch, timeoutMs = 2000, sqlImpl?: Sql): Retriever | undefined {
   if (!url && !sqlImpl) return undefined;
   if (!key) return undefined;
   const sql: Sql = sqlImpl ?? (neon(url!) as unknown as Sql);
